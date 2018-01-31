@@ -5,7 +5,9 @@ from sqlalchemy.orm import sessionmaker
 
 from gtecs import params
 
-# TODO: build name from params
+
+__all__ = ['open_session', 'load_session']
+
 
 engine_string = 'mysql+pymysql://' + str(params.DATABASE_LOCATION)
 engine = create_engine(engine_string, echo=params.DATABASE_ECHO,

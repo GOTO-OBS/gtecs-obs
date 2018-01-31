@@ -12,6 +12,20 @@ from astropy.coordinates import Longitude
 from astropy import units as u
 
 
+__all__ = ['add_user', 'get_userkey', 'get_username', 'validate_user',
+           'get_filtered_queue', 'get_queue',
+           'get_pointings', 'get_pointing_by_id',
+           'get_mpointings', 'get_mpointing_by_id',
+           'get_exposure_set_by_id', 'get_survey_tile_by_name',
+           'get_expired_pointing_ids', 'get_expired_mpointing_ids',
+           'insert_items',
+           'bulk_update_pointing_status', 'bulk_update_mpointing_status',
+           '_make_random_pointing',
+           'markJobCompleted', 'markJobAborted',
+           'markJobInterrupted', 'markJobRunning',
+           ]
+
+
 def add_user(session, userName, password, fullName):
     """
     Add a user to the database.

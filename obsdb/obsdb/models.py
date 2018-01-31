@@ -11,6 +11,11 @@ from sqlalchemy.orm import column_property
 from astropy.time import Time
 from astropy import units as u
 
+
+__all__ = ['User', 'Event', 'EventTile', 'Survey', 'SurveyTile', 'ExposureSet',
+           'Pointing', 'ObservingBlock', 'Mpointing', 'ImageLog']
+
+
 Base = declarative_base()
 
 pointing_status_list = Enum('pending', 'running', 'completed',
@@ -18,6 +23,7 @@ pointing_status_list = Enum('pending', 'running', 'completed',
 
 mpointing_status_list = Enum('unscheduled', 'scheduled', 'completed',
                              'aborted', 'expired', 'deleted')
+
 
 class Event(Base):
 
@@ -298,6 +304,7 @@ class EventTile(Base):
         return template.format(
             self.tileID, self.ra, self.decl, self.probability, self.eventID,
             self.surveyTileID)
+
 
 class Survey(Base):
 

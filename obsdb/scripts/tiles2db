@@ -12,8 +12,7 @@ import numpy
 from astropy import units as u
 from astropy.time import Time
 
-from gtecs import params
-from gtecs import database as db
+import obsdb as db
 
 
 Tile = namedtuple('Tile', 'tel, ra, dec, time, dt, prob, cumprob, rank')

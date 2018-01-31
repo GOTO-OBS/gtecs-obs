@@ -3,19 +3,10 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from gtecs import params
-
-
 __all__ = ['open_session', 'load_session']
 
-
-engine_string = 'mysql+pymysql://' + str(params.DATABASE_LOCATION)
-engine = create_engine(engine_string, echo=params.DATABASE_ECHO,
-                       pool_pre_ping=True) # needs sqlalchemy >= 1.2
-
-
 @contextmanager
-def open_session():
+def open_session(host='localhost', echo=False):
     """
     Create a DB session context manager.
 
@@ -23,6 +14,15 @@ def open_session():
     to DB when scope closes and rolls back on exceptions.
 
     Needless to say it also closes the session when it goes out of scope.
+
+    Parameters
+    ----------
+    host : str, optional
+        the host location of the database
+        default is 'localhost'
+    echo : bool, optional
+        if true, will log all statements to the engines logger,
+        which defaults to stdout
 
     Returns
     -------
@@ -37,6 +37,11 @@ def open_session():
     >>>     newUser = User('sl', '1234', 'Stuey')
     >>>     session.add(newUser)
     """
+
+    location_string = 'goto:gotoobs@{}/goto_obs'.format(host)
+    engine_string = 'mysql+pymysql://{}'.format(location_string)
+    engine = create_engine(engine_string, echo=echo, pool_pre_ping=True)
+
     Session = sessionmaker(bind=engine)
     session = Session()
     try:
@@ -49,12 +54,21 @@ def open_session():
         session.close()
 
 
-def load_session(echo=False):
+def load_session(host='localhost', echo=False):
     """
     Create a DB session.
 
     By making a DB session this way, you must commit and rollback changes
     yourself.
+
+    Parameters
+    ----------
+    host : str, optional
+        the host location of the database
+        default is 'localhost'
+    echo : bool, optional
+        if true, will log all statements to the engines logger,
+        which defaults to stdout
 
     Returns
     -------
@@ -74,6 +88,11 @@ def load_session(echo=False):
     >>> finally:
     >>>    session.close()
     """
+
+    location_string = 'goto:gotoobs@{}/goto_obs'.format(host)
+    engine_string = 'mysql+pymysql://{}'.format(location_string)
+    engine = create_engine(engine_string, echo=echo, pool_pre_ping=True)
+
     Session = sessionmaker(bind=engine)
     session = Session()
     return session

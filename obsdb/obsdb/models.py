@@ -129,8 +129,8 @@ class User(Base):
     Examples
     --------
 
-        >>> from gtecs.database import *
-        >>> from gtecs.database import _make_random_pointing
+        >>> from obsdb import *
+        >>> from obsdb import _make_random_pointing
         >>>
         >>> bob = User(userName='bob', password='1234', fullName="Bob Marley")
         >>> session = load_session()
@@ -217,7 +217,7 @@ class EventTile(Base):
     Examples
     --------
 
-        >>> from gtecs.database import *
+        >>> from obsdb import *
 
         make a LIGO event to associate our tile with
 
@@ -405,7 +405,7 @@ class SurveyTile(Base):
     Examples
     --------
 
-        >>> from gtecs.database import *
+        >>> from obsdb import *
 
         make a survey to associate our tile with
 
@@ -646,7 +646,7 @@ class Pointing(Base):
     Examples
     --------
 
-        >>> from gtecs.database import *
+        >>> from obsdb import *
         >>> from astropy import units as u
         >>> from astropy.time import Time
         >>> session = load_session()
@@ -825,7 +825,7 @@ class ObservingBlock(Base):
     Examples
     --------
 
-        >>> from gtecs.database import *
+        >>> from obsdb import *
 
         make an ObservingBlock
         (an Mpointing with mpointingID = 1 is already in the database)
@@ -961,7 +961,7 @@ class Mpointing(Base):
 
     --------
 
-        >>> from gtecs.database import *
+        >>> from obsdb import *
         >>> from astropy.time import Time
 
         make an Mpointing - starting at midnight, 5 pointings that stay in the queue
@@ -1342,7 +1342,7 @@ s
 
         Returns
         -------
-        current : `gtecs.database.ObservingBlock`
+        current : `obsdb.ObservingBlock`
             The current observing block (may be None).
         """
         current_block = [block for block in self.observing_blocks if block.current]
@@ -1362,7 +1362,7 @@ s
 
         Returns
         -------
-        last : `gtecs.database.ObservingBlock`
+        last : `obsdb.ObservingBlock`
             The last block done (may be None).
         """
         current_block = self.get_current_block()
@@ -1388,7 +1388,7 @@ s
 
         Returns
         -------
-        next : `gtecs.database.ObservingBlock`
+        next : `obsdb.ObservingBlock`
             The next block to do after the current one (may be None).
         """
         current_block = self.get_current_block()

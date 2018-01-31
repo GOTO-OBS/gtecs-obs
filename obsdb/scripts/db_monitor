@@ -7,8 +7,17 @@ import sys
 
 from astropy.time import Time
 
-from gtecs import database as db
-from gtecs import style
+import obsdb as db
+
+
+def gtxt(text):
+    return '\033[32;1m' + str(text) + '\033[0m'
+
+def ytxt(text):
+    return '\033[33;1m' + str(text) + '\033[0m'
+
+def btxt(text):
+    return '\033[34;1m' + str(text) + '\033[0m'
 
 t = Time.now()
 
@@ -26,7 +35,7 @@ with db.open_session() as session:
 
     running, _ = db.get_queue(session)
     if running:
-        print(style.ytxt('CURRENTLY OBSERVING: ID %i \n' %running.pointingID))
+        print(ytxt('CURRENTLY OBSERVING: ID %i \n' %running.pointingID))
     else:
         print('\n')
 
@@ -43,12 +52,12 @@ with db.open_session() as session:
             print(string, end=' ')
 
             if pointing.status == 'running':
-                status = style.ytxt('RUNNING')
+                status = ytxt('RUNNING')
             elif pointing.status == 'completed':
-                status = style.gtxt('completed')
+                status = gtxt('completed')
             elif pointing.status == 'pending':
                 if t > Time(pointing.startUTC):
-                    status = style.btxt('pending')
+                    status = btxt('pending')
                 else:
                     wait = Time(pointing.startUTC) - t
                     status = 'upcoming ({:.1f}h)'.format(wait.to('hour').value)

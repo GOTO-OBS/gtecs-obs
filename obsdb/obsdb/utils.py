@@ -557,7 +557,7 @@ def insert_items(session, items):
     -----------
     session : `sqlalchemy.Session.session`
         the session object
-    items : `gtecs.database.model.Base`
+    items : `obsdb.models.Base`
         A model instance, e.g `Pointing`
     """
     items = list(items)

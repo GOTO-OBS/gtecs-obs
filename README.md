@@ -38,7 +38,7 @@ Configuration
 Configuration of the `obsdb` module is done using a config file and the Python module [configobj](http://configobj.readthedocs.io/en/latest/).
 When running, the module will look for a file named *.obsdb.conf* either in the current directory, the user's home directory or any path specified by the *OBSDB_CONF* environment variable.
 
-An example *.obsdb.conf* file is present in the base directory of this repository.
+An example *.obsdb.conf* file is included in the `obsdb` directory of this repository.
 
 If no such file is found, `obsdb` will use the default config, as shown in the *data* directory.
 Users can override any of these default settings using the *.obsdb.conf* file.

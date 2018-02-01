@@ -9,7 +9,7 @@ import time
 
 from sqlalchemy.orm import joinedload
 
-import obsdb as dbs
+import obsdb as db
 
 
 def ThereCanOnlyBeOne():

@@ -10,7 +10,7 @@ setup(name='obsdb',
       author_email='martin.dyer@sheffield.ac.uk',
       packages=['obsdb'],
       package_data={'': ['data/*']},
-      install_requires=['sqlalchemy>=1.2', 'astropy'],
+      install_requires=['sqlalchemy>=1.2', 'pymysql', 'astropy', 'configobj'],
       scripts=glob.glob('scripts/*'),
       include_package_data=True,
       zip_safe=False)

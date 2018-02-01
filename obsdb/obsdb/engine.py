@@ -3,10 +3,17 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from . import params
+
 __all__ = ['open_session', 'load_session']
 
+
+ENGINE = create_engine('mysql+pymysql://{}'.format(params.DATABASE_LOCATION),
+                       echo=params.DATABASE_ECHO,
+                       pool_pre_ping=params.DATABASE_PRE_PING)
+
 @contextmanager
-def open_session(host='localhost', echo=False):
+def open_session():
     """
     Create a DB session context manager.
 
@@ -14,15 +21,6 @@ def open_session(host='localhost', echo=False):
     to DB when scope closes and rolls back on exceptions.
 
     Needless to say it also closes the session when it goes out of scope.
-
-    Parameters
-    ----------
-    host : str, optional
-        the host location of the database
-        default is 'localhost'
-    echo : bool, optional
-        if true, will log all statements to the engines logger,
-        which defaults to stdout
 
     Returns
     -------
@@ -38,11 +36,7 @@ def open_session(host='localhost', echo=False):
     >>>     session.add(newUser)
     """
 
-    location_string = 'goto:gotoobs@{}/goto_obs'.format(host)
-    engine_string = 'mysql+pymysql://{}'.format(location_string)
-    engine = create_engine(engine_string, echo=echo, pool_pre_ping=True)
-
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=ENGINE)
     session = Session()
     try:
         yield session
@@ -54,21 +48,12 @@ def open_session(host='localhost', echo=False):
         session.close()
 
 
-def load_session(host='localhost', echo=False):
+def load_session():
     """
     Create a DB session.
 
     By making a DB session this way, you must commit and rollback changes
     yourself.
-
-    Parameters
-    ----------
-    host : str, optional
-        the host location of the database
-        default is 'localhost'
-    echo : bool, optional
-        if true, will log all statements to the engines logger,
-        which defaults to stdout
 
     Returns
     -------
@@ -89,10 +74,6 @@ def load_session(host='localhost', echo=False):
     >>>    session.close()
     """
 
-    location_string = 'goto:gotoobs@{}/goto_obs'.format(host)
-    engine_string = 'mysql+pymysql://{}'.format(location_string)
-    engine = create_engine(engine_string, echo=echo, pool_pre_ping=True)
-
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=ENGINE)
     session = Session()
     return session

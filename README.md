@@ -1,4 +1,4 @@
-# GOTO Obs Database
+# GOTO Observation Database (ObsDB)
 
 This repository contains the MySQL schema for the GOTO pointings database and a Python module *obsdb* which has various SQLAlchemy objects and functions to interact with the database.
 
@@ -28,5 +28,20 @@ Or alternatively:
 
 > `$ pip install .`
 
+You should then be able to import the API using `import obsdb` within Python.
+
+Several scripts from the `obsdb/scripts` folder should also be added to your path.
+
+
+Testing
+---------------------------------
+
+After setting up the database and installing the module, you can test it works correctly using the included `test_database.py` script in the base directory.
+
+> `$ python test_database.py`
+
+Note this script assumes you start from a completely clean, empty database.
+
+
 Martin Dyer
-Last update: 31 Jan 2018
+Last update: 1 Feb 2018

@@ -3,17 +3,26 @@ Demonstrate the use of the database modules.
 Assume we start from a clean database.
 """
 
+import sys
 import time
 
 from astropy import units as u
 from astropy.time import Time
 
-from gtecs.database import *
-from gtecs.database import _make_random_pointing
+from obsdb import *
+from obsdb import _make_random_pointing
 
 
 # add a user
 with open_session() as session:
+    try:
+        userKey = get_userkey(session, 'goto')
+        if userKey:
+            print('Error: Database is not empty')
+            sys.exit()
+    except ValueError:
+        pass
+
     add_user(session, 'goto', 'password', "GOTO Test Observer")
 
     # create an event

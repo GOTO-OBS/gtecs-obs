@@ -33,8 +33,19 @@ You should then be able to import the API using `import obsdb` within Python.
 Several scripts from the `obsdb/scripts` folder should also be added to your path.
 
 
+Configuration
+-------------
+Configuration of the `obsdb` module is done using a config file and the Python module [configobj](http://configobj.readthedocs.io/en/latest/).
+When running, the module will look for a file named *.obsdb.conf* either in the current directory, the user's home directory or any path specified by the *OBSDB_CONF* environment variable.
+
+An example *.obsdb.conf* file is present in the base directory of this repository.
+
+If no such file is found, `obsdb` will use the default config, as shown in the *data* directory.
+Users can override any of these default settings using the *.obsdb.conf* file.
+
+
 Testing
----------------------------------
+-------
 
 After setting up the database and installing the module, you can test it works correctly using the included `test_database.py` script in the base directory.
 

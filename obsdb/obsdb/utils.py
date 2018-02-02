@@ -210,7 +210,12 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
 
     """
     queue = session.query(Pointing)
+
+    # only get pending pointings
     queue = queue.filter(Pointing.status == 'pending')
+
+    # only get pointings with exposure sets, we've seen some odd ones without any
+    queue = queue.filter(Pointing.exposure_sets)
 
     if time is None:
         time = Time.now()

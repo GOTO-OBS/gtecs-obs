@@ -22,10 +22,12 @@ MP_SETTINGS = dict(start_rank=998,
                    minTime=(120+30)*3,
                    maxSunAlt=-12,
                    maxMoon='B',
+                   minMoonSep=30,
                    ToO=0,
-                   num_repeats=0,
-                   intervals=4320, #3 days
-                   valid_durations=525600)
+                   num_todo=-1,
+                   valid_time=-1,
+                   wait_time=4320, #3 days
+                   )
 
 EXP_SETTINGS = dict(expTime=120,
                     raoff=0.,
@@ -34,7 +36,7 @@ EXP_SETTINGS = dict(expTime=120,
                     typeFlag='SCIENCE',
                     #filt='L',
                     binning=1,
-                    otaMask=None)
+                    utMask=None)
 
 
 def get_userkey(username, description=''):

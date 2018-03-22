@@ -1438,6 +1438,17 @@ s
         if self.status != 'unscheduled':
             return None
 
+        # As a safety check, see if the mpointing has any other pointings that
+        # are already pending or running.
+        # If so the mpointing status should be 'scheduled' and therefore be
+        # caught above, but strange things can happen.
+        # This should prevent the cases where Mpointings have multiple
+        # pointings in the queue, hopefully!
+        if len(self.pointings) > 0:
+            statuses = [p.status for p in self.pointings]
+            if 'pending' in statuses or 'running' in statuses:
+                return None
+
         # all the observations have been completed
         if self.num_remaining == 0:
             return None

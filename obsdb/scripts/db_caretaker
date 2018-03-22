@@ -51,6 +51,24 @@ while True:
         else:
             print('> None found')
 
+    # check Mpointings marked as unscheduled are really unscheduled
+    # (we've had issues in the past with multiple scheduled pointings)
+    with db.open_session() as session:
+        unscheduled_mps = db.get_mpointings(session, status='unscheduled')
+        incorrect_mps = []
+
+        if len(unscheduled_mps) > 0:
+            for mp in unscheduled_mps:
+                statuses = [p.status for p in mp.pointings]
+                if 'pending' in statuses or 'running' in statuses:
+                    incorrect_mps += [mp.mpointingID]
+            if len(incorrect_mps) > 0:
+                print('Found some incorrectly marked unscheduled Mpointings...')
+                print('> Marking {} Mpointings as scheduled'.format(len(incorrect_mps)))
+                start = time.time()
+                db.bulk_update_mpointing_status(session, incorrect_mps, 'scheduled')
+                print('>    took {:.2f} secs'.format(time.time()-start))
+
     # schedule Pointings for unscheduled Mpointings
     with db.open_session() as session:
         print('Getting any unscheduled Mpointings...')

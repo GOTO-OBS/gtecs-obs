@@ -231,14 +231,6 @@ def fill_mpointing(mpointing):
         except:
             pass
 
-    ### MinAlt
-    while mpointing['minAlt'] is None:
-        minAlt = input('Minimum altitude (deg, min=30): ')
-        try:
-            mpointing['minAlt'] = int(minAlt)
-        except:
-            pass
-
     return mpointing
 
 
@@ -281,13 +273,13 @@ if __name__ == '__main__':
                          'num_todo': None,
                          'valid_time': None,
                          'wait_time': None,
-                         'minAlt': None,
                          # auto filled values
                          'minTime': None,
                          # default values:
                          'maxSunAlt': -15,
                          'maxMoon': 'B',
                          'minMoonSep': 30,
+                         'minAlt': 40,
                          'ToO': 0,
                          }
 

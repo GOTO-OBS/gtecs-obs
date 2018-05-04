@@ -335,7 +335,7 @@ if __name__ == '__main__':
         while more_exposures is True:
             exposure_set = fill_exposure_set(default_exposure_set.copy())
 
-            total_exptime += exposure_set['expTime'] * exposure_set['numexp']
+            total_exptime += (exposure_set['expTime']+30) * exposure_set['numexp']
             exposure_sets.append(exposure_set)
 
             add_more = None

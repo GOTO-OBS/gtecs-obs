@@ -209,19 +209,35 @@ def fill_mpointing(mpointing):
 
     ### Number to do
     while mpointing['num_todo'] is None:
-        mpointing['num_todo'] = int(input('Number of visits? [0=infinite]: '))
+        num_todo = input('Number of visits? [-1=infinite]: ')
+        try:
+            mpointing['num_todo'] = int(num_todo)
+        except:
+            pass
 
     ## Valid time
     while mpointing['valid_time'] is None:
-        mpointing['valid_time'] = int(input('Time for the pointing to be valid for (min): '))
+        valid_time = input('Time for the pointing to be valid for (min): ')
+        try:
+            mpointing['valid_time'] = int(valid_time)
+        except:
+            pass
 
     ## Wait time
     while mpointing['wait_time'] is None:
-        mpointing['wait_time'] = int(input('Time between visits (min): '))
+        wait_time = input('Time between visits (min): ')
+        try:
+            mpointing['wait_time'] = int(wait_time)
+        except:
+            pass
 
     ### MinAlt
     while mpointing['minAlt'] is None:
-        mpointing['minAlt'] = int(input('Minimum altitude (deg, min=30): '))
+        minAlt = input('Minimum altitude (deg, min=30): ')
+        try:
+            mpointing['minAlt'] = int(minAlt)
+        except:
+            pass
 
     return mpointing
 
@@ -230,17 +246,27 @@ def fill_exposure_set(exposure_set):
 
     ### Number of exposures
     while exposure_set['numexp'] is None:
-        exposure_set['numexp'] = int(input('Number of exposures: '))
+        numexp = input('Number of exposures: ')
+        try:
+            exposure_set['numexp'] = int(numexp)
+        except:
+            pass
 
     ### Exposure time
     while exposure_set['expTime'] is None:
-        exposure_set['expTime'] = int(input('Exposure time: '))
+        expTime = input('Exposure time: ')
+        try:
+            exposure_set['expTime'] = int(expTime)
+        except:
+            pass
 
     ### Filter
-    filt_str = 'X'
-    while filt_str.upper() not in ['L','R','G','B']:
-        filt_str = input('Filter [L/R/G/B/C]: ').upper()
-    exposure_set['filt'] = filt_str
+    while exposure_set['filt'] not in ['L','R','G','B']:
+        filt = input('Filter [L/R/G/B/C]: ')
+        try:
+            exposure_set['filt'] = filt.upper()
+        except:
+            pass
 
     return exposure_set
 

@@ -194,18 +194,26 @@ def fill_mpointing(mpointing):
         except:
             pass
 
-
-    ### Rank
-    rank_str = 'None'
-    while rank_str.lower() not in ['low', 'medium', 'high', 'l', 'm', 'h']:
-        rank_str = input('Enter rank [low/medium/high]: ')
-
-    if rank_str.lower() in ['low', 'l']:
-        mpointing['start_rank'] = 8
-    elif rank_str.lower() in ['medium', 'm']:
-        mpointing['start_rank'] = 7
-    elif rank_str.lower() in ['high', 'h']:
+    ### ToO & Rank
+    too = None
+    while too not in ['y','n','Y','N']:
+        too = input('Is the target a ToO (can interupt)? [y/n]: ')
+    if too in ['y','Y']:
+        mpointing['ToO'] = 1
+        print('  Setting ToO rank automatically to: high')
         mpointing['start_rank'] = 6
+    else:
+        mpointing['ToO'] = 0
+        rank_str = 'None'
+        while rank_str.lower() not in ['low', 'medium', 'high', 'l', 'm', 'h']:
+            rank_str = input('Enter rank [low/medium/high]: ')
+
+        if rank_str.lower() in ['low', 'l']:
+            mpointing['start_rank'] = 8
+        elif rank_str.lower() in ['medium', 'm']:
+            mpointing['start_rank'] = 7
+        elif rank_str.lower() in ['high', 'h']:
+            mpointing['start_rank'] = 6
 
     ### Number to do
     while mpointing['num_todo'] is None:
@@ -269,6 +277,7 @@ if __name__ == '__main__':
                          'objectName': None,
                          'ra': None,
                          'decl': None,
+                         'ToO': None,
                          'start_rank': None,
                          'num_todo': None,
                          'valid_time': None,
@@ -280,7 +289,6 @@ if __name__ == '__main__':
                          'maxMoon': 'B',
                          'minMoonSep': 30,
                          'minAlt': 40,
-                         'ToO': 0,
                          }
 
     exposure_sets = []

@@ -308,9 +308,11 @@ if __name__ == '__main__':
         print("** Insert pointing into GOTO queue database **")
 
         # Get userKey
-        username = input('Enter your database username: ')
-        if username is None:
-            username = 'goto'
+        # username = input('Enter your database username: ')
+        # if username is None:
+        #     username = 'goto'
+        print('Using default username: goto')
+        username = 'goto'
 
         # Fill Mpointing infomation
         mpointing = default_mpointing.copy()

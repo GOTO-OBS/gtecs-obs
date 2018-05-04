@@ -225,16 +225,16 @@ def fill_mpointing(mpointing):
         mpointing['wait_time'] = 1000 # ensures once a night
     else:
         while mpointing['valid_time'] is None:
-            valid_time = input('Time for the pointing to be valid for (min, -1=infinite): ')
+            valid_time = input('Time for the pointing to be valid for (minutes, -1=infinite): ')
             try:
                 mpointing['valid_time'] = int(valid_time)
             except:
                 pass
 
         while mpointing['wait_time'] is None:
-            wait_time = input('Time between visits (min, 0=no wait): ')
+            wait_time = input('Time between visits (minutes, can be array, 0=no wait): ')
             try:
-                mpointing['wait_time'] = int(wait_time)
+                mpointing['wait_time'] = [int(i) for i in wait_time.split(',')]
             except:
                 pass
 

@@ -1,5 +1,9 @@
 #Ignore compiled python files
 *.pyc
 
-#Ignore Visual Studio Code DB
+#Ignore Visual Studio Code files
 *.browse*
+*.vscode*
+
+#Ignore non-final schema
+newschema.sql

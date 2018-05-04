@@ -254,7 +254,7 @@ def fill_exposure_set(exposure_set):
 
     ### Filter
     while exposure_set['filt'] not in ['L','R','G','B']:
-        filt = input('Filter [L/R/G/B/C]: ')
+        filt = input('Filter [L/R/G/B]: ')
         try:
             exposure_set['filt'] = filt.upper()
         except:

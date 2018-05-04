@@ -215,29 +215,37 @@ def fill_mpointing(mpointing):
         elif rank_str.lower() in ['high', 'h']:
             mpointing['start_rank'] = 6
 
+
+    ## Valid time & wait time
+    daily = None
+    while daily not in ['y','n','Y','N']:
+        daily = input('Use default cadance (once a night)? [y/n]: ')
+    if daily in ['y','Y']:
+        mpointing['valid_time'] = -1
+        mpointing['wait_time'] = 1000 # ensures once a night
+    else:
+        while mpointing['valid_time'] is None:
+            valid_time = input('Time for the pointing to be valid for (min, -1=infinite): ')
+            try:
+                mpointing['valid_time'] = int(valid_time)
+            except:
+                pass
+
+        while mpointing['wait_time'] is None:
+            wait_time = input('Time between visits (min, 0=no wait): ')
+            try:
+                mpointing['wait_time'] = int(wait_time)
+            except:
+                pass
+
     ### Number to do
     while mpointing['num_todo'] is None:
-        num_todo = input('Number of visits? [-1=infinite]: ')
+        num_todo = input('Number of visits? (-1=infinite): ')
         try:
             mpointing['num_todo'] = int(num_todo)
         except:
             pass
 
-    ## Valid time
-    while mpointing['valid_time'] is None:
-        valid_time = input('Time for the pointing to be valid for (min): ')
-        try:
-            mpointing['valid_time'] = int(valid_time)
-        except:
-            pass
-
-    ## Wait time
-    while mpointing['wait_time'] is None:
-        wait_time = input('Time between visits (min): ')
-        try:
-            mpointing['wait_time'] = int(wait_time)
-        except:
-            pass
 
     return mpointing
 

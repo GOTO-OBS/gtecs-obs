@@ -41,12 +41,12 @@ with db.open_session() as session:
 
     for pointing in all_pointings:
         if show_all or (pointing.survey is None and pointing.status != 'expired'):
-            string = '{: <6.0f} | {: >20} | {: >3.0f} | {: >6.2f} | {: >6.2f} | {} | {} |'.format(
+            string = '{: <6.0f} | {: >20} | {: >3.0f}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
                                             pointing.pointingID,
                                             pointing.objectName,
                                             pointing.rank,
+                                            '!' if pointing.ToO else ' ',
                                             pointing.ra, pointing.decl,
-                                            int(pointing.survey is not None),
                                             pointing.startUTC)
 
             print(string, end=' ')

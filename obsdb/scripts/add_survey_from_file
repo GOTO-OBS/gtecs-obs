@@ -1,31 +1,22 @@
 #!/usr/bin/env python
-"""
-A script add a survey of defined points into the G-TeCS database
-"""
+"""A script add a survey of defined points into the G-TeCS database."""
 
-import sys
-import time
-import getpass
 import argparse
-
-from sqlalchemy.orm import joinedload
-
-import numpy as np
-
-import astropy.units as u
+import getpass
+import time
 
 import obsdb as db
 
 
 MP_SETTINGS = dict(minAlt=35,
-                   minTime=(60+5)*3,
+                   minTime=(60 + 5) * 3,
                    maxSunAlt=-12,
                    maxMoon='B',
                    minMoonSep=50,
                    ToO=0,
                    num_todo=-1,
                    valid_time=-1,
-                   wait_time=4320, #3 days
+                   wait_time=4320,  # 3 days
                    )
 
 EXP_SETTINGS = dict(expTime=60,
@@ -39,12 +30,11 @@ EXP_SETTINGS = dict(expTime=60,
 
 
 def get_userkey(username, description=''):
-    """Get user key of a user, and create it if it doesn't exit"""
-
+    """Get user key of a user, and create it if it doesn't exit."""
     with db.open_session() as session:
         try:
             user_key = db.get_userkey(session, username)
-        except:
+        except Exception:
             # Create user if it doesn't exist
             prompt = "Creating {} user - give password: ".format(username)
             passwd = getpass.getpass(prompt=prompt)
@@ -55,7 +45,7 @@ def get_userkey(username, description=''):
 
 
 def get_coords_from_file(filename):
-    """Define mini-survey tiles centres and ranks"""
+    """Define mini-survey tiles centres and ranks."""
     allras = []
     alldecs = []
     ranks = []
@@ -67,7 +57,7 @@ def get_coords_from_file(filename):
             tile, ra, dec, *_ = line.split()
             if i > 800:
                 break
-            rank = (i-1)//100 + 990
+            rank = (i - 1) // 100 + 990
             name = 'Galaxy_survey_{}'.format(tile)
 
             print(name, ra, dec, rank)
@@ -81,11 +71,11 @@ def get_coords_from_file(filename):
 
 
 def run(filename):
+    """Create the mpointings and add them to the database."""
     # Create the tile centres
     ras, decs, ranks, names = get_coords_from_file(filename)
 
     # Add to the database
-    tiles = []
     mpointings = []
     user_key = get_userkey('goto', 'GOTO Survey')
     with db.open_session() as session:
@@ -102,19 +92,19 @@ def run(filename):
 
             mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
             mpointings.append(mp)
-        print('  took {:.2f} secs'.format(time.time()-start))
+        print('  took {:.2f} secs'.format(time.time() - start))
 
         print('Adding {} mpointings to database...'.format(len(mpointings)))
         start = time.time()
         db.insert_items(session, mpointings)
-        print('  took {:.2f} secs'.format(time.time()-start))
+        print('  took {:.2f} secs'.format(time.time() - start))
 
 
 if __name__ == '__main__':
     description = """Create a mini-survey around a given centre."""
 
     parser = argparse.ArgumentParser(description=description,
-                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('file', help="File with tiles", type=str)
 

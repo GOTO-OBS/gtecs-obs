@@ -1,31 +1,26 @@
 #!/usr/bin/env python
-"""
-A script to allow simple adding of pointings to the scheduler database
-"""
+"""A script to allow simple adding of pointings to the scheduler database."""
 
-import readline
 import getpass
 
-from astropy.time import Time
-from astropy.coordinates import SkyCoord, get_body
+from astropy.coordinates import SkyCoord
 
 import obsdb as db
 
 
 def parse_ra(ra_str):
-    """
-    Parse an RA string and return a float in decimal degrees, or ValueError
-    ------------------
+    """Parse an RA string and return a float in decimal degrees, or ValueError.
+
     Valid formats:
         Decimal degrees
             e.g. "6" OR "212" OR "317.321"
         Hour Minute Second (space or colon seperated)
             e.g. "3 2 1" OR "10:0:0" OR "8 56 25.7"
-    ------------------
-    Will also check for limits (0 <= hours < 24 etc.)
-    """
 
-    ra_list = ra_str.replace(':',' ').split()
+    Will also check for limits (0 <= hours < 24 etc.)
+
+    """
+    ra_list = ra_str.replace(':', ' ').split()
 
     # option 1: decimal degrees
     if len(ra_list) == 1:
@@ -50,8 +45,8 @@ def parse_ra(ra_str):
             raise ValueError('RA minutes must be between 0 and 60')
         if not 0 <= s < 60:
             raise ValueError('RA seconds must be between 0 and 60')
-        ra_hrs = h + m/60. + s/3600.
-        ra_deg = ra_hrs*360./24.
+        ra_hrs = h + m / 60. + s / 3600.
+        ra_deg = ra_hrs * 360. / 24.
 
     # they're the only options
     else:
@@ -61,9 +56,8 @@ def parse_ra(ra_str):
 
 
 def parse_dec(dec_str):
-    """
-    Parse an Dec string and return a float in decimal degrees, or ValueError
-    ------------------
+    """Parse an Dec string and return a float in decimal degrees, or ValueError.
+
     Valid formats:
         Decimal degrees
             e.g. "002" OR "194" OR "43.51"
@@ -71,11 +65,11 @@ def parse_dec(dec_str):
             e.g. "201 9 55" OR "+12:4:2.54" OR "-0 44 19"
         Sign Degree Arcminute Arcsecond (space or colon seperated)
             e.g. "+ 201 9 55" OR "+ 12:4:2.54" OR "- 0 44 19"
-    ------------------
-    Will also check for limits (0 <= minutes < 60 etc.)
-    """
 
-    dec_list = dec_str.replace(':',' ').split()
+    Will also check for limits (0 <= minutes < 60 etc.)
+
+    """
+    dec_list = dec_str.replace(':', ' ').split()
 
     # option 1: decimal degrees
     if len(dec_list) == 1:
@@ -88,7 +82,7 @@ def parse_dec(dec_str):
 
     # option 2: +dms notation (the old way)
     elif len(dec_list) == 4:
-        if dec_list[0] not in ['+','-']:
+        if dec_list[0] not in ['+', '-']:
             raise ValueError('Sign should be "+" or "-"')
         sign = dec_list[0]
         try:
@@ -104,9 +98,9 @@ def parse_dec(dec_str):
         if not 0 <= s < 60:
             raise ValueError('Dec arcseconds must be between 0 and 60')
         if sign == '+':
-            dec_deg = d + m/60. + s/3600.
+            dec_deg = d + m / 60. + s / 3600.
         else:
-            dec_deg = -d - m/60. - s/3600.
+            dec_deg = -d - m / 60. - s / 3600.
         if not -90 <= dec_deg <= 90:
             raise ValueError('Dec must be between 90 and -90')
 
@@ -129,9 +123,9 @@ def parse_dec(dec_str):
         if not 0 <= s < 60:
             raise ValueError('Dec arcseconds must be between 0 and 60')
         if sign == '+':
-            dec_deg = d + m/60. + s/3600.
-        else:  #NB d is negative
-            dec_deg = d - m/60. - s/3600.
+            dec_deg = d + m / 60. + s / 3600.
+        else:  # NB d is negative
+            dec_deg = d - m / 60. - s / 3600.
         if not -90 <= dec_deg <= 90:
             raise ValueError('Dec must be between 90 and -90')
 
@@ -143,10 +137,11 @@ def parse_dec(dec_str):
 
 
 def get_userkey(session, username):
+    """Get the userkey for the given username, and create it if it doesn't already exist."""
     try:
         user_key = db.get_userkey(session, username)
         print('    Attributing pointings to user "{}"'.format(username))
-    except:
+    except Exception:
         # Create user if it doesn't exist
         print('    User "{}" not recognised, creating new user...'.format(username))
         description = input('Enter your full name: ')
@@ -160,45 +155,45 @@ def get_userkey(session, username):
 
 
 def fill_mpointing(mpointing):
-
-    ### Object name
+    """Fill out an mpointing frame with user input."""
+    # Object name
     while mpointing['objectName'] is None:
         mpointing['objectName'] = input('Enter Target name: ')
 
-    ### Try coord lookup
+    # Try coord lookup
     try:
         coord = SkyCoord.from_name(mpointing['objectName'])
-    except:
+    except Exception:
         coord = None
     if coord is not None:
-        print('    Found catalogue object: RA {:.4f} deg, Dec {:.4f} deg '.format(coord.ra.value, coord.dec.value))
+        print('    Found catalogue object: RA {:.4f} deg, Dec {:.4f} deg '.format(coord.ra.value,
+                                                                                  coord.dec.value))
         use_coords = None
-        while use_coords not in ['y','n','Y','N']:
+        while use_coords not in ['y', 'n', 'Y', 'N']:
             use_coords = input('Use these coordinates? [y/n]: ')
-        if use_coords in ['y','Y']:
+        if use_coords in ['y', 'Y']:
             mpointing['ra'] = coord.ra.value
             mpointing['decl'] = coord.dec.value
 
-
-    ### Enter coords
+    # Enter coords
     while mpointing['ra'] is None:
         ra_str = input('Target RA [h m s OR deg]: ')
         try:
             mpointing['ra'] = parse_ra(ra_str)
-        except:
+        except Exception:
             pass
     while mpointing['decl'] is None:
         dec_str = input('Target Dec [d m s OR deg]: ')
         try:
             mpointing['decl'] = parse_dec(dec_str)
-        except:
+        except Exception:
             pass
 
-    ### ToO & Rank
+    # ToO & Rank
     too = None
-    while too not in ['y','n','Y','N']:
+    while too not in ['y', 'n', 'Y', 'N']:
         too = input('Is the target a ToO (can interupt)? [y/n]: ')
-    if too in ['y','Y']:
+    if too in ['y', 'Y']:
         mpointing['ToO'] = 1
         print('  Setting ToO rank automatically to: high')
         mpointing['start_rank'] = 6
@@ -215,65 +210,63 @@ def fill_mpointing(mpointing):
         elif rank_str.lower() in ['high', 'h']:
             mpointing['start_rank'] = 6
 
-
-    ## Valid time & wait time
+    # Valid time & wait time
     daily = None
-    while daily not in ['y','n','Y','N']:
+    while daily not in ['y', 'n', 'Y', 'N']:
         daily = input('Use default cadance (once a night)? [y/n]: ')
-    if daily in ['y','Y']:
+    if daily in ['y', 'Y']:
         mpointing['valid_time'] = -1
-        mpointing['wait_time'] = 1000 # ensures once a night
+        mpointing['wait_time'] = 1000  # ensures once a night
     else:
         while mpointing['valid_time'] is None:
             valid_time = input('Time for the pointing to be valid for (minutes, -1=infinite): ')
             try:
                 mpointing['valid_time'] = int(valid_time)
-            except:
+            except Exception:
                 pass
 
         while mpointing['wait_time'] is None:
             wait_time = input('Time between visits (minutes, can be array, 0=no wait): ')
             try:
                 mpointing['wait_time'] = [int(i) for i in wait_time.split(',')]
-            except:
+            except Exception:
                 pass
 
-    ### Number to do
+    # Number to do
     while mpointing['num_todo'] is None:
         num_todo = input('Number of visits? (-1=infinite): ')
         try:
             mpointing['num_todo'] = int(num_todo)
-        except:
+        except Exception:
             pass
-
 
     return mpointing
 
 
 def fill_exposure_set(exposure_set):
-
-    ### Number of exposures
+    """Fill out an exposure set frame with user input."""
+    # Number of exposures
     while exposure_set['numexp'] is None:
         numexp = input('Number of exposures: ')
         try:
             exposure_set['numexp'] = int(numexp)
-        except:
+        except Exception:
             pass
 
-    ### Exposure time
+    # Exposure time
     while exposure_set['expTime'] is None:
-        expTime = input('Exposure time: ')
+        exptime = input('Exposure time: ')
         try:
-            exposure_set['expTime'] = int(expTime)
-        except:
+            exposure_set['expTime'] = int(exptime)
+        except Exception:
             pass
 
-    ### Filter
-    while exposure_set['filt'] not in ['L','R','G','B']:
+    # Filter
+    while exposure_set['filt'] not in ['L', 'R', 'G', 'B']:
         filt = input('Filter [L/R/G/B]: ')
         try:
             exposure_set['filt'] = filt.upper()
-        except:
+        except Exception:
             pass
 
     return exposure_set
@@ -335,18 +328,17 @@ if __name__ == '__main__':
         while more_exposures is True:
             exposure_set = fill_exposure_set(default_exposure_set.copy())
 
-            total_exptime += (exposure_set['expTime']+30) * exposure_set['numexp']
+            total_exptime += (exposure_set['expTime'] + 30) * exposure_set['numexp']
             exposure_sets.append(exposure_set)
 
             add_more = None
-            while add_more not in ['y','Y','n','N']:
+            while add_more not in ['y', 'Y', 'n', 'N']:
                 add_more = input('Add another exposure set? [y/n]: ')
 
-            if add_more not in ['y','Y']:
+            if add_more not in ['y', 'Y']:
                 more_exposures = False
 
         mpointing['minTime'] = total_exptime
-
 
         mp = db.Mpointing(**mpointing)
         for exposure_set in exposure_sets:

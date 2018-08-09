@@ -1,15 +1,16 @@
+#!/usr/bin/env python
+"""Utility functions for using the database."""
+
 import hashlib
 
-from .engine import load_session, open_session
-from .models import (User, Event, EventTile, Survey, SurveyTile,
-                     Pointing, Mpointing, ObservingBlock, ExposureSet,
-                     ImageLog)
-from sqlalchemy.orm.exc import NoResultFound
+from astropy import units as u
+from astropy.coordinates import Longitude
+from astropy.time import Time
+
 from sqlalchemy import or_
 
-from astropy.time import Time
-from astropy.coordinates import Longitude
-from astropy import units as u
+from .engine import open_session
+from .models import ExposureSet, Mpointing, Pointing, Survey, SurveyTile, User
 
 
 __all__ = ['add_user', 'get_userkey', 'get_username', 'validate_user',
@@ -19,101 +20,98 @@ __all__ = ['add_user', 'get_userkey', 'get_username', 'validate_user',
            'get_exposure_set_by_id', 'get_survey_tile_by_name',
            'get_expired_pointing_ids', 'get_expired_mpointing_ids',
            'insert_items',
-           'bulk_update_pointing_status', 'bulk_update_mpointing_status',
-           '_make_random_pointing',
-           'markJobCompleted', 'markJobAborted',
-           'markJobInterrupted', 'markJobRunning',
+           'update_pointing_status', 'bulk_update_pointing_status', 'bulk_update_mpointing_status',
+           'mark_completed', 'mark_aborted', 'mark_interrupted', 'mark_running',
            ]
 
 
-def add_user(session, userName, password, fullName):
-    """
-    Add a user to the database.
+def add_user(session, username, password, fullname):
+    """Add a user to the database.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session`
-    userName : string
+    username : string
         short user name
     password : string
         plain text password. stored in DB using a sha512 hash for security
-    fullName : string
+    fullname : string
         full name of user
+
     """
     password_hash = hashlib.sha512(password.encode()).hexdigest()
-    new_user = User(userName=userName, password=password_hash, fullName=fullName)
+    new_user = User(userName=username, password=password_hash, fullName=fullname)
     session.add(new_user)
 
 
-def get_userkey(session, userName):
-    """
-    Returns the userKey for a given userName.
+def get_userkey(session, username):
+    """Return the userkey for a given username.
 
-    The userKey must be supplied as an argument to create a
+    The userkey must be supplied as an argument to create a
     Pointing.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session`
-    userName : string
+    username : string
         short name of user
 
     Returns
     --------
-    userKey : int
+    userkey : int
         id of user in database
 
     Raises
     ------
     ValueError : if no matching User is found in the database
+
     """
     query = session.query(User)
-    query = query.filter(User.userName == userName)
+    query = query.filter(User.userName == username)
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
     return user.userKey
 
 
-def get_username(session, userKey):
-    """
-    Returns the userName for a given userKey.
+def get_username(session, userkey):
+    """Return the username for a given userkey.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session`
-    userKey : int
+    userkey : int
         id of user in database.
 
     Returns
     --------
-    userName : string
+    username : string
         short name of user
 
     Raises
     ------
     ValueError : if no matching User is found in the database
+
     """
     query = session.query(User)
-    query = query.filter(User.userKey == userKey)
+    query = query.filter(User.userKey == userkey)
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
     return user.userName
 
 
-def validate_user(session, userName, password):
-    """
-    Check user exists and password is correct.
+def validate_user(session, username, password):
+    """Check user exists and password is correct.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session`
-    userName : string
+    username : string
         short name of user
     password : string
         plain text password (stored in DB using a sha512 hash for security)
@@ -125,12 +123,13 @@ def validate_user(session, userName, password):
 
     Raises
     ------
-    ValueError : if userName is not found in DB
+    ValueError : if username is not found in DB
+
     """
     password_hash = hashlib.sha512(password.encode()).hexdigest()
 
     query = session.query(User)
-    query = query.filter(User.userName == userName)
+    query = query.filter(User.userName == username)
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
@@ -144,8 +143,7 @@ def validate_user(session, userName, password):
 
 def get_filtered_queue(session, time=None, rank_limit=None, location=None,
                        altitude_limit=20, hourangle_limit=6, limit_number=None):
-    """
-    Get the currently valid queue, and filter against visibility and rank.
+    """Get the currently valid queue, and filter against visibility and rank.
 
     The queue is defined as all pending pointings with a valid date range. We then filter
     out tiles that are not visible, order by rank and limit by rank if requested.
@@ -188,7 +186,6 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
 
     Examples
     --------
-
     An example using `open_session`. The items retrieved won't function outside the
     scope of the with block, since they rely on a session to access the underlying
     database.
@@ -198,7 +195,8 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     >>>     njobs = len(pending_jobs)
     >>>     exposure_list = current_job.exposure_sets
     >>> current_job
-    DetachedInstanceError: Instance <Pointing at 0x10a00ac50> is not bound to a Session; attribute refresh operation cannot proceed
+    DetachedInstanceError: Instance <Pointing at 0x10a00ac50> is not bound to a Session;
+    attribute refresh operation cannot proceed
 
     An example using `load_session`. This will return a session object. With this method
     you don't have to worry so about about scope, but you do have to be careful about
@@ -224,14 +222,14 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     # are we after the start time?
     queue = queue.filter(Pointing.startUTC < now)
     # are we before the stop time (if any)?
-    queue = queue.filter(or_(Pointing.stopUTC > now, Pointing.stopUTC==None))
+    queue = queue.filter(or_(Pointing.stopUTC > now, Pointing.stopUTC == None))  # noqa: E711
 
     # now limit by RA and Dec
     if location is not None:
         # local sidereal time, units of degrees
         lst = time.sidereal_time('mean', location.lon)
-        lo_lim = Longitude(lst - hourangle_limit*u.hourangle).deg
-        up_lim = Longitude(lst + hourangle_limit*u.hourangle).deg
+        lo_lim = Longitude(lst - hourangle_limit * u.hourangle).deg
+        up_lim = Longitude(lst + hourangle_limit * u.hourangle).deg
         if up_lim > lo_lim:
             queue = queue.filter(Pointing.ra < up_lim,
                                  Pointing.ra > lo_lim)
@@ -268,8 +266,7 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
 
 
 def get_queue(session, time=None):
-    """
-    Get the currently valid queue.
+    """Get the currently valid queue.
 
     The queue is defined as all pending pointings with a valid date range.
 
@@ -291,7 +288,6 @@ def get_queue(session, time=None):
 
     Examples
     --------
-
     An example using `open_session`. The items retrieved won't function outside the
     scope of the with block, since they rely on a session to access the underlying
     database.
@@ -302,7 +298,8 @@ def get_queue(session, time=None):
     >>>     exposure_list = current_job.exposure_sets
     >>>     sorted_ranks = sorted([job.rank for job in pending_jobs])
     >>> current_job
-    DetachedInstanceError: Instance <Pointing at 0x10a00ac50> is not bound to a Session; attribute refresh operation cannot proceed
+    DetachedInstanceError: Instance <Pointing at 0x10a00ac50> is not bound to a Session;
+    attribute refresh operation cannot proceed
 
     An example using `load_session`. This will return a session object. With this method
     you don't have to worry so about about scope, but you do have to be careful about
@@ -318,16 +315,15 @@ def get_queue(session, time=None):
     return current_pointing, pending_queue
 
 
-def get_pointings(session, pointingIDs=None, status=None):
-    """
-    Get pointings, filtered by ID or status.
+def get_pointings(session, pointing_ids=None, status=None):
+    """Get pointings, filtered by ID or status.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    pointingIDs : int or list
-        supply a pointingID or list of IDs to filter by id
+    pointing_ids : int or list
+        supply a pointing ID or list of IDs to filter by id
     status : string or list
         supply a status or list of statuses to filter by status
 
@@ -335,10 +331,11 @@ def get_pointings(session, pointingIDs=None, status=None):
     -------
     pointings : list
         a list of all matching Pointings
+
     """
     query = session.query(Pointing)
-    if pointingIDs is not None:
-        query = query.filter(Pointing.pointingID.in_(list(pointingIDs)))
+    if pointing_ids is not None:
+        query = query.filter(Pointing.pointingID.in_(list(pointing_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
@@ -347,16 +344,15 @@ def get_pointings(session, pointingIDs=None, status=None):
     return pointings
 
 
-def get_pointing_by_id(session, pointingID):
-    """
-    Get a single Pointing, filtered by ID.
+def get_pointing_by_id(session, pointing_id):
+    """Get a single Pointing, filtered by ID.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    pointingID : int
-        the id number of the pointingID
+    pointing_id : int
+        the id number of the pointing
 
     Returns
     -------
@@ -366,24 +362,24 @@ def get_pointing_by_id(session, pointingID):
     Raises
     ------
     ValueError : if no matching Pointing is found in the database
+
     """
     query = session.query(Pointing)
-    query = query.filter(Pointing.pointingID == pointingID)
+    query = query.filter(Pointing.pointingID == pointing_id)
     pointing = query.one_or_none()
     if not pointing:
         raise ValueError('No matching Pointing found')
     return pointing
 
 
-def get_mpointings(session, mpointingIDs=None, status=None):
-    """
-    Get mpointings, filtered by mpointingID or status.
+def get_mpointings(session, mpointing_ids=None, status=None):
+    """Get mpointings, filtered by ID or status.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    mpointingIDs : int or list
+    mpointing_ids : int or list
         supply a ID or list of IDs to filter results
     status : string or list
         supply a status or list of statuses to filter by status
@@ -392,10 +388,11 @@ def get_mpointings(session, mpointingIDs=None, status=None):
     -------
     mpointings : list
         a list of all matching Mpointings
+
     """
     query = session.query(Mpointing)
-    if mpointingIDs is not None:
-        query = query.filter(Mpointing.mpointingID.in_(list(mpointingIDs)))
+    if mpointing_ids is not None:
+        query = query.filter(Mpointing.mpointingID.in_(list(mpointing_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
@@ -404,15 +401,14 @@ def get_mpointings(session, mpointingIDs=None, status=None):
     return mpointings
 
 
-def get_mpointing_by_id(session, mpointingID):
-    """
-    Get a single Mpointing, filtered by ID.
+def get_mpointing_by_id(session, mpointing_id):
+    """Get a single Mpointing, filtered by ID.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    mpointingID : int
+    mpointing_id : int
         the id number of the Mpointing
 
     Returns
@@ -423,24 +419,24 @@ def get_mpointing_by_id(session, mpointingID):
     Raises
     ------
     ValueError : if no matching Mpointing is found in the database
+
     """
     query = session.query(Mpointing)
-    query = query.filter(Mpointing.mpointingID == mpointingID)
+    query = query.filter(Mpointing.mpointingID == mpointing_id)
     mpointing = query.one_or_none()
     if not mpointing:
         raise ValueError('No matching Mpointing found')
     return mpointing
 
 
-def get_exposure_set_by_id(session, expID):
-    """
-    Get a single ExposureSet, filtered by ID.
+def get_exposure_set_by_id(session, expset_id):
+    """Get a single ExposureSet, filtered by ID.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    expID : int
+    expset_id : int
         the id number of the ExposureSet
 
     Returns
@@ -451,9 +447,10 @@ def get_exposure_set_by_id(session, expID):
     Raises
     ------
     ValueError : if no matching ExposureSet is found in the database
+
     """
     query = session.query(ExposureSet)
-    query = query.filter(ExposureSet.expID == expID)
+    query = query.filter(ExposureSet.expID == expset_id)
     exposure_set = query.one_or_none()
     if not exposure_set:
         raise ValueError('No matching ExposureSet found')
@@ -461,8 +458,7 @@ def get_exposure_set_by_id(session, expID):
 
 
 def get_survey_tile_by_name(session, survey_name, tile_name):
-    """
-    Get a tile in a survey from the name of the survey and tile.
+    """Get a tile in a survey from the name of the survey and tile.
 
     Parameters
     ----------
@@ -481,6 +477,7 @@ def get_survey_tile_by_name(session, survey_name, tile_name):
     Raises
     ------
     ValueError : if no matching SurveyTile is found in the database
+
     """
     query = session.query(Survey, SurveyTile)
     query = query.filter(Survey.name == survey_name,
@@ -492,8 +489,7 @@ def get_survey_tile_by_name(session, survey_name, tile_name):
 
 
 def get_expired_pointing_ids(session, time=None):
-    """
-    Finds all the pointings still pending whose valid period has expired.
+    """Find all the pointings still pending whose valid period has expired.
 
     Parameters
     ----------
@@ -505,8 +501,9 @@ def get_expired_pointing_ids(session, time=None):
 
     Returns
     -------
-    pointingIDs : list
-        a list of all matching Pointing IDs
+    pointing_ids : list
+        a list of all matching pointing IDs
+
     """
     if time is None:
         now = Time.now().iso
@@ -518,12 +515,11 @@ def get_expired_pointing_ids(session, time=None):
                          Pointing.stopUTC < now)
 
     # return values, unpacking tuples
-    return [pID for (pID,) in query.all()]
+    return [pointing_id for (pointing_id,) in query.all()]
 
 
 def get_expired_mpointing_ids(session, time=None):
-    """
-    Finds all the mpointings still unscheduled whose valid period has expired.
+    """Find all the mpointings still unscheduled whose valid period has expired.
 
     Parameters
     ----------
@@ -535,8 +531,9 @@ def get_expired_mpointing_ids(session, time=None):
 
     Returns
     -------
-    mpointingIDs : list
-        a list of all matching Mpointing IDs
+    mpointing_ids : list
+        a list of all matching mpointing IDs
+
     """
     if time is None:
         now = Time.now().iso
@@ -548,12 +545,11 @@ def get_expired_mpointing_ids(session, time=None):
                          Mpointing.stopUTC < now)
 
     # return values, unpacking tuples
-    return [mpID for (mpID,) in query.all()]
+    return [mpointing_id for (mpointing_id,) in query.all()]
 
 
 def insert_items(session, items):
-    """
-    Insert one or more items into the database.
+    """Insert one or more items into the database.
 
     This routine is slow for large numbers of items,
     use one of the bulk_insert routines instead.
@@ -564,6 +560,7 @@ def insert_items(session, items):
         the session object
     items : `obsdb.models.Base`
         A model instance, e.g `Pointing`
+
     """
     items = list(items)
     for i, item in enumerate(items):
@@ -572,9 +569,27 @@ def insert_items(session, items):
             session.flush()
 
 
-def bulk_update_pointing_status(session, pointingIDs, status):
+def update_pointing_status(session, pointing_id, status):
+    """Set the status of the given pointing.
+
+    For large numbers of pointings use `bulk_update_pointing_status`.
+
+    Parameters
+    ----------
+    session : `sqlalchemy.Session.session`
+        the session object
+    pointing_id : int
+        the id number of the pointing
+    status : string
+        status to set pointing to
+
     """
-    Set the status of a large number of pointings.
+    pointing = get_pointing_by_id(session, pointing_id)
+    pointing.status = status
+
+
+def bulk_update_pointing_status(session, pointing_ids, status):
+    """Set the status of a large number of pointings.
 
     Setting the status of a pointing, or updating any DB item, does not
     need this function. One can use:
@@ -590,18 +605,18 @@ def bulk_update_pointing_status(session, pointingIDs, status):
     ----------
     session : `sqlalchemy.Session.session`
         the session object
-    pointingIDs : list
-        a list of pointingIDs to update
+    pointing_ids : list
+        a list of pointing IDs to update
     status : string
         status to set pointings to
+
     """
-    mappings = [dict(pointingID=pID, status=status) for pID in pointingIDs]
+    mappings = [dict(pointingID=pointing_id, status=status) for pointing_id in pointing_ids]
     session.bulk_update_mappings(Pointing, mappings)
 
 
-def bulk_update_mpointing_status(session, mpointingIDs, status):
-    """
-    Set the status of a large number of mpointings.
+def bulk_update_mpointing_status(session, mpointing_ids, status):
+    """Set the status of a large number of mpointings.
 
     Setting the status of an mpointing, or updating any DB item, does not
     need this function. One can use:
@@ -617,99 +632,71 @@ def bulk_update_mpointing_status(session, mpointingIDs, status):
     ----------
     session : `sqlalchemy.Session.session`
         the session object
-    mpointingIDs : list
-        a list of mpointingIDs to update
+    mpointing_ids : list
+        a list of mpointing IDs to update
     status : string
         status to set mpointings to
+
     """
-    mappings = [dict(mpointingID=mpID, status=status) for mpID in mpointingIDs]
+    mappings = [dict(mpointingID=mpointing_id, status=status) for mpointing_id in mpointing_ids]
     session.bulk_update_mappings(Mpointing, mappings)
 
 
-def _make_random_pointing(userKey, numexps=None, time=None):
-    """
-    Make a random pointing for testing.
+def mark_completed(pointing_id):
+    """Update the given pointing's status to 'completed'.
 
-    It should be observable from La Palma at the time of creation.
-    However not all pointings will be valid in the queue immedietly due to
-    random start and stop times.
+    A utility function that creates its own session.
 
     Parameters
     ----------
-    numexps : int
-        if None, a random number of exposure_sets between 1 and 5 will be added
+    pointing_id : int
+        the id number of the pointing
 
-    time : `~astropy.time.Time`
-        The time to centre the pointings around
-        if None, the current time is used
-
-    Returns
-    -------
-    pointing : `Pointing`
-        the new Pointing
     """
-    import numpy as np
-    from astropy.coordinates import EarthLocation
-    from astropy import units as u
-
-    lapalma = EarthLocation(lat=28*u.deg, lon=-17*u.deg)
-    if time is None:
-        time = Time.now()
-    # LST in degrees
-    lst = time.sidereal_time('mean', longitude=lapalma.lon).deg
-    t1 = time + np.random.randint(-5, 2) * u.day
-    t2 = t1 + np.random.randint(1, 10) * u.day
-    p = Pointing(objectName='randObj',
-                 ra=np.random.uniform(lst-3, lst+3),
-                 decl=np.random.uniform(10, 89),
-                 rank=np.random.randint(1, 100),
-                 minAlt=30,
-                 maxSunAlt=-15,
-                 minTime=np.random.uniform(100, 3600),
-                 maxMoon=np.random.choice(['D', 'G', 'B']),
-                 minMoonSep=30,
-                 ToO=np.random.randint(0, 2),
-                 startUTC=t1,
-                 stopUTC=t2,
-                 status='pending',
-                 userKey=userKey,
-                 )
-
-    if numexps is None:
-        numexps = np.random.randint(1, 6)
-    for i in range(numexps):
-        exposure_set = ExposureSet(expTime=np.random.uniform(10., 360.),
-                                   numexp=1,
-                                   typeFlag="SCIENCE",
-                                   filt=np.random.choice(['L', 'R', 'G', 'B']),
-                                   binning=1,
-                                   raoff=0,
-                                   decoff=0,
-                                   )
-        p.exposure_sets.append(exposure_set)
-
-    return p
-
-
-def markJobCompleted(pID):
     with open_session() as s:
-        pointing = get_pointing_by_id(s, pID)
-        pointing.status = 'completed'
+        update_pointing_status(s, pointing_id, 'completed')
 
 
-def markJobAborted(pID):
+def mark_aborted(pointing_id):
+    """Update the given pointing's status to 'aborted'.
+
+    A utility function that creates its own session.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    """
     with open_session() as s:
-        pointing = get_pointing_by_id(s, pID)
-        pointing.status = 'aborted'
+        update_pointing_status(s, pointing_id, 'aborted')
 
 
-def markJobInterrupted(pID):
+def mark_interrupted(pointing_id):
+    """Update the given pointing's status to 'interrupted'.
+
+    A utility function that creates its own session.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    """
     with open_session() as s:
-        pointing = get_pointing_by_id(s, pID)
-        pointing.status = 'interrupted'
+        update_pointing_status(s, pointing_id, 'interrupted')
 
 
-def markJobRunning(pID):
+def mark_running(pointing_id):
+    """Update the given pointing's status to 'running'.
+
+    A utility function that creates its own session.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    """
     with open_session() as s:
-        pointing = get_pointing_by_id(s, pID)
-        pointing.status = 'running'
+        update_pointing_status(s, pointing_id, 'running')

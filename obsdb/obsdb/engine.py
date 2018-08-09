@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+"""Session management functions."""
+
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine
@@ -12,10 +15,10 @@ ENGINE = create_engine('mysql+pymysql://{}'.format(params.DATABASE_LOCATION),
                        echo=params.DATABASE_ECHO,
                        pool_pre_ping=params.DATABASE_PRE_PING)
 
+
 @contextmanager
 def open_session():
-    """
-    Create a DB session context manager.
+    """Create a DB session context manager.
 
     Automatically takes care of commiting changes
     to DB when scope closes and rolls back on exceptions.
@@ -34,14 +37,14 @@ def open_session():
     >>> with open_session() as session:
     >>>     newUser = User('sl', '1234', 'Stuey')
     >>>     session.add(newUser)
-    """
 
+    """
     Session = sessionmaker(bind=ENGINE)
     session = Session()
     try:
         yield session
         session.commit()
-    except:
+    except Exception:
         session.rollback()
         raise
     finally:
@@ -49,8 +52,7 @@ def open_session():
 
 
 def load_session():
-    """
-    Create a DB session.
+    """Create a DB session.
 
     By making a DB session this way, you must commit and rollback changes
     yourself.
@@ -72,8 +74,8 @@ def load_session():
     >>>    session.rollback()
     >>> finally:
     >>>    session.close()
-    """
 
+    """
     Session = sessionmaker(bind=ENGINE)
     session = Session()
     return session

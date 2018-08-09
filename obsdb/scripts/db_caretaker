@@ -1,27 +1,24 @@
 #!/usr/bin/env python
-"""
-A script to take care of the queue database
-"""
+"""A script to take care of the queue database."""
 
 import os
 import sys
 import time
 
-from sqlalchemy.orm import joinedload
 from astropy.time import Time
 
 import obsdb as db
 
 
-def ThereCanOnlyBeOne():
-    """Quit if this process is already running (dodgy kludge!)"""
+def there_can_only_be_one():
+    """Quit if this process is already running (dodgy kludge!)."""
     ps = os.popen('ps -fu ' + os.environ['LOGNAME'] + ' | grep -v cron | grep -v emacs').read()
     if ps.count(sys.argv[0]) > 1:
         print(sys.argv[0], ' already running')
         sys.exit()
 
 
-ThereCanOnlyBeOne()
+there_can_only_be_one()
 
 
 print('~~~~~~~~~~~~~~~~~~~')
@@ -36,7 +33,7 @@ with db.open_session() as session:
         print('> Marking {} Pointings as expired'.format(len(expired_pointings)))
         start = time.time()
         db.bulk_update_pointing_status(session, expired_pointings, 'expired')
-        print('>    took {:.2f} secs'.format(time.time()-start))
+        print('>    took {:.2f} secs'.format(time.time() - start))
     else:
         print('> None found')
 
@@ -49,7 +46,7 @@ with db.open_session() as session:
         print('> Marking {} Mpointings as expired'.format(len(expired_mpointings)))
         start = time.time()
         db.bulk_update_mpointing_status(session, expired_mpointings, 'expired')
-        print('>    took {:.2f} secs'.format(time.time()-start))
+        print('>    took {:.2f} secs'.format(time.time() - start))
     else:
         print('> None found')
 
@@ -69,7 +66,7 @@ with db.open_session() as session:
             print('> Marking {} Mpointings as scheduled'.format(len(incorrect_mps)))
             start = time.time()
             db.bulk_update_mpointing_status(session, incorrect_mps, 'scheduled')
-            print('>    took {:.2f} secs'.format(time.time()-start))
+            print('>    took {:.2f} secs'.format(time.time() - start))
 
 # schedule Pointings for unscheduled Mpointings
 with db.open_session() as session:
@@ -81,13 +78,11 @@ with db.open_session() as session:
         start = time.time()
         pointings = [mp.get_next_pointing() for mp in unscheduled_mps]
         pointings = [p for p in pointings if p is not None]
-        print('>    took {:.2f} secs'.format(time.time()-start))
+        print('>    took {:.2f} secs'.format(time.time() - start))
 
         print('> Inserting {} Pointings into DB'.format(len(pointings)))
         start = time.time()
         db.insert_items(session, pointings)
-        print('>    took {:.2f} secs'.format(time.time()-start))
+        print('>    took {:.2f} secs'.format(time.time() - start))
     else:
         print('> None found')
-
-

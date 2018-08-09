@@ -1,6 +1,9 @@
-from setuptools import setup
+"""Setup script for the obsdb package."""
 import glob
+
 from obsdb import __version__
+
+from setuptools import setup
 
 setup(name='obsdb',
       version=__version__,

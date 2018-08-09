@@ -1,8 +1,13 @@
+#!/usr/bin/env python
+"""ObsDB module parameters."""
+
 import os
 import sys
-import socket
-import pkg_resources
+
 import configobj
+
+import pkg_resources
+
 import validate
 
 
@@ -32,7 +37,7 @@ for loc in paths:
 # validate ConfigObj, filling defaults from configspec if missing from config file
 validator = validate.Validator()
 result = config.validate(validator)
-if result != True:
+if result is not True:
     print('Config file validation failed')
     sys.exit(1)
 

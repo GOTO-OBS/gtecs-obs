@@ -1,0 +1,156 @@
+#!/usr/bin/env python
+"""A script add an inverse survey of defined points into the G-TeCS database."""
+
+import argparse
+import getpass
+import time
+
+import astropy.units as u
+
+import gototile
+
+import numpy as np
+
+import obsdb as db
+
+
+MP_SETTINGS = dict(start_rank=800,
+                   minAlt=35,
+                   minTime=(60 + 5) * 3,
+                   maxSunAlt=-12,
+                   maxMoon='B',
+                   minMoonSep=50,
+                   ToO=0,
+                   num_todo=3,
+                   valid_time=-1,
+                   wait_time=10080,  # 1 week
+                   )
+
+EXP_SETTINGS = dict(expTime=60,
+                    raoff=0.,
+                    decoff=0.,
+                    numexp=3,
+                    typeFlag='SCIENCE',
+                    filt='L',
+                    binning=1,
+                    utMask=None)
+
+
+def get_userkey(username, description=''):
+    """Get user key of a user, and create it if it doesn't exit."""
+    with db.open_session() as session:
+        try:
+            user_key = db.get_userkey(session, username)
+        except Exception:
+            # Create user if it doesn't exist
+            prompt = "Creating {} user - give password: ".format(username)
+            passwd = getpass.getpass(prompt=prompt)
+            db.add_user(session, username, passwd, description)
+            session.commit()
+            user_key = db.get_userkey(session, username)
+    return user_key
+
+
+def get_coords_from_file(filename):
+    """Define mini-survey tiles centres and ranks."""
+    allras = []
+    alldecs = []
+    ranks = []
+    names = []
+    with open(filename) as file:
+        for i, line in enumerate(file):
+            if line[0] == '#':
+                continue
+            tile, ra, dec, *_ = line.split()
+            if i > 800:
+                break
+            rank = (i - 1) // 100 + 990
+            name = tile  # 'Galaxy_survey_{}'.format(tile)
+
+            # print(name, ra, dec, rank)
+
+            allras.append(ra)
+            alldecs.append(dec)
+            ranks.append(rank)
+            names.append(name)
+
+    return allras, alldecs, ranks, names
+
+
+def get_tiles(fov, overlap, nside=256):
+    """Define survey tiles using GOTO-tile."""
+    tiles = gototile.grid.tileallsky(fov, nside, overlap)
+    coords = tiles[2]
+    ras, decs = coords.ra.value, coords.dec.value
+    names = np.arange(len(coords)) + 1
+    return ras, decs, names
+
+
+def run(filename):
+    """Create the mpointings and add them to the database."""
+    ra_fov = 5.6
+    dec_fov = 2.5
+    ra_overlap = 0.1
+    dec_overlap = 0.5
+
+    fov = {'ra': ra_fov * u.deg, 'dec': dec_fov * u.deg}
+    overlap = {'ra': ra_overlap, 'dec': dec_overlap}
+
+    # Get tiles from GOTO-tile
+    tile_ras, tile_decs, tile_names = get_tiles(fov, overlap)
+
+    # Get the tiles that are in the survey file
+    _, _, _, survey_names = get_coords_from_file(filename)
+
+    # Filter to the tiles NOT in the survey file
+    # (I bet there's a better way to do this with masks...)
+    ras = []
+    decs = []
+    names = []
+    for i in range(len(tile_names)):
+        ra = tile_ras[i]
+        dec = tile_decs[i]
+        name = 'T{}'.format(tile_names[i])
+
+        if name not in survey_names:
+            ras.append(ra)
+            decs.append(dec)
+            names.append('Galaxy_anti-survey_{}'.format(name))
+
+    # Add to the database
+    mpointings = []
+    user_key = get_userkey('goto', 'GOTO Survey')
+    with db.open_session() as session:
+        # create Mpointings
+        print('Creating mpointings...')
+        start = time.time()
+        for ra, dec, name in zip(ras, decs, names):
+            mp = db.Mpointing(userKey=user_key,
+                              objectName=name,
+                              ra=float(ra),
+                              decl=float(dec),
+                              **MP_SETTINGS)
+
+            mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
+            mpointings.append(mp)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+        print('Adding {} mpointings to database...'.format(len(mpointings)))
+        start = time.time()
+        db.insert_items(session, mpointings)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+
+if __name__ == '__main__':
+    description = __doc__
+
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('file', help="File with tiles", type=str)
+
+    args = parser.parse_args()
+
+    filename = args.file
+
+    run(filename)

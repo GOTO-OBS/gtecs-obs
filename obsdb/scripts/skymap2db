@@ -8,12 +8,12 @@
 
 import argparse
 import os
-import sys
 import time
 
+import astropy.units as u
+
+from gototile.grid import SkyGrid
 from gototile.skymap import SkyMap
-from gototile.skymaptools import tile_skymap
-from gototile.telescope import GOTON4, GOTON8, GOTOS4, GOTOS8
 
 import obsdb as db
 
@@ -65,7 +65,7 @@ def add_to_database(pointings, event_time, event_name, survey_name, filename):
         # Go through the pointings
         for pointing in pointings:
             # Get pointing infomation
-            tile_name = str(pointing['fieldname'])
+            tile_name = str(pointing['tilename'])
             prob = float(pointing['prob'])
 
             # Find the matched Survey tile
@@ -93,18 +93,30 @@ def add_to_database(pointings, event_time, event_name, survey_name, filename):
             session.add(mpointing)
 
 
-def run(filename, telescope, survey_name, hp_lim=0.001, n_lim=200):
+def run(filename, hp_lim=0.001, n_lim=200):
     """Create the mpointings and add them to the database."""
+    ra_fov = 5.5
+    dec_fov = 2.6
+    ra_overlap = 0.1
+    dec_overlap = 0.1
+
+    fov = {'ra': ra_fov * u.deg, 'dec': dec_fov * u.deg}
+    overlap = {'ra': ra_overlap, 'dec': dec_overlap}
+
+    # Create an all-sky grid with GOTO-tile
+    grid = SkyGrid(fov, overlap)
+
     # open skymap and get event details
     print('Loading skymap...')
-    skymap = SkyMap(filename)
-    event_time = skymap.header['date-det']
-    event_name = skymap.header['objid']
+    skymap = SkyMap.from_fits(filename)
+    event_time = skymap.date_det
+    event_name = skymap.objid
     print('  loaded event {}'.format(event_name))
 
-    # get pointings from gototile
+    # apply the skymap to the grid
     print('Getting skymap tile pointings')
-    pointings = tile_skymap(skymap, [telescope])
+    grid.apply_skymap(skymap)
+    pointings = grid.get_table()
     pointings.sort('prob')
     pointings.reverse()
     print('  loaded {} pointings'.format(len(pointings)))
@@ -129,7 +141,7 @@ def run(filename, telescope, survey_name, hp_lim=0.001, n_lim=200):
     # add pointings to the database
     print('Adding {} tiles to the database...'.format(len(selected_pointings)))
     start = time.time()
-    add_to_database(selected_pointings, event_time, event_name, survey_name, filename)
+    add_to_database(selected_pointings, event_time, event_name, grid.name, filename)
     print('  took {:.2f} secs'.format(time.time() - start))
 
 
@@ -142,8 +154,6 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('filename', help="skymap file")
-    parser.add_argument('--telescope', help="telescope name", default='gn4')
-    parser.add_argument('--survey_name', help="survey name", default='-allsky-0.5')
     parser.add_argument('--priority', help="minimum priority", type=float, default=0.001)
     parser.add_argument('--number', help="minimum number", type=int, default=200)
 
@@ -151,22 +161,4 @@ if __name__ == '__main__':
 
     filename = os.path.realpath(args.filename)  # unpack relative paths
 
-    if args.telescope.upper() in ['GOTON4', 'GN4']:
-        telescope = GOTON4()
-    elif args.telescope.upper() in ['GOTON8', 'GN8']:
-        telescope = GOTON8()
-    elif args.telescepe.upper() in ['GOTOS4', 'GS4']:
-        telescope = GOTOS4()
-    elif args.telescepe.upper() in ['GOTOS8', 'GS8']:
-        telescope = GOTOS8()
-    else:
-        print('Telescope not supported:', args.telescope)
-        sys.exit()
-
-    if args.survey_name[0] == '-':
-        survey_name = telescope.name.replace('-', '') + args.survey_name
-    else:
-        survey_name = args.survey_name
-
-    run(filename, telescope, survey_name,
-        hp_lim=args.priority, n_lim=args.number)
+    run(filename, hp_lim=args.priority, n_lim=args.number)

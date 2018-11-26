@@ -7,25 +7,23 @@ import time
 
 import astropy.units as u
 
-import gototile
-
-import numpy as np
+from gototile.grid import SkyGrid
 
 import obsdb as db
 
 
 SURVEY_SETTINGS = dict(start_rank=999,
                        minAlt=35,
-                       minTime=120,
+                       minTime=45,
                        maxSunAlt=-12,
                        maxMoon='B',
                        minMoonSep=30,
                        ToO=0,
-                       num_todo=-1,
+                       num_todo=1,
                        valid_time=-1,
-                       wait_time=4320)
+                       wait_time=0)
 
-EXP_SETTINGS = dict(expTime=120,
+EXP_SETTINGS = dict(expTime=30,
                     raoff=0.,
                     decoff=0.,
                     numexp=3,
@@ -50,35 +48,27 @@ def get_userkey(username, description=''):
     return user_key
 
 
-def get_tiles(fov, overlap, nside=256):
-    """Define survey tiles using GOTO-tile."""
-    tiles = gototile.grid.tileallsky(fov, nside, overlap)
-    coords = tiles[2]
-    ras, decs = coords.ra.value, coords.dec.value
-    names = np.arange(len(coords)) + 1
-    return ras, decs, names
-
-
 def run(fov, overlap):
     """Create the mpointings and add them to the database."""
-    # Get tiles from GOTO-tile
-    ras, decs, names = get_tiles(fov, overlap)
+    # Create an all-sky grid with GOTO-tile
+    grid = SkyGrid(fov, overlap)
+    tile_coords = grid.coords
+    tile_names = grid.tilenames
 
     # Add to the database
-    tiles = []
-    mpointings = []
     user_key = get_userkey('goto', 'GOTO Survey')
     with db.open_session() as session:
         # create a Survey
-        survey_name = '{}x{}-allsky-{}-{}'.format(fov['ra'], fov['dec'],
-                                                  overlap['ra'], overlap['dec'])
-        survey = db.Survey(name=survey_name)
+        survey = db.Survey(name=grid.name)
         session.add(survey)
 
         # create SurveyTiles
+        tiles = []
         print('Creating tiles...')
         start = time.time()
-        for ra, dec, name in zip(ras, decs, names):
+        for coord, name in zip(tile_coords, tile_names):
+            ra = coord.ra.value
+            dec = coord.dec.value
             if abs(dec) < 0.00001:  # GOTO-tile rounding errors
                 dec = 0
             tile = db.SurveyTile(ra=float(ra), decl=float(dec), name=str(name))
@@ -92,12 +82,14 @@ def run(fov, overlap):
         print('  took {:.2f} secs'.format(time.time() - start))
 
         # create Mpointings
+        mpointings = []
         print('Creating mpointings...')
         start = time.time()
         for tile in tiles:
             mp = db.Mpointing(userKey=user_key,
-                              objectName='T{}'.format(tile.name),
+                              objectName=tile.name,
                               **SURVEY_SETTINGS)
+            mp.objectName = survey.name + '_' + tile.name
             mp.surveyID = survey.surveyID
             mp.surveyTileID = tile.tileID
             mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))

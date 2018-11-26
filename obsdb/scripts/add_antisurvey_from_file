@@ -7,9 +7,7 @@ import time
 
 import astropy.units as u
 
-import gototile
-
-import numpy as np
+from gototile.grid import SkyGrid
 
 import obsdb as db
 
@@ -77,27 +75,20 @@ def get_coords_from_file(filename):
     return allras, alldecs, ranks, names
 
 
-def get_tiles(fov, overlap, nside=256):
-    """Define survey tiles using GOTO-tile."""
-    tiles = gototile.grid.tileallsky(fov, nside, overlap)
-    coords = tiles[2]
-    ras, decs = coords.ra.value, coords.dec.value
-    names = np.arange(len(coords)) + 1
-    return ras, decs, names
-
-
 def run(filename):
     """Create the mpointings and add them to the database."""
-    ra_fov = 5.6
-    dec_fov = 2.5
+    ra_fov = 5.5
+    dec_fov = 2.6
     ra_overlap = 0.1
-    dec_overlap = 0.5
+    dec_overlap = 0.1
 
     fov = {'ra': ra_fov * u.deg, 'dec': dec_fov * u.deg}
     overlap = {'ra': ra_overlap, 'dec': dec_overlap}
 
-    # Get tiles from GOTO-tile
-    tile_ras, tile_decs, tile_names = get_tiles(fov, overlap)
+    # Create an all-sky grid with GOTO-tile
+    grid = SkyGrid(fov, overlap)
+    tile_coords = grid.coords
+    tile_names = grid.tilenames
 
     # Get the tiles that are in the survey file
     _, _, _, survey_names = get_coords_from_file(filename)
@@ -107,14 +98,10 @@ def run(filename):
     ras = []
     decs = []
     names = []
-    for i in range(len(tile_names)):
-        ra = tile_ras[i]
-        dec = tile_decs[i]
-        name = 'T{}'.format(tile_names[i])
-
+    for coord, name in zip(tile_coords, tile_names):
         if name not in survey_names:
-            ras.append(ra)
-            decs.append(dec)
+            ras.append(coord.ra.value)
+            decs.append(coord.dec.value)
             names.append('Galaxy_anti-survey_{}'.format(name))
 
     # Add to the database

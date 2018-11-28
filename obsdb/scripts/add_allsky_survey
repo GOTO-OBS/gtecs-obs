@@ -14,16 +14,16 @@ import obsdb as db
 
 SURVEY_SETTINGS = dict(start_rank=999,
                        minAlt=35,
-                       minTime=45,
+                       minTime=120,
                        maxSunAlt=-12,
                        maxMoon='B',
                        minMoonSep=30,
                        ToO=0,
-                       num_todo=1,
+                       num_todo=-1,
                        valid_time=-1,
-                       wait_time=0)
+                       wait_time=4320)
 
-EXP_SETTINGS = dict(expTime=30,
+EXP_SETTINGS = dict(expTime=120,
                     raoff=0.,
                     decoff=0.,
                     numexp=3,

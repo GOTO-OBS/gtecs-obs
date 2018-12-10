@@ -449,16 +449,14 @@ DROP TRIGGER IF EXISTS `goto_obs`.`pointings_BEFORE_UPDATE` $$
 USE `goto_obs`$$
 CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`pointings_BEFORE_UPDATE` BEFORE UPDATE ON `pointings` FOR EACH ROW
 BEGIN
-	IF (NEW.`ts` <> OLD.`ts`) THEN
-    	IF (OLD.`status` != 'running' AND NEW.`status` = 'running') THEN
-			/* the pointing has started */
-			SET NEW.`startedUTC` = NOW();
-        END IF;
-		IF (OLD.`status` IN ('pending', 'running') AND NEW.`status` NOT IN ('pending', 'running')) THEN
-			/* the pointing has finished somehow (completed, aborted, interrupted, expired...) */
-			SET NEW.`stoppedUTC` = NOW();
-        END IF;
-	END IF;
+	IF (OLD.`status` != 'running' AND NEW.`status` = 'running') THEN
+		/* the pointing has started */
+		SET NEW.`startedUTC` = UTC_TIMESTAMP();
+    END IF;
+	IF (OLD.`status` IN ('pending', 'running') AND NEW.`status` NOT IN ('pending', 'running')) THEN
+		/* the pointing has finished somehow (completed, aborted, interrupted, expired...) */
+		SET NEW.`stoppedUTC` = UTC_TIMESTAMP();
+    END IF;
 END$$
 
 

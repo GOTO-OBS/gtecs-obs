@@ -468,8 +468,8 @@ BEGIN
 	DECLARE isinfinite INT;
 	IF (NEW.`ts` <> OLD.`ts`) THEN
 		IF NEW.`status` NOT IN ('pending', 'running') THEN
-			/* the pointing is finished somehow (completed, aborted, interrupted, expired...) */
-			UPDATE `mpointings` SET `status` = 'unscheduled' WHERE (NEW.`mpointings_mpointingID` = `mpointings`.`mpointingID`);
+			/* the pointing is finished somehow (completed, aborted, interrupted, expired...), so mark mpointing as unscheduled iff it is scheduled */
+			UPDATE `mpointings` SET `status` = 'unscheduled' WHERE (`mpointings`.`mpointingID` = NEW.`mpointings_mpointingID` and `mpointings`.`status` = 'scheduled');
 		END IF;
 		IF NEW.`status` = 'completed' THEN
 			/* increase the Mpointing's completed count */

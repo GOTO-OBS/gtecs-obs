@@ -14,7 +14,7 @@ REQUIRES = ['sqlalchemy>=1.2',
 # Get the version string
 __version__ = None
 with open('obsdb/version.py') as f:
-    version = exec(f.read())
+    exec(f.read())  # Should set __version__
 
 setup(name='obsdb',
       version=__version__,

@@ -11,6 +11,10 @@ REQUIRES = ['sqlalchemy>=1.2',
             'configobj',
             ]
 
+# Get the version string
+with open('obsdb/version.py') as f:
+    version = exec(f.read())
+
 setup(name='obsdb',
       version=__version__,
       description='Observation Database API for GOTO',

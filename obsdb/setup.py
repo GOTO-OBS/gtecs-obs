@@ -1,9 +1,15 @@
 """Setup script for the obsdb package."""
 import glob
 
-from obsdb import __version__
-
 from setuptools import setup
+
+PACKAGES = ['obsdb']
+
+REQUIRES = ['sqlalchemy>=1.2',
+            'pymysql',
+            'astropy',
+            'configobj',
+            ]
 
 setup(name='obsdb',
       version=__version__,
@@ -11,9 +17,10 @@ setup(name='obsdb',
       url='http://github.com/GOTO/goto-obsdb',
       author='Martin Dyer',
       author_email='martin.dyer@sheffield.ac.uk',
-      packages=['obsdb'],
+      install_requires=REQUIRES,
+      packages=PACKAGES,
       package_data={'': ['data/*']},
-      install_requires=['sqlalchemy>=1.2', 'pymysql', 'astropy', 'configobj'],
-      scripts=glob.glob('scripts/*'),
       include_package_data=True,
-      zip_safe=False)
+      scripts=glob.glob('scripts/*'),
+      zip_safe=False,
+      )

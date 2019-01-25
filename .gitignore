@@ -1,9 +1,9 @@
-#Ignore compiled python files
+# Compiled python files
 *.pyc
 
-#Ignore Visual Studio Code files
+# Visual Studio Code files
 *.browse*
 *.vscode*
 
-#Ignore non-final schema
+# Test schema
 newschema.sql

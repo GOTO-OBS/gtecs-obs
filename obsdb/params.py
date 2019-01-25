@@ -10,37 +10,48 @@ import pkg_resources
 
 import validate
 
+from . import __version__
 
-# get a default spec for config file, either from local path, or installed path
+
+# Load configspec file for default configuration
 if os.path.exists('obsdb/data/configspec.ini'):
-    # we are running in install dir, during installation
-    configspec_file = 'obsdb/data/configspec.ini'
+    # We are running in install dir, during installation
+    CONFIGSPEC_FILE = 'obsdb/data/configspec.ini'
 else:
-    # we are being imported, find pkg_resources
-    configspec_file = pkg_resources.resource_filename('obsdb', 'data/configspec.ini')
+    # We are being imported, find pkg_resources
+    CONFIGSPEC_FILE = pkg_resources.resource_filename('obsdb', 'data/configspec.ini')
 
-# try and load config file
-# look in current dir, home directory and anywhere specified by OBSDB_CONF environment variable
-paths = [os.curdir, os.path.expanduser("~")]
+# Try to find .obsdb.conf file, look in the home directory and
+# anywhere specified by OBSDB_CONF environment variable
+paths = [os.path.expanduser("~")]
 if "OBSDB_CONF" in os.environ:
-    paths.append(os.environ["OBSDB_CONF"])
+    OBSDB_CONF_PATH = os.environ["OBSDB_CONF"]
+    paths.append(OBSDB_CONF_PATH)
+else:
+    OBSDB_CONF_PATH = None
 
-# now load config file
-config = configobj.ConfigObj({}, configspec=configspec_file)
+# Load the config file as a ConfigObj
+config = configobj.ConfigObj({}, configspec=CONFIGSPEC_FILE)
+CONFIG_FILE_PATH = None
 for loc in paths:
     try:
         with open(os.path.join(loc, ".obsdb.conf")) as source:
-            config = configobj.ConfigObj(source, configspec=configspec_file)
-    except IOError as e:
+            config = configobj.ConfigObj(source, configspec=CONFIGSPEC_FILE)
+            CONFIG_FILE_PATH = loc
+    except IOError:
         pass
 
-# validate ConfigObj, filling defaults from configspec if missing from config file
+# Validate ConfigObj, filling defaults from configspec if missing from config file
 validator = validate.Validator()
 result = config.validate(validator)
 if result is not True:
     print('Config file validation failed')
+    print([k for k in result if not result[k]])
     sys.exit(1)
 
+############################################################
+# Module parameters
+VERSION = __version__
 
 # Database parameters
 DATABASE_USER = config['DATABASE_USER']

@@ -1,9 +1,11 @@
-#Ignore compiled python files
-*.pyc
+# Python files
+__pycache__/
+*.py[cod]
+*.egg-info/
 
-#Ignore Visual Studio Code files
+# Visual Studio Code files
 *.browse*
 *.vscode*
 
-#Ignore non-final schema
+# Test schema
 newschema.sql

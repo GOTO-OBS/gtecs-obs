@@ -246,10 +246,10 @@ def fill_mpointing(mpointing):
         string = 'Use default constraints (alt>30, sunalt<-15, moon<B, moonsep>30)? [y/n]: '
         default_cons = input(string)
     if default_cons in ['y', 'Y']:
-        mpointing['minAlt'] = 30,
-        mpointing['maxSunAlt'] = -15,
-        mpointing['maxMoon'] = 'B',
-        mpointing['minMoonSep'] = 30,
+        mpointing['minAlt'] = 30
+        mpointing['maxSunAlt'] = -15
+        mpointing['maxMoon'] = 'B'
+        mpointing['minMoonSep'] = 30
     else:
         while mpointing['minAlt'] is None:
             invalue = input('Minimum target altitude (degrees): ')

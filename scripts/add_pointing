@@ -461,7 +461,15 @@ if __name__ == '__main__':
             es = db.ExposureSet(**exposure_set)
             mp.exposure_sets.append(es)
 
-        db.insert_items(session, [mp])
-
-        print('Inserted Mpointing into obsdb:')
+        print('~~ Final check ~~')
         print(mp)
+        for es in mp.exposure_sets:
+            print(es)
+
+        confirm = None
+        while confirm not in ['y', 'Y', 'n', 'N']:
+            confirm = input('Add to the database? [y/n]: ')
+
+        if confirm in ['y', 'Y']:
+            db.insert_items(session, [mp])
+            print('Inserted into observation database')

@@ -287,31 +287,31 @@ class Pointing(Base):
         return value
 
     # now include relationships to other tables
-    eventID = Column('events_eventID', Integer, ForeignKey('events.eventID'),
+    eventID = Column('eventID', Integer, ForeignKey('events.eventID'),
                      nullable=True)
     event = relationship("Event", backref="pointings")
 
-    userKey = Column('users_userKey', Integer, ForeignKey('users.userKey'),
+    userKey = Column('userKey', Integer, ForeignKey('users.userKey'),
                      nullable=False)
     user = relationship("User", backref="pointings", uselist=False)
 
-    mpointingID = Column('mpointings_mpointingID', Integer, ForeignKey('mpointings.mpointingID'),
+    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'),
                          nullable=True)
     mpointing = relationship("Mpointing", backref="pointings", uselist=False)
 
-    blockID = Column('observing_blocks_blockID', Integer, ForeignKey('observing_blocks.blockID'),
+    blockID = Column('blockID', Integer, ForeignKey('observing_blocks.blockID'),
                      nullable=True)
     observing_block = relationship("ObservingBlock", back_populates="pointings", uselist=False)
 
-    eventTileID = Column('event_tiles_tileID', Integer, ForeignKey('event_tiles.tileID'),
+    eventTileID = Column('eventTileID', Integer, ForeignKey('event_tiles.tileID'),
                          nullable=True)
     eventTile = relationship("EventTile", back_populates="pointings", uselist=False)
 
-    surveyID = Column('surveys_surveyID', Integer, ForeignKey('surveys.surveyID'),
+    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'),
                       nullable=True)
     survey = relationship("Survey", backref="pointings")
 
-    surveyTileID = Column('survey_tiles_tileID', Integer, ForeignKey('survey_tiles.tileID'),
+    surveyTileID = Column('surveyTileID', Integer, ForeignKey('survey_tiles.tileID'),
                           nullable=True)
     surveyTile = relationship("SurveyTile", back_populates="pointings", uselist=False)
 
@@ -400,12 +400,12 @@ class ExposureSet(Base):
     binning = Column(Integer)
     utMask = Column(Integer, nullable=True)
 
-    pointingID = Column('pointings_pointingID', Integer,
+    pointingID = Column('pointingID', Integer,
                         ForeignKey('pointings.pointingID'),
                         nullable=False)
     pointing = relationship("Pointing", backref="exposure_sets", uselist=False)
 
-    mpointingID = Column('mpointings_mpointingID', Integer,
+    mpointingID = Column('mpointingID', Integer,
                          ForeignKey('mpointings.mpointingID'),
                          nullable=False)
     mpointing = relationship("Mpointing", backref="exposure_sets", uselist=False)
@@ -764,23 +764,23 @@ class Mpointing(Base):
     num_completed = Column(Integer)
     status = Column(mpointing_status_list, default='unscheduled')
 
-    eventID = Column('events_eventID', Integer, ForeignKey('events.eventID'),
+    eventID = Column('eventID', Integer, ForeignKey('events.eventID'),
                      nullable=True)
     event = relationship("Event", backref="mpointings")
 
-    userKey = Column('users_userKey', Integer, ForeignKey('users.userKey'),
+    userKey = Column('userKey', Integer, ForeignKey('users.userKey'),
                      nullable=False)
     user = relationship("User", backref="mpointings", uselist=False)
 
-    eventTileID = Column('event_tiles_tileID', Integer,
+    eventTileID = Column('eventTileID', Integer,
                          ForeignKey('event_tiles.tileID'), nullable=True)
     eventTile = relationship("EventTile", back_populates="mpointing", uselist=False)
 
-    surveyID = Column('surveys_surveyID', Integer, ForeignKey('surveys.surveyID'),
+    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'),
                       nullable=True)
     survey = relationship("Survey", backref="mpointings")
 
-    surveyTileID = Column('survey_tiles_tileID', Integer,
+    surveyTileID = Column('surveyTileID', Integer,
                           ForeignKey('survey_tiles.tileID'), nullable=True)
     surveyTile = relationship("SurveyTile", back_populates="mpointing", uselist=False)
 
@@ -1162,7 +1162,7 @@ class ObservingBlock(Base):
     valid_time = Column(Integer)
     wait_time = Column(Integer)
     current = Column(Integer, default=False)
-    mpointingID = Column('mpointings_mpointingID', Integer,
+    mpointingID = Column('mpointingID', Integer,
                          ForeignKey('mpointings.mpointingID'),
                          nullable=False)
 
@@ -1362,11 +1362,11 @@ class EventTile(Base):
     pointings = relationship("Pointing", back_populates="eventTile")
     mpointing = relationship("Mpointing", back_populates="eventTile")
 
-    eventID = Column('events_eventID', Integer, ForeignKey('events.eventID'),
+    eventID = Column('eventID', Integer, ForeignKey('events.eventID'),
                      nullable=False)
     event = relationship("Event", back_populates="eventTiles", uselist=False)
 
-    surveyTileID = Column('survey_tiles_tileID', Integer,
+    surveyTileID = Column('surveyTileID', Integer,
                           ForeignKey('survey_tiles.tileID'), nullable=True)
     surveyTile = relationship("SurveyTile", back_populates="eventTiles", uselist=False)
 
@@ -1518,7 +1518,7 @@ class SurveyTile(Base):
     mpointing = relationship("Mpointing", back_populates="surveyTile")
     pointings = relationship("Pointing", back_populates="surveyTile")
 
-    surveyID = Column('surveys_surveyID', Integer, ForeignKey('surveys.surveyID'),
+    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'),
                       nullable=False)
     survey = relationship("Survey", back_populates="surveyTiles", uselist=False)
 
@@ -1606,14 +1606,14 @@ class ImageLog(Base):
     set_position = Column(Integer, default=1)
     set_total = Column(Integer, default=1)
 
-    expID = Column('exposure_sets_expID', Integer, ForeignKey('exposure_sets.expID'), nullable=True)
+    expID = Column('expID', Integer, ForeignKey('exposure_sets.expID'), nullable=True)
     exposure_set = relationship("ExposureSet", backref="image_logs", uselist=False)
 
-    pointingID = Column('pointings_pointingID', Integer, ForeignKey('pointings.pointingID'),
+    pointingID = Column('pointingID', Integer, ForeignKey('pointings.pointingID'),
                         nullable=True)
     pointing = relationship("Pointing", backref="image_logs", uselist=False)
 
-    mpointingID = Column('mpointings_mpointingID', Integer, ForeignKey('mpointings.mpointingID'),
+    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'),
                          nullable=True)
     mpointing = relationship("Mpointing", backref="image_logs", uselist=False)
 

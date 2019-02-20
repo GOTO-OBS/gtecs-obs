@@ -68,10 +68,7 @@ CREATE TABLE `survey_tiles` (
   -- indexes
   -- foreign keys
   `surveys_surveyID` INT NOT NULL,
-  INDEX `fk_survey_tiles_surveys1_idx` (`surveys_surveyID`),
-  CONSTRAINT `fk_survey_tiles_surveys1`
-    FOREIGN KEY (`surveys_surveyID`)
-    REFERENCES `surveys` (`surveyID`)
+  CONSTRAINT FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
   )
   ENGINE = InnoDB;
 
@@ -88,10 +85,8 @@ CREATE TABLE`event_tiles` (
   -- foreign keys
   `events_eventID` INT NOT NULL,
   `survey_tiles_tileID` INT NULL,
-  INDEX `fk_event_tiles_events1_idx` (`events_eventID`),
-  INDEX `fk_event_tiles_survey_tiles1_idx` (`survey_tiles_tileID`),
-  CONSTRAINT `fk_event_tiles_events1` FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
-  CONSTRAINT `fk_event_tiles_survey_tiles1` FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`)
+  CONSTRAINT FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
+  CONSTRAINT FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`)
   )
   ENGINE = InnoDB;
 
@@ -127,16 +122,11 @@ CREATE TABLE `mpointings` (
   `survey_tiles_tileID` INT NULL,
   `events_eventID` INT NULL,
   `event_tiles_tileID` INT NULL,
-  INDEX `fk_mpointing_events1_idx` (`events_eventID`),
-  INDEX `fk_mpointing_users1_idx` (`users_userKey`),
-  INDEX `fk_mpointings_survey_tiles1_idx` (`survey_tiles_tileID`),
-  INDEX `fk_mpointings_event_tiles1_idx` (`event_tiles_tileID`),
-  INDEX `fk_mpointings_surveys1_idx` (`surveys_surveyID`),
-  CONSTRAINT `fk_mpointing_events1` FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
-  CONSTRAINT `fk_mpointing_users1` FOREIGN KEY (`users_userKey`) REFERENCES `users` (`userKey`),
-  CONSTRAINT `fk_mpointings_survey_tiles1` FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`),
-  CONSTRAINT `fk_mpointings_event_tiles1` FOREIGN KEY (`event_tiles_tileID`) REFERENCES `event_tiles` (`tileID`),
-  CONSTRAINT `fk_mpointings_surveys1` FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
+  CONSTRAINT FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
+  CONSTRAINT FOREIGN KEY (`users_userKey`) REFERENCES `users` (`userKey`),
+  CONSTRAINT FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`),
+  CONSTRAINT FOREIGN KEY (`event_tiles_tileID`) REFERENCES `event_tiles` (`tileID`),
+  CONSTRAINT FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
   )
   ENGINE = InnoDB;
 
@@ -154,8 +144,7 @@ CREATE TABLE `observing_blocks` (
   INDEX `current_idx` (`current`),
   -- foreign keys
   `mpointings_mpointingID` INT NOT NULL,
-  INDEX `fk_observing_blocks_mpointing1_idx` (`mpointings_mpointingID`),
-  CONSTRAINT `fk_observing_blocks_mpointing1` FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  CONSTRAINT FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`)
   )
   ENGINE = InnoDB;
 
@@ -192,20 +181,13 @@ CREATE TABLE `pointings` (
   `survey_tiles_tileID` INT NULL,
   `events_eventID` INT NULL,
   `event_tiles_tileID` INT NULL,
-  INDEX `fk_pointings_events1_idx` (`events_eventID`),
-  INDEX `fk_pointings_users1_idx` (`users_userKey`),
-  INDEX `fk_pointings_observing_blocks1_idx` (`observing_blocks_blockID`),
-  INDEX `fk_pointings_mpointings1_idx` (`mpointings_mpointingID`),
-  INDEX `fk_pointings_event_tiles1_idx` (`event_tiles_tileID`),
-  INDEX `fk_pointings_survey_tiles1_idx` (`survey_tiles_tileID`),
-  INDEX `fk_pointings_surveys1_idx` (`surveys_surveyID`),
-  CONSTRAINT `fk_pointings_users1` FOREIGN KEY (`users_userKey`) REFERENCES `users` (`userKey`),
-  CONSTRAINT `fk_pointings_mpointings1` FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`),
-  CONSTRAINT `fk_pointings_events1` FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
-  CONSTRAINT `fk_pointings_observing_blocks1` FOREIGN KEY (`observing_blocks_blockID`) REFERENCES `observing_blocks` (`blockID`),
-  CONSTRAINT `fk_pointings_event_tiles1` FOREIGN KEY (`event_tiles_tileID`) REFERENCES `event_tiles` (`tileID`),
-  CONSTRAINT `fk_pointings_survey_tiles1` FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`),
-  CONSTRAINT `fk_pointings_surveys1` FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
+  CONSTRAINT FOREIGN KEY (`users_userKey`) REFERENCES `users` (`userKey`),
+  CONSTRAINT FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`),
+  CONSTRAINT FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
+  CONSTRAINT FOREIGN KEY (`observing_blocks_blockID`) REFERENCES `observing_blocks` (`blockID`),
+  CONSTRAINT FOREIGN KEY (`event_tiles_tileID`) REFERENCES `event_tiles` (`tileID`),
+  CONSTRAINT FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`),
+  CONSTRAINT FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -227,10 +209,8 @@ CREATE TABLE `exposure_sets` (
   -- foreign keys
   `pointings_pointingID` INT NULL,
   `mpointings_mpointingID` INT NULL,
-  INDEX `fk_exposures_pointings1_idx` (`pointings_pointingID`),
-  INDEX `fk_exposures_mpointing1_idx` (`mpointings_mpointingID`),
-  CONSTRAINT `fk_exposures_pointings1` FOREIGN KEY (`pointings_pointingID`) REFERENCES `pointings` (`pointingID`),
-  CONSTRAINT `fk_exposures_mpointing1` FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  CONSTRAINT FOREIGN KEY (`pointings_pointingID`) REFERENCES `pointings` (`pointingID`),
+  CONSTRAINT FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -255,12 +235,9 @@ CREATE TABLE `image_logs` (
   `exposure_sets_expID` INT NULL DEFAULT NULL,
   `pointings_pointingID` INT NULL DEFAULT NULL,
   `mpointings_mpointingID` INT NULL DEFAULT NULL,
-  INDEX `fk_image_logs_exposure_sets1_idx` (`exposure_sets_expID`),
-  INDEX `fk_image_logs_pointings1_idx` (`pointings_pointingID`),
-  INDEX `fk_image_logs_mpointings1_idx` (`mpointings_mpointingID`),
-  CONSTRAINT `fk_image_logs_exposure_sets1` FOREIGN KEY (`exposure_sets_expID`) REFERENCES `exposure_sets` (`expID`),
-  CONSTRAINT `fk_image_logs_pointings1` FOREIGN KEY (`pointings_pointingID`) REFERENCES `pointings` (`pointingID`),
-  CONSTRAINT `fk_image_logs_mpointings1` FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  CONSTRAINT FOREIGN KEY (`exposure_sets_expID`) REFERENCES `exposure_sets` (`expID`),
+  CONSTRAINT FOREIGN KEY (`pointings_pointingID`) REFERENCES `pointings` (`pointingID`),
+  CONSTRAINT FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;

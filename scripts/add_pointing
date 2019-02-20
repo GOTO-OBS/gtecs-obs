@@ -3,7 +3,12 @@
 
 import getpass
 
+import astropy.units as u
 from astropy.coordinates import SkyCoord
+
+from gototile.grid import SkyGrid
+
+import numpy as np
 
 import obsdb as db
 
@@ -156,38 +161,111 @@ def get_userkey(session, username):
 
 def fill_mpointing(mpointing):
     """Fill out an mpointing frame with user input."""
-    # Object name
-    while mpointing['objectName'] is None:
-        mpointing['objectName'] = input('Enter Target name: ')
 
-    # Try coord lookup
-    try:
-        coord = SkyCoord.from_name(mpointing['objectName'])
-    except Exception:
-        coord = None
-    if coord is not None:
-        print('    Found catalogue object: RA {:.4f} deg, Dec {:.4f} deg '.format(coord.ra.value,
-                                                                                  coord.dec.value))
-        use_coords = None
-        while use_coords not in ['y', 'n', 'Y', 'N']:
-            use_coords = input('Use these coordinates? [y/n]: ')
-        if use_coords in ['y', 'Y']:
-            mpointing['ra'] = coord.ra.value
-            mpointing['decl'] = coord.dec.value
+    # On or off grid?
+    ongrid = None
+    while ongrid not in ['y', 'n', 'Y', 'N']:
+        ongrid = input('Observe constrained to the grid? [y/n]: ')
+    if ongrid in ['y', 'Y']:
+        # TODO: We should load the grid from the database
+        fov = {'ra': 5.5 * u.deg, 'dec': 2.6 * u.deg}
+        overlap = {'ra': 0.1, 'dec': 0.1}
+        grid = SkyGrid(fov, overlap, kind='minverlap')
 
-    # Enter coords
-    while mpointing['ra'] is None:
-        ra_str = input('Target RA [h m s OR deg]: ')
+        db_surveys = session.query(db.Survey).filter(db.Survey.name == grid.name).all()
+        if not db_surveys:
+            db_survey = None
+            raise ValueError('Cannot find grid in the database')
+        else:
+            db_survey = db_surveys[-1]
+        print('    Using grid {}'.format(db_survey.name))
+
+        obstile = None
+        while obstile not in ['1', '2']:
+            obstile = input('Observe a specific tile [1] or find a tile from coordinates [2]?: ')
+        if obstile == '1':
+            tile_index = None
+            while tile_index is None:
+                tile_name = 'T' + input('Tile to observe: T')
+                try:
+                    tile_index = grid.tilenames.index(tile_name)
+                except ValueError:
+                    print('Could not find tile {} in grid {}'.format(tile_name, grid.name))
+        else:
+            target_ra = None
+            target_dec = None
+            while target_ra is None:
+                ra_str = input('Target RA [h m s OR deg]: ')
+                try:
+                    target_ra = parse_ra(ra_str)
+                except Exception:
+                    pass
+            while target_dec is None:
+                dec_str = input('Target Dec [d m s OR deg]: ')
+                try:
+                    target_dec = parse_dec(dec_str)
+                except Exception:
+                    pass
+            coord = SkyCoord(target_ra * u.deg, target_dec * u.deg)
+            sep = np.array(coord.separation(grid.coords))
+            tile_index = np.where(sep == (min(sep)))[0][0]
+            tile_name = grid.tilenames[tile_index]
+
+        # Find the matching SurveyTile
+        query = session.query(db.SurveyTile)
+        query = query.filter(db.SurveyTile.survey == db_survey,
+                             db.SurveyTile.name == tile_name)
+        db_tile = query.one_or_none()
+        if not db_tile:
+            raise ValueError('Cannot find tile in the database')
+
+        print('    Using coords for {}: ra={:.4f}, dec={:.4f}'.format(db_tile.name,
+                                                                      db_tile.ra,
+                                                                      db_tile.decl,
+                                                                      ))
+        mpointing['objectName'] = db_survey.name + '_' + db_tile.name + '_' + 'EXTRA'
+        mpointing['ra'] = db_tile.ra
+        mpointing['decl'] = db_tile.decl
+        mpointing['surveyID'] = db_survey.surveyID
+        mpointing['surveyTileID'] = db_tile.tileID
+
+    else:
+        # We're off grid
+        mpointing['surveyID'] = None
+        mpointing['surveyTileID'] = None
+
+        # Object name
+        while mpointing['objectName'] is None:
+            mpointing['objectName'] = input('Enter Target name: ')
+
+        # Try coord lookup
         try:
-            mpointing['ra'] = parse_ra(ra_str)
+            coord = SkyCoord.from_name(mpointing['objectName'])
         except Exception:
-            pass
-    while mpointing['decl'] is None:
-        dec_str = input('Target Dec [d m s OR deg]: ')
-        try:
-            mpointing['decl'] = parse_dec(dec_str)
-        except Exception:
-            pass
+            coord = None
+        if coord is not None:
+            print('    Found catalogue object: ra={:.4f}, dec={:.4f}'.format(coord.ra.value,
+                                                                             coord.dec.value))
+            use_coords = None
+            while use_coords not in ['y', 'n', 'Y', 'N']:
+                use_coords = input('Use these coordinates? [y/n]: ')
+            if use_coords in ['y', 'Y']:
+                mpointing['ra'] = coord.ra.value
+                mpointing['decl'] = coord.dec.value
+
+        # Enter coords
+        while mpointing['ra'] is None:
+            ra_str = input('Target RA [h m s OR deg]: ')
+            try:
+                mpointing['ra'] = parse_ra(ra_str)
+            except Exception:
+                pass
+        while mpointing['decl'] is None:
+            dec_str = input('Target Dec [d m s OR deg]: ')
+            try:
+                mpointing['decl'] = parse_dec(dec_str)
+            except Exception:
+                pass
 
     # ToO & Rank
     too = None
@@ -195,7 +273,7 @@ def fill_mpointing(mpointing):
         too = input('Is the target a ToO (can interupt)? [y/n]: ')
     if too in ['y', 'Y']:
         mpointing['ToO'] = 1
-        print('  Setting ToO rank automatically to: high')
+        print('    Setting ToO rank automatically to: high')
         mpointing['start_rank'] = 6
     else:
         mpointing['ToO'] = 0
@@ -240,6 +318,45 @@ def fill_mpointing(mpointing):
         except Exception:
             pass
 
+    # Constraings
+    default_cons = None
+    while default_cons not in ['y', 'n', 'Y', 'N']:
+        string = 'Use default constraints (alt>30, sunalt<-15, moon<B, moonsep>30)? [y/n]: '
+        default_cons = input(string)
+    if default_cons in ['y', 'Y']:
+        mpointing['minAlt'] = 30
+        mpointing['maxSunAlt'] = -15
+        mpointing['maxMoon'] = 'B'
+        mpointing['minMoonSep'] = 30
+    else:
+        while mpointing['minAlt'] is None:
+            invalue = input('Minimum target altitude (degrees): ')
+            try:
+                mpointing['minAlt'] = float(invalue)
+            except Exception:
+                pass
+
+        while mpointing['maxSunAlt'] is None:
+            invalue = input('Maximum Sun altitude (degrees): ')
+            try:
+                mpointing['maxSunAlt'] = float(invalue)
+            except Exception:
+                pass
+
+        while mpointing['maxMoon'] not in ['D', 'G', 'B']:
+            invalue = input('Maximum Moon brightness [D/G/B]: ')
+            try:
+                mpointing['maxMoon'] = invalue.upper()
+            except Exception:
+                pass
+
+        while mpointing['minMoonSep'] is None:
+            invalue = input('Minimum seperation from the Moon (degrees): ')
+            try:
+                mpointing['minMoonSep'] = float(invalue)
+            except Exception:
+                pass
+
     return mpointing
 
 
@@ -283,13 +400,12 @@ if __name__ == '__main__':
                          'num_todo': None,
                          'valid_time': None,
                          'wait_time': None,
+                         'minAlt': None,
+                         'maxSunAlt': None,
+                         'maxMoon': None,
+                         'minMoonSep': None,
                          # auto filled values
                          'minTime': None,
-                         # default values:
-                         'maxSunAlt': -15,
-                         'maxMoon': 'B',
-                         'minMoonSep': 30,
-                         'minAlt': 40,
                          }
 
     exposure_sets = []
@@ -345,7 +461,15 @@ if __name__ == '__main__':
             es = db.ExposureSet(**exposure_set)
             mp.exposure_sets.append(es)
 
-        db.insert_items(session, [mp])
-
-        print('Inserted Mpointing into obsdb:')
+        print('~~ Final check ~~')
         print(mp)
+        for es in mp.exposure_sets:
+            print(es)
+
+        confirm = None
+        while confirm not in ['y', 'Y', 'n', 'N']:
+            confirm = input('Add to the database? [y/n]: ')
+
+        if confirm in ['y', 'Y']:
+            db.insert_items(session, [mp])
+            print('Inserted into observation database')

@@ -22,25 +22,21 @@ USE `goto_obs` ;
 -- Events table
 DROP TABLE IF EXISTS `events` ;
 CREATE TABLE `events` (
-  `eventID` INT NOT NULL AUTO_INCREMENT,
+  `eventID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(255) NOT NULL,
   `source` VARCHAR(255) NOT NULL COMMENT 'LIGO, SWIFT etc.',
-  `ivo` VARCHAR(255) NOT NULL,
-  `skymap` VARCHAR(255) NULL,
-  PRIMARY KEY (`eventID`),
-  UNIQUE INDEX `ivo_UNIQUE` (`ivo` ASC)
+  `ivo` VARCHAR(255) NOT NULL UNIQUE,
+  `skymap` VARCHAR(255) NULL
   )
   ENGINE = InnoDB;
 
 -- Users table
 DROP TABLE IF EXISTS `users` ;
 CREATE TABLE IF NOT EXISTS `users` (
-  `userKey` INT(11) NOT NULL AUTO_INCREMENT,
-  `user_name` TEXT NOT NULL,
-  `password` TEXT NOT NULL,
-  `fullName` TEXT NOT NULL,
-  PRIMARY KEY (`userKey`),
-  UNIQUE INDEX `user_name_UNIQUE` (`user_name`(10) ASC)
+  `userKey` INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `user_name` VARCHAR(255) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL,
+  `fullName` TEXT NOT NULL
   )
   ENGINE = InnoDB
   AUTO_INCREMENT = 24
@@ -49,21 +45,19 @@ CREATE TABLE IF NOT EXISTS `users` (
 -- Surveys table
 DROP TABLE IF EXISTS `surveys` ;
 CREATE TABLE `surveys` (
-  `surveyID` INT NOT NULL AUTO_INCREMENT,
-  `name` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`surveyID`)
+  `surveyID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL
   )
   ENGINE = InnoDB;
 
 -- Survey tiles table
 DROP TABLE IF EXISTS `survey_tiles` ;
 CREATE TABLE `survey_tiles` (
-  `tileID` INT NOT NULL AUTO_INCREMENT,
+  `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(255) NOT NULL,
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
   `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
   `surveys_surveyID` INT NOT NULL,
-  PRIMARY KEY (`tileID`),
   INDEX `fk_survey_tiles_surveys1_idx` (`surveys_surveyID` ASC),
   CONSTRAINT `fk_survey_tiles_surveys1`
     FOREIGN KEY (`surveys_surveyID`)
@@ -76,14 +70,13 @@ CREATE TABLE `survey_tiles` (
 -- Event tiles table
 DROP TABLE IF EXISTS `event_tiles` ;
 CREATE TABLE`event_tiles` (
-  `tileID` INT NOT NULL AUTO_INCREMENT,
+  `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `ra` FLOAT NOT NULL,
   `decl` FLOAT NOT NULL,
   `probability` FLOAT NOT NULL,
   `unobserved_probability` FLOAT NOT NULL,
   `events_eventID` INT NOT NULL,
   `survey_tiles_tileID` INT NULL,
-  PRIMARY KEY (`tileID`),
   INDEX `fk_event_tiles_events1_idx` (`events_eventID` ASC),
   INDEX `fk_event_tiles_survey_tiles1_idx` (`survey_tiles_tileID` ASC),
   CONSTRAINT `fk_event_tiles_events1`
@@ -102,7 +95,7 @@ CREATE TABLE`event_tiles` (
 -- Mpointings table
 DROP TABLE IF EXISTS `mpointings` ;
 CREATE TABLE `mpointings` (
-  `mpointingID` INT NOT NULL AUTO_INCREMENT,
+  `mpointingID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `status` ENUM('unscheduled', 'scheduled', 'completed', 'aborted', 'expired', 'deleted') NOT NULL DEFAULT 'unscheduled',
   `object` TEXT NOT NULL,
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
@@ -125,7 +118,6 @@ CREATE TABLE `mpointings` (
   `survey_tiles_tileID` INT NULL,
   `events_eventID` INT NULL,
   `event_tiles_tileID` INT NULL,
-  PRIMARY KEY (`mpointingID`),
   INDEX `fk_mpointing_events1_idx` (`events_eventID` ASC),
   INDEX `fk_mpointing_users1_idx` (`users_userKey` ASC),
   INDEX `fk_mpointings_survey_tiles1_idx` (`survey_tiles_tileID` ASC),
@@ -165,13 +157,12 @@ CREATE TABLE `mpointings` (
 -- Observing blocks table
 DROP TABLE IF EXISTS `observing_blocks` ;
 CREATE TABLE `observing_blocks` (
-  `blockID` INT NOT NULL AUTO_INCREMENT,
+  `blockID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `blockNum` INT NOT NULL,
   `current` INT NOT NULL DEFAULT 0,
   `valid_time` FLOAT NOT NULL COMMENT 'how long after the startUTC the pointing should be valid for in minutes',
   `wait_time` FLOAT NOT NULL COMMENT 'time to wait after this pointing before scheduling the next',
   `mpointings_mpointingID` INT NOT NULL,
-  PRIMARY KEY (`blockID`),
   INDEX `fk_observing_blocks_mpointing1_idx` (`mpointings_mpointingID` ASC),
   INDEX `blockNum_idx` (`blockNum` ASC),
   INDEX `current_idx` (`current` ASC),
@@ -186,7 +177,7 @@ CREATE TABLE `observing_blocks` (
 -- Pointings table
 DROP TABLE IF EXISTS `pointings` ;
 CREATE TABLE `pointings` (
-  `pointingID` INT(24) NOT NULL AUTO_INCREMENT,
+  `pointingID` INT(24) NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `status` ENUM('pending', 'running', 'completed', 'aborted', 'interrupted', 'expired', 'deleted') NOT NULL DEFAULT 'pending',
   `object` TEXT NOT NULL COMMENT 'object name',
   `ra` FLOAT NOT NULL COMMENT 'in decimal degrees',
@@ -210,7 +201,6 @@ CREATE TABLE `pointings` (
   `survey_tiles_tileID` INT NULL,
   `events_eventID` INT NULL,
   `event_tiles_tileID` INT NULL,
-  PRIMARY KEY (`pointingID`),
   INDEX `fk_pointings_events1_idx` (`events_eventID` ASC),
   INDEX `fk_pointings_users1_idx` (`users_userKey` ASC),
   INDEX `fk_pointings_observing_blocks1_idx` (`observing_blocks_blockID` ASC),
@@ -264,7 +254,7 @@ CREATE TABLE `pointings` (
 -- Exposure sets table
 DROP TABLE IF EXISTS `exposure_sets` ;
 CREATE TABLE `exposure_sets` (
-  `expID` INT(24) NOT NULL AUTO_INCREMENT,
+  `expID` INT(24) NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `utMask` INT NULL COMMENT 'bit mask to allocate to individual UTs. NULL means send to all',
   `typeFlag` ENUM('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD') NOT NULL,
   `filter` CHAR(2) NOT NULL,
@@ -275,7 +265,6 @@ CREATE TABLE `exposure_sets` (
   `decoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'dec offset (arcsec)',
   `pointings_pointingID` INT NULL,
   `mpointings_mpointingID` INT NULL,
-  PRIMARY KEY (`expID`),
   INDEX `fk_exposures_pointings1_idx` (`pointings_pointingID` ASC),
   INDEX `fk_exposures_mpointing1_idx` (`mpointings_mpointingID` ASC),
   CONSTRAINT `fk_exposures_pointings1`
@@ -296,8 +285,8 @@ CREATE TABLE `exposure_sets` (
 -- Image logs table
 DROP TABLE IF EXISTS `image_logs` ;
 CREATE TABLE `image_logs` (
-  `logID` INT(24) NOT NULL AUTO_INCREMENT,
-  `filename` VARCHAR(30) NOT NULL COMMENT 'full FITS file name, including extension',
+  `logID` INT(24) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `filename` VARCHAR(30) NOT NULL UNIQUE COMMENT 'full FITS file name, including extension',
   `runNumber` INT NOT NULL,
   `ut` INT NOT NULL,
   `utMask` INT NOT NULL,
@@ -308,8 +297,6 @@ CREATE TABLE `image_logs` (
   `exposure_sets_expID` INT NULL DEFAULT NULL,
   `pointings_pointingID` INT NULL DEFAULT NULL,
   `mpointings_mpointingID` INT NULL DEFAULT NULL,
-  PRIMARY KEY (`logID`),
-  UNIQUE INDEX `filename` (`filename` ASC),
   INDEX `fk_image_logs_exposure_sets1_idx` (`exposure_sets_expID` ASC),
   INDEX `fk_image_logs_pointings1_idx` (`pointings_pointingID` ASC),
   INDEX `fk_image_logs_mpointings1_idx` (`mpointings_mpointingID` ASC),

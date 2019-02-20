@@ -39,7 +39,6 @@ CREATE TABLE IF NOT EXISTS `users` (
   `fullName` TEXT NOT NULL
   )
   ENGINE = InnoDB
-  AUTO_INCREMENT = 24
   DEFAULT CHARACTER SET = latin1;
 
 -- Surveys table
@@ -216,7 +215,6 @@ CREATE TABLE `pointings` (
     REFERENCES `surveys` (`surveyID`)
   )
   ENGINE = InnoDB
-  AUTO_INCREMENT = 17073
   DEFAULT CHARACTER SET = latin1;
 
 -- Exposure sets table
@@ -243,7 +241,6 @@ CREATE TABLE `exposure_sets` (
     REFERENCES `mpointings` (`mpointingID`)
   )
   ENGINE = InnoDB
-  AUTO_INCREMENT = 126598
   DEFAULT CHARACTER SET = latin1;
 
 -- Image logs table
@@ -277,7 +274,6 @@ CREATE TABLE `image_logs` (
     REFERENCES `mpointings` (`mpointingID`)
   )
   ENGINE = InnoDB
-  AUTO_INCREMENT = 204285
   DEFAULT CHARACTER SET = latin1;
 
 -- -----------------------------------------------------

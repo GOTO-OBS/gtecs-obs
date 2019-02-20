@@ -18,20 +18,6 @@ USE `goto_obs` ;
 -- -----------------------------------------------------
 -- Create tables
 
--- Events table
-DROP TABLE IF EXISTS `events` ;
-CREATE TABLE `events` (
-  -- columns
-  `eventID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL,
-  `source` VARCHAR(255) NOT NULL COMMENT 'LIGO, SWIFT etc.',
-  `ivo` VARCHAR(255) NOT NULL UNIQUE,
-  `skymap` VARCHAR(255) NULL
-  -- indexes
-  -- foreign keys
-  )
-  ENGINE = InnoDB;
-
 -- Users table
 DROP TABLE IF EXISTS `users` ;
 CREATE TABLE IF NOT EXISTS `users` (
@@ -45,108 +31,6 @@ CREATE TABLE IF NOT EXISTS `users` (
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
-
--- Surveys table
-DROP TABLE IF EXISTS `surveys` ;
-CREATE TABLE `surveys` (
-  -- columns
-  `surveyID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL
-  -- indexes
-  -- foreign keys
-  )
-  ENGINE = InnoDB;
-
--- Survey tiles table
-DROP TABLE IF EXISTS `survey_tiles` ;
-CREATE TABLE `survey_tiles` (
-  -- columns
-  `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL,
-  `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
-  `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
-  -- indexes
-  -- foreign keys
-  `surveys_surveyID` INT NOT NULL,
-  CONSTRAINT FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
-  )
-  ENGINE = InnoDB;
-
--- Event tiles table
-DROP TABLE IF EXISTS `event_tiles` ;
-CREATE TABLE`event_tiles` (
-  -- columns
-  `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `ra` FLOAT NOT NULL,
-  `decl` FLOAT NOT NULL,
-  `probability` FLOAT NOT NULL,
-  `unobserved_probability` FLOAT NOT NULL,
-  -- indexes
-  -- foreign keys
-  `events_eventID` INT NOT NULL,
-  `survey_tiles_tileID` INT NULL,
-  CONSTRAINT FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
-  CONSTRAINT FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`)
-  )
-  ENGINE = InnoDB;
-
--- Mpointings table
-DROP TABLE IF EXISTS `mpointings` ;
-CREATE TABLE `mpointings` (
-  -- columns
-  `mpointingID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `status` ENUM('unscheduled', 'scheduled', 'completed', 'aborted', 'expired', 'deleted') NOT NULL DEFAULT 'unscheduled',
-  `object` TEXT NOT NULL,
-  `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
-  `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
-  `rank` INT NOT NULL,
-  `start_rank` INT NOT NULL,
-  `minAlt` FLOAT NOT NULL,
-  `maxSunAlt` FLOAT NOT NULL DEFAULT -15,
-  `minTime` FLOAT NOT NULL,
-  `maxMoon` CHAR(1) NOT NULL,
-  `minMoonSep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
-  `ToO` BOOLEAN NOT NULL DEFAULT FALSE,
-  `infinite` BOOLEAN NOT NULL DEFAULT FALSE,
-  `startUTC` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'only works on mysql later than 5.6.5',
-  `stopUTC` DATETIME NULL COMMENT 'If Null then the Mpointing will continue until it is complete',
-  `num_todo` INT NOT NULL,
-  `num_completed` INT NOT NULL DEFAULT 0,
-  -- indexes
-  INDEX `status_idx` (`status`),
-  INDEX `startUTC_idx` (`startUTC`),
-  INDEX `stopUTC_idx` (`stopUTC`),
-  -- foreign keys
-  `users_userKey` INT NOT NULL,
-  `surveys_surveyID` INT NULL,
-  `survey_tiles_tileID` INT NULL,
-  `events_eventID` INT NULL,
-  `event_tiles_tileID` INT NULL,
-  CONSTRAINT FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
-  CONSTRAINT FOREIGN KEY (`users_userKey`) REFERENCES `users` (`userKey`),
-  CONSTRAINT FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`),
-  CONSTRAINT FOREIGN KEY (`event_tiles_tileID`) REFERENCES `event_tiles` (`tileID`),
-  CONSTRAINT FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
-  )
-  ENGINE = InnoDB;
-
--- Observing blocks table
-DROP TABLE IF EXISTS `observing_blocks` ;
-CREATE TABLE `observing_blocks` (
-  -- columns
-  `blockID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `blockNum` INT NOT NULL,
-  `current` BOOLEAN NOT NULL DEFAULT FALSE,
-  `valid_time` FLOAT NOT NULL COMMENT 'how long after the startUTC the pointing should be valid for in minutes',
-  `wait_time` FLOAT NOT NULL COMMENT 'time to wait after this pointing before scheduling the next',
-  -- indexes
-  INDEX `blockNum_idx` (`blockNum`),
-  INDEX `current_idx` (`current`),
-  -- foreign keys
-  `mpointings_mpointingID` INT NOT NULL,
-  CONSTRAINT FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`)
-  )
-  ENGINE = InnoDB;
 
 -- Pointings table
 DROP TABLE IF EXISTS `pointings` ;
@@ -214,6 +98,122 @@ CREATE TABLE `exposure_sets` (
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
+
+-- Mpointings table
+DROP TABLE IF EXISTS `mpointings` ;
+CREATE TABLE `mpointings` (
+  -- columns
+  `mpointingID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `status` ENUM('unscheduled', 'scheduled', 'completed', 'aborted', 'expired', 'deleted') NOT NULL DEFAULT 'unscheduled',
+  `object` TEXT NOT NULL,
+  `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
+  `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
+  `rank` INT NOT NULL,
+  `start_rank` INT NOT NULL,
+  `minAlt` FLOAT NOT NULL,
+  `maxSunAlt` FLOAT NOT NULL DEFAULT -15,
+  `minTime` FLOAT NOT NULL,
+  `maxMoon` CHAR(1) NOT NULL,
+  `minMoonSep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
+  `ToO` BOOLEAN NOT NULL DEFAULT FALSE,
+  `infinite` BOOLEAN NOT NULL DEFAULT FALSE,
+  `startUTC` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'only works on mysql later than 5.6.5',
+  `stopUTC` DATETIME NULL COMMENT 'If Null then the Mpointing will continue until it is complete',
+  `num_todo` INT NOT NULL,
+  `num_completed` INT NOT NULL DEFAULT 0,
+  -- indexes
+  INDEX `status_idx` (`status`),
+  INDEX `startUTC_idx` (`startUTC`),
+  INDEX `stopUTC_idx` (`stopUTC`),
+  -- foreign keys
+  `users_userKey` INT NOT NULL,
+  `surveys_surveyID` INT NULL,
+  `survey_tiles_tileID` INT NULL,
+  `events_eventID` INT NULL,
+  `event_tiles_tileID` INT NULL,
+  CONSTRAINT FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
+  CONSTRAINT FOREIGN KEY (`users_userKey`) REFERENCES `users` (`userKey`),
+  CONSTRAINT FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`),
+  CONSTRAINT FOREIGN KEY (`event_tiles_tileID`) REFERENCES `event_tiles` (`tileID`),
+  CONSTRAINT FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
+  )
+  ENGINE = InnoDB;
+
+-- Observing blocks table
+DROP TABLE IF EXISTS `observing_blocks` ;
+CREATE TABLE `observing_blocks` (
+  -- columns
+  `blockID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `blockNum` INT NOT NULL,
+  `current` BOOLEAN NOT NULL DEFAULT FALSE,
+  `valid_time` FLOAT NOT NULL COMMENT 'how long after the startUTC the pointing should be valid for in minutes',
+  `wait_time` FLOAT NOT NULL COMMENT 'time to wait after this pointing before scheduling the next',
+  -- indexes
+  INDEX `blockNum_idx` (`blockNum`),
+  INDEX `current_idx` (`current`),
+  -- foreign keys
+  `mpointings_mpointingID` INT NOT NULL,
+  CONSTRAINT FOREIGN KEY (`mpointings_mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  )
+  ENGINE = InnoDB;
+
+-- Events table
+DROP TABLE IF EXISTS `events` ;
+CREATE TABLE `events` (
+  -- columns
+  `eventID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `source` VARCHAR(255) NOT NULL COMMENT 'LIGO, SWIFT etc.',
+  `ivo` VARCHAR(255) NOT NULL UNIQUE,
+  `skymap` VARCHAR(255) NULL
+  -- indexes
+  -- foreign keys
+  )
+  ENGINE = InnoDB;
+
+-- Event tiles table
+DROP TABLE IF EXISTS `event_tiles` ;
+CREATE TABLE`event_tiles` (
+  -- columns
+  `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `ra` FLOAT NOT NULL,
+  `decl` FLOAT NOT NULL,
+  `probability` FLOAT NOT NULL,
+  `unobserved_probability` FLOAT NOT NULL,
+  -- indexes
+  -- foreign keys
+  `events_eventID` INT NOT NULL,
+  `survey_tiles_tileID` INT NULL,
+  CONSTRAINT FOREIGN KEY (`events_eventID`) REFERENCES `events` (`eventID`),
+  CONSTRAINT FOREIGN KEY (`survey_tiles_tileID`) REFERENCES `survey_tiles` (`tileID`)
+  )
+  ENGINE = InnoDB;
+
+-- Surveys table
+DROP TABLE IF EXISTS `surveys` ;
+CREATE TABLE `surveys` (
+  -- columns
+  `surveyID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL
+  -- indexes
+  -- foreign keys
+  )
+  ENGINE = InnoDB;
+
+-- Survey tiles table
+DROP TABLE IF EXISTS `survey_tiles` ;
+CREATE TABLE `survey_tiles` (
+  -- columns
+  `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
+  `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
+  -- indexes
+  -- foreign keys
+  `surveys_surveyID` INT NOT NULL,
+  CONSTRAINT FOREIGN KEY (`surveys_surveyID`) REFERENCES `surveys` (`surveyID`)
+  )
+  ENGINE = InnoDB;
 
 -- Image logs table
 DROP TABLE IF EXISTS `image_logs` ;

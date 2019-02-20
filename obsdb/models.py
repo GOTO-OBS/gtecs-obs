@@ -84,9 +84,13 @@ class User(Base):
 
     """
 
-    __tablename__ = "users"
+    # Set corresponding SQL table name
+    __tablename__ = 'users'
 
+    # Primary key
     userKey = Column(Integer, primary_key=True)
+
+    # Columns
     userName = Column('user_name', String)
     password = Column(String)
     fullName = Column(String)
@@ -238,10 +242,14 @@ class Pointing(Base):
 
     """
 
-    __tablename__ = "pointings"
+    # Set corresponding SQL table name
+    __tablename__ = 'pointings'
 
+    # Primary key
     pointingID = Column(Integer, primary_key=True)
-    objectName = Column("object", String)
+
+    # Columns
+    objectName = Column('object', String)
     ra = Column(Float)
     decl = Column(Float)
     rank = Column(Integer)
@@ -257,9 +265,39 @@ class Pointing(Base):
     stoppedUTC = Column(DateTime, default=None)
     status = Column(pointing_status_list, default='pending')
 
-    # use validators to allow various types of input for UTC
-    # also enforce stopUTC > startUTC
-    # NB stopUTC can be None, for never-expiring pointings
+    # Foreign keys
+    userKey = Column('userKey', Integer, ForeignKey('users.userKey'), nullable=False)
+    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'), nullable=True)
+    blockID = Column('blockID', Integer, ForeignKey('observing_blocks.blockID'), nullable=True)
+    eventID = Column('eventID', Integer, ForeignKey('events.eventID'), nullable=True)
+    eventTileID = Column('eventTileID', Integer, ForeignKey('event_tiles.tileID'), nullable=True)
+    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'), nullable=True)
+    surveyTileID = Column('surveyTileID', Integer, ForeignKey('survey_tiles.tileID'), nullable=True)
+
+    # Foreign relationships
+    user = relationship('User', backref='pointings', uselist=False)
+    mpointing = relationship('Mpointing', backref='pointings', uselist=False)
+    observing_block = relationship('ObservingBlock', back_populates='pointings', uselist=False)
+    event = relationship('Event', backref='pointings')
+    eventTile = relationship('EventTile', back_populates='pointings', uselist=False)
+    survey = relationship('Survey', backref='pointings')
+    surveyTile = relationship('SurveyTile', back_populates='pointings', uselist=False)
+
+    def __repr__(self):
+        template = ("Pointing(pointingID={}, status='{}', " +
+                    "objectName={}, ra={}, decl={}, rank={}, " +
+                    "minAlt={}, maxSunAlt={}, minTime={}, maxMoon={}, minMoonSep={}, " +
+                    "ToO={}, startUTC={}, stopUTC={}, startedUTC={}, stoppedUTC={}, " +
+                    "userKey={}, mpointingID={}, blockID={}, " +
+                    "eventID={}, eventTileID={}, surveyID={}, surveyTileID={})")
+        return template.format(
+            self.pointingID, self.status, self.objectName, self.ra, self.decl, self.rank,
+            self.minAlt, self.maxSunAlt, self.minTime, self.maxMoon, self.minMoonSep,
+            bool(self.ToO), self.startUTC, self.stopUTC, self.startedUTC, self.stoppedUTC,
+            self.userKey, self.mpointingID, self.blockID,
+            self.eventID, self.eventTileID, self.surveyID, self.surveyTileID
+        )
+
     @validates('startUTC', 'stopUTC')
     def munge_times(self, key, field):
         """Use validators to allow various types of input for UTC.
@@ -285,50 +323,6 @@ class Pointing(Base):
                 raise AssertionError("stopUTC must be later than startUTC")
 
         return value
-
-    # now include relationships to other tables
-    eventID = Column('eventID', Integer, ForeignKey('events.eventID'),
-                     nullable=True)
-    event = relationship("Event", backref="pointings")
-
-    userKey = Column('userKey', Integer, ForeignKey('users.userKey'),
-                     nullable=False)
-    user = relationship("User", backref="pointings", uselist=False)
-
-    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'),
-                         nullable=True)
-    mpointing = relationship("Mpointing", backref="pointings", uselist=False)
-
-    blockID = Column('blockID', Integer, ForeignKey('observing_blocks.blockID'),
-                     nullable=True)
-    observing_block = relationship("ObservingBlock", back_populates="pointings", uselist=False)
-
-    eventTileID = Column('eventTileID', Integer, ForeignKey('event_tiles.tileID'),
-                         nullable=True)
-    eventTile = relationship("EventTile", back_populates="pointings", uselist=False)
-
-    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'),
-                      nullable=True)
-    survey = relationship("Survey", backref="pointings")
-
-    surveyTileID = Column('surveyTileID', Integer, ForeignKey('survey_tiles.tileID'),
-                          nullable=True)
-    surveyTile = relationship("SurveyTile", back_populates="pointings", uselist=False)
-
-    def __repr__(self):
-        template = ("Pointing(pointingID={}, status='{}', " +
-                    "objectName={}, ra={}, decl={}, rank={}, " +
-                    "minAlt={}, maxSunAlt={}, minTime={}, maxMoon={}, minMoonSep={}, " +
-                    "ToO={}, startUTC={}, stopUTC={}, startedUTC={}, stoppedUTC={}, " +
-                    "userKey={}, mpointingID={}, blockID={}, " +
-                    "eventID={}, eventTileID={}, surveyID={}, surveyTileID={})")
-        return template.format(
-            self.pointingID, self.status, self.objectName, self.ra, self.decl, self.rank,
-            self.minAlt, self.maxSunAlt, self.minTime, self.maxMoon, self.minMoonSep,
-            bool(self.ToO), self.startUTC, self.stopUTC, self.startedUTC, self.stoppedUTC,
-            self.userKey, self.mpointingID, self.blockID,
-            self.eventID, self.eventTileID, self.surveyID, self.surveyTileID
-        )
 
 
 class ExposureSet(Base):
@@ -388,9 +382,13 @@ class ExposureSet(Base):
 
     """
 
-    __tablename__ = "exposure_sets"
+    # Set corresponding SQL table name
+    __tablename__ = 'exposure_sets'
 
+    # Primary key
     expID = Column(Integer, primary_key=True)
+
+    # Columns
     raoff = Column(Float, server_default='0.0')
     decoff = Column(Float, server_default='0.0')
     typeFlag = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'))
@@ -400,15 +398,13 @@ class ExposureSet(Base):
     binning = Column(Integer)
     utMask = Column(Integer, nullable=True)
 
-    pointingID = Column('pointingID', Integer,
-                        ForeignKey('pointings.pointingID'),
-                        nullable=False)
-    pointing = relationship("Pointing", backref="exposure_sets", uselist=False)
+    # Foreign keys
+    pointingID = Column('pointingID', Integer, ForeignKey('pointings.pointingID'), nullable=False)
+    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'), nullable=False)
 
-    mpointingID = Column('mpointingID', Integer,
-                         ForeignKey('mpointings.mpointingID'),
-                         nullable=False)
-    mpointing = relationship("Mpointing", backref="exposure_sets", uselist=False)
+    # Foreign relationships
+    pointing = relationship('Pointing', backref='exposure_sets', uselist=False)
+    mpointing = relationship('Mpointing', backref='exposure_sets', uselist=False)
 
     def __repr__(self):
         template = ("ExposureSet(expID={}, raoff={}, decoff={}, typeFlag={}, " +
@@ -743,9 +739,13 @@ class Mpointing(Base):
 
     """
 
-    __tablename__ = "mpointings"
+    # Set corresponding SQL table name
+    __tablename__ = 'mpointings'
 
+    # Primary key
     mpointingID = Column(Integer, primary_key=True)
+
+    # Columns
     objectName = Column('object', String)
     ra = Column(Float)
     decl = Column(Float)
@@ -764,27 +764,20 @@ class Mpointing(Base):
     num_completed = Column(Integer)
     status = Column(mpointing_status_list, default='unscheduled')
 
-    eventID = Column('eventID', Integer, ForeignKey('events.eventID'),
-                     nullable=True)
-    event = relationship("Event", backref="mpointings")
+    # Foreign keys
+    userKey = Column('userKey', Integer, ForeignKey('users.userKey'), nullable=False)
+    eventID = Column('eventID', Integer, ForeignKey('events.eventID'), nullable=True)
+    eventTileID = Column('eventTileID', Integer, ForeignKey('event_tiles.tileID'), nullable=True)
+    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'), nullable=True)
+    surveyTileID = Column('surveyTileID', Integer, ForeignKey('survey_tiles.tileID'), nullable=True)
 
-    userKey = Column('userKey', Integer, ForeignKey('users.userKey'),
-                     nullable=False)
-    user = relationship("User", backref="mpointings", uselist=False)
-
-    eventTileID = Column('eventTileID', Integer,
-                         ForeignKey('event_tiles.tileID'), nullable=True)
-    eventTile = relationship("EventTile", back_populates="mpointing", uselist=False)
-
-    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'),
-                      nullable=True)
-    survey = relationship("Survey", backref="mpointings")
-
-    surveyTileID = Column('surveyTileID', Integer,
-                          ForeignKey('survey_tiles.tileID'), nullable=True)
-    surveyTile = relationship("SurveyTile", back_populates="mpointing", uselist=False)
-
-    observing_blocks = relationship("ObservingBlock", back_populates="mpointing", viewonly=True)
+    # Foreign relationships
+    user = relationship('User', backref='mpointings', uselist=False)
+    event = relationship('Event', backref='mpointings')
+    survey = relationship('Survey', backref='mpointings')
+    eventTile = relationship('EventTile', back_populates='mpointing', uselist=False)
+    surveyTile = relationship('SurveyTile', back_populates='mpointing', uselist=False)
+    observing_blocks = relationship('ObservingBlock', back_populates='mpointing', viewonly=True)
 
     def __repr__(self):
         template = ("Mpointing(mpointingID={}, status='{}', num_todo={}, num_completed={}," +
@@ -1155,20 +1148,26 @@ class ObservingBlock(Base):
 
     """
 
-    __tablename__ = "observing_blocks"
+    # Set corresponding SQL table name
+    __tablename__ = 'observing_blocks'
 
+    # Primary key
     blockID = Column(Integer, primary_key=True)
+
+    # Columns
     blockNum = Column(Integer)
     valid_time = Column(Integer)
     wait_time = Column(Integer)
     current = Column(Integer, default=False)
+
+    # Foreign keys
     mpointingID = Column('mpointingID', Integer,
                          ForeignKey('mpointings.mpointingID'),
                          nullable=False)
 
-    # relationships
-    mpointing = relationship("Mpointing", back_populates="observing_blocks", uselist=False)
-    pointings = relationship("Pointing", back_populates="observing_block")
+    # Foreign relationships
+    mpointing = relationship('Mpointing', back_populates='observing_blocks', uselist=False)
+    pointings = relationship('Pointing', back_populates='observing_block')
 
     def __repr__(self):
         template = ("ObservingBlock(blockID={}, blockNum={}, valid_time={}, " +
@@ -1222,15 +1221,20 @@ class Event(Base):
 
     """
 
-    __tablename__ = "events"
+    # Set corresponding SQL table name
+    __tablename__ = 'events'
 
+    # Primary key
     eventID = Column(Integer, primary_key=True)
+
+    # Columns
     name = Column(String)
     source = Column(String)
     ivo = Column(String, unique=True)
     skymap = Column(String)
 
-    eventTiles = relationship("EventTile", back_populates="event")
+    # Foreign relationships
+    eventTiles = relationship('EventTile', back_populates='event')
 
     def __repr__(self):
         return "Event(eventID={}, name={}, source={}, ivo={}, skymap={})".format(
@@ -1350,25 +1354,27 @@ class EventTile(Base):
 
     """
 
-    __tablename__ = "event_tiles"
+    # Set corresponding SQL table name
+    __tablename__ = 'event_tiles'
 
+    # Primary key
     tileID = Column(Integer, primary_key=True)
+
+    # Columns
     ra = Column(Float)
     decl = Column(Float)
     probability = Column(Float)
     unobserved_probability = Column(Float)
 
-    # handle relationships
-    pointings = relationship("Pointing", back_populates="eventTile")
-    mpointing = relationship("Mpointing", back_populates="eventTile")
+    # Foreign keys
+    eventID = Column('eventID', Integer, ForeignKey('events.eventID'), nullable=False)
+    surveyTileID = Column('surveyTileID', Integer, ForeignKey('survey_tiles.tileID'), nullable=True)
 
-    eventID = Column('eventID', Integer, ForeignKey('events.eventID'),
-                     nullable=False)
-    event = relationship("Event", back_populates="eventTiles", uselist=False)
-
-    surveyTileID = Column('surveyTileID', Integer,
-                          ForeignKey('survey_tiles.tileID'), nullable=True)
-    surveyTile = relationship("SurveyTile", back_populates="eventTiles", uselist=False)
+    # Foreign relationships
+    pointings = relationship('Pointing', back_populates='eventTile')
+    mpointing = relationship('Mpointing', back_populates='eventTile')
+    event = relationship('Event', back_populates='eventTiles', uselist=False)
+    surveyTile = relationship('SurveyTile', back_populates='eventTiles', uselist=False)
 
     def __repr__(self):
         template = ("EventTile(tileID={}, ra={}, decl={}, " +
@@ -1417,12 +1423,17 @@ class Survey(Base):
 
     """
 
-    __tablename__ = "surveys"
+    # Set corresponding SQL table name
+    __tablename__ = 'surveys'
 
+    # Primary key
     surveyID = Column(Integer, primary_key=True)
+
+    # Columns
     name = Column(String)
 
-    surveyTiles = relationship("SurveyTile", back_populates="survey")
+    # Foreign relationships
+    surveyTiles = relationship('SurveyTile', back_populates='survey')
 
     def __repr__(self):
         return "Survey(surveyID={}, name={})".format(
@@ -1507,20 +1518,25 @@ class SurveyTile(Base):
 
     """
 
-    __tablename__ = "survey_tiles"
+    # Set corresponding SQL table name
+    __tablename__ = 'survey_tiles'
 
+    # Primary key
     tileID = Column(Integer, primary_key=True)
+
+    # Columns
     ra = Column(Float)
     decl = Column(Float)
     name = Column(String)
 
-    eventTiles = relationship("EventTile", back_populates="surveyTile")
-    mpointing = relationship("Mpointing", back_populates="surveyTile")
-    pointings = relationship("Pointing", back_populates="surveyTile")
+    # Foreign keys
+    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'), nullable=False)
 
-    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'),
-                      nullable=False)
-    survey = relationship("Survey", back_populates="surveyTiles", uselist=False)
+    # Foreign relationships
+    survey = relationship('Survey', back_populates='surveyTiles', uselist=False)
+    eventTiles = relationship('EventTile', back_populates='surveyTile')
+    mpointing = relationship('Mpointing', back_populates='surveyTile')
+    pointings = relationship('Pointing', back_populates='surveyTile')
 
     def __repr__(self):
         template = ("SurveyTile(tileID={}, ra={}, decl={}, " +
@@ -1594,9 +1610,13 @@ class ImageLog(Base):
 
     """
 
-    __tablename__ = "image_logs"
+    # Set corresponding SQL table name
+    __tablename__ = 'image_logs'
 
+    # Primary key
     logID = Column(Integer, primary_key=True)
+
+    # Columns
     filename = Column(String)
     runNumber = Column(Integer)
     ut = Column(Integer)
@@ -1606,16 +1626,15 @@ class ImageLog(Base):
     set_position = Column(Integer, default=1)
     set_total = Column(Integer, default=1)
 
+    # Foreign keys
     expID = Column('expID', Integer, ForeignKey('exposure_sets.expID'), nullable=True)
-    exposure_set = relationship("ExposureSet", backref="image_logs", uselist=False)
+    pointingID = Column('pointingID', Integer, ForeignKey('pointings.pointingID'), nullable=True)
+    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'), nullable=True)
 
-    pointingID = Column('pointingID', Integer, ForeignKey('pointings.pointingID'),
-                        nullable=True)
-    pointing = relationship("Pointing", backref="image_logs", uselist=False)
-
-    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'),
-                         nullable=True)
-    mpointing = relationship("Mpointing", backref="image_logs", uselist=False)
+    # Foreign relationships
+    exposure_set = relationship('ExposureSet', backref='image_logs', uselist=False)
+    pointing = relationship('Pointing', backref='image_logs', uselist=False)
+    mpointing = relationship('Mpointing', backref='image_logs', uselist=False)
 
     def __repr__(self):
         template = ("ImageLog(logID={}, filename={}, runNumber={}, " +

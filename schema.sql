@@ -33,7 +33,7 @@ CREATE TABLE `events` (
 -- Users table
 DROP TABLE IF EXISTS `users` ;
 CREATE TABLE IF NOT EXISTS `users` (
-  `userKey` INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `userKey` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `user_name` VARCHAR(255) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
   `fullName` TEXT NOT NULL
@@ -93,8 +93,8 @@ CREATE TABLE `mpointings` (
   `object` TEXT NOT NULL,
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
   `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
-  `rank` INT(11) NOT NULL,
-  `start_rank` INT(11) NOT NULL,
+  `rank` INT NOT NULL,
+  `start_rank` INT NOT NULL,
   `minAlt` FLOAT NOT NULL,
   `maxSunAlt` FLOAT NOT NULL DEFAULT -15,
   `minTime` FLOAT NOT NULL,
@@ -106,7 +106,7 @@ CREATE TABLE `mpointings` (
   `stopUTC` DATETIME NULL COMMENT 'If Null then the Mpointing will continue until it is complete',
   `num_todo` INT NOT NULL,
   `num_completed` INT NOT NULL DEFAULT 0,
-  `users_userKey` INT(11) NOT NULL,
+  `users_userKey` INT NOT NULL,
   `surveys_surveyID` INT NULL,
   `survey_tiles_tileID` INT NULL,
   `events_eventID` INT NULL,
@@ -158,7 +158,7 @@ CREATE TABLE `observing_blocks` (
 -- Pointings table
 DROP TABLE IF EXISTS `pointings` ;
 CREATE TABLE `pointings` (
-  `pointingID` INT(24) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `pointingID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `status` ENUM('pending', 'running', 'completed', 'aborted', 'interrupted', 'expired', 'deleted') NOT NULL DEFAULT 'pending',
   `object` TEXT NOT NULL COMMENT 'object name',
   `ra` FLOAT NOT NULL COMMENT 'in decimal degrees',
@@ -175,7 +175,7 @@ CREATE TABLE `pointings` (
   `startedUTC` DATETIME NULL,
   `stoppedUTC` DATETIME NULL,
   `ts` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  `users_userKey` INT(11) NOT NULL,
+  `users_userKey` INT NOT NULL,
   `mpointings_mpointingID` INT NULL,
   `observing_blocks_blockID` INT NULL,
   `surveys_surveyID` INT NULL,
@@ -220,15 +220,15 @@ CREATE TABLE `pointings` (
 -- Exposure sets table
 DROP TABLE IF EXISTS `exposure_sets` ;
 CREATE TABLE `exposure_sets` (
-  `expID` INT(24) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `expID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `utMask` INT NULL COMMENT 'bit mask to allocate to individual UTs. NULL means send to all',
   `typeFlag` ENUM('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD') NOT NULL,
-  `filter` CHAR(2) NOT NULL,
+  `filter` CHAR(1) NOT NULL,
   `exptime` FLOAT NOT NULL,
-  `binning` INT(11) UNSIGNED NOT NULL,
-  `numexp` INT(11) UNSIGNED NOT NULL,
-  `raoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'RA offset (arcsecs)',
-  `decoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'dec offset (arcsec)',
+  `binning` INT UNSIGNED NOT NULL,
+  `numexp` INT UNSIGNED NOT NULL,
+  `raoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'arcsecs',
+  `decoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'arcsec',
   `pointings_pointingID` INT NULL,
   `mpointings_mpointingID` INT NULL,
   INDEX `fk_exposures_pointings1_idx` (`pointings_pointingID`),
@@ -246,7 +246,7 @@ CREATE TABLE `exposure_sets` (
 -- Image logs table
 DROP TABLE IF EXISTS `image_logs` ;
 CREATE TABLE `image_logs` (
-  `logID` INT(24) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `logID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `filename` VARCHAR(30) NOT NULL UNIQUE COMMENT 'full FITS file name, including extension',
   `runNumber` INT NOT NULL,
   `ut` INT NOT NULL,

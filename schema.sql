@@ -58,7 +58,7 @@ CREATE TABLE `survey_tiles` (
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
   `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
   `surveys_surveyID` INT NOT NULL,
-  INDEX `fk_survey_tiles_surveys1_idx` (`surveys_surveyID` ASC),
+  INDEX `fk_survey_tiles_surveys1_idx` (`surveys_surveyID`),
   CONSTRAINT `fk_survey_tiles_surveys1`
     FOREIGN KEY (`surveys_surveyID`)
     REFERENCES `surveys` (`surveyID`)
@@ -77,8 +77,8 @@ CREATE TABLE`event_tiles` (
   `unobserved_probability` FLOAT NOT NULL,
   `events_eventID` INT NOT NULL,
   `survey_tiles_tileID` INT NULL,
-  INDEX `fk_event_tiles_events1_idx` (`events_eventID` ASC),
-  INDEX `fk_event_tiles_survey_tiles1_idx` (`survey_tiles_tileID` ASC),
+  INDEX `fk_event_tiles_events1_idx` (`events_eventID`),
+  INDEX `fk_event_tiles_survey_tiles1_idx` (`survey_tiles_tileID`),
   CONSTRAINT `fk_event_tiles_events1`
     FOREIGN KEY (`events_eventID`)
     REFERENCES `events` (`eventID`)
@@ -118,14 +118,14 @@ CREATE TABLE `mpointings` (
   `survey_tiles_tileID` INT NULL,
   `events_eventID` INT NULL,
   `event_tiles_tileID` INT NULL,
-  INDEX `fk_mpointing_events1_idx` (`events_eventID` ASC),
-  INDEX `fk_mpointing_users1_idx` (`users_userKey` ASC),
-  INDEX `fk_mpointings_survey_tiles1_idx` (`survey_tiles_tileID` ASC),
-  INDEX `fk_mpointings_event_tiles1_idx` (`event_tiles_tileID` ASC),
-  INDEX `fk_mpointings_surveys1_idx` (`surveys_surveyID` ASC),
-  INDEX `status_idx` (`status` ASC),
-  INDEX `startUTC_idx` (`startUTC` ASC),
-  INDEX `stopUTC_idx` (`stopUTC` ASC),
+  INDEX `fk_mpointing_events1_idx` (`events_eventID`),
+  INDEX `fk_mpointing_users1_idx` (`users_userKey`),
+  INDEX `fk_mpointings_survey_tiles1_idx` (`survey_tiles_tileID`),
+  INDEX `fk_mpointings_event_tiles1_idx` (`event_tiles_tileID`),
+  INDEX `fk_mpointings_surveys1_idx` (`surveys_surveyID`),
+  INDEX `status_idx` (`status`),
+  INDEX `startUTC_idx` (`startUTC`),
+  INDEX `stopUTC_idx` (`stopUTC`),
   CONSTRAINT `fk_mpointing_events1`
     FOREIGN KEY (`events_eventID`)
     REFERENCES `events` (`eventID`)
@@ -163,9 +163,9 @@ CREATE TABLE `observing_blocks` (
   `valid_time` FLOAT NOT NULL COMMENT 'how long after the startUTC the pointing should be valid for in minutes',
   `wait_time` FLOAT NOT NULL COMMENT 'time to wait after this pointing before scheduling the next',
   `mpointings_mpointingID` INT NOT NULL,
-  INDEX `fk_observing_blocks_mpointing1_idx` (`mpointings_mpointingID` ASC),
-  INDEX `blockNum_idx` (`blockNum` ASC),
-  INDEX `current_idx` (`current` ASC),
+  INDEX `fk_observing_blocks_mpointing1_idx` (`mpointings_mpointingID`),
+  INDEX `blockNum_idx` (`blockNum`),
+  INDEX `current_idx` (`current`),
   CONSTRAINT `fk_observing_blocks_mpointing1`
     FOREIGN KEY (`mpointings_mpointingID`)
     REFERENCES `mpointings` (`mpointingID`)
@@ -201,16 +201,16 @@ CREATE TABLE `pointings` (
   `survey_tiles_tileID` INT NULL,
   `events_eventID` INT NULL,
   `event_tiles_tileID` INT NULL,
-  INDEX `fk_pointings_events1_idx` (`events_eventID` ASC),
-  INDEX `fk_pointings_users1_idx` (`users_userKey` ASC),
-  INDEX `fk_pointings_observing_blocks1_idx` (`observing_blocks_blockID` ASC),
-  INDEX `fk_pointings_mpointings1_idx` (`mpointings_mpointingID` ASC),
-  INDEX `status_idx` (`status` ASC),
-  INDEX `startUTC_idx` (`startUTC` ASC),
-  INDEX `stopUTC_idx` (`stopUTC` ASC),
-  INDEX `fk_pointings_event_tiles1_idx` (`event_tiles_tileID` ASC),
-  INDEX `fk_pointings_survey_tiles1_idx` (`survey_tiles_tileID` ASC),
-  INDEX `fk_pointings_surveys1_idx` (`surveys_surveyID` ASC),
+  INDEX `fk_pointings_events1_idx` (`events_eventID`),
+  INDEX `fk_pointings_users1_idx` (`users_userKey`),
+  INDEX `fk_pointings_observing_blocks1_idx` (`observing_blocks_blockID`),
+  INDEX `fk_pointings_mpointings1_idx` (`mpointings_mpointingID`),
+  INDEX `status_idx` (`status`),
+  INDEX `startUTC_idx` (`startUTC`),
+  INDEX `stopUTC_idx` (`stopUTC`),
+  INDEX `fk_pointings_event_tiles1_idx` (`event_tiles_tileID`),
+  INDEX `fk_pointings_survey_tiles1_idx` (`survey_tiles_tileID`),
+  INDEX `fk_pointings_surveys1_idx` (`surveys_surveyID`),
   CONSTRAINT `fk_pointings_events1`
     FOREIGN KEY (`events_eventID`)
     REFERENCES `events` (`eventID`)
@@ -265,8 +265,8 @@ CREATE TABLE `exposure_sets` (
   `decoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'dec offset (arcsec)',
   `pointings_pointingID` INT NULL,
   `mpointings_mpointingID` INT NULL,
-  INDEX `fk_exposures_pointings1_idx` (`pointings_pointingID` ASC),
-  INDEX `fk_exposures_mpointing1_idx` (`mpointings_mpointingID` ASC),
+  INDEX `fk_exposures_pointings1_idx` (`pointings_pointingID`),
+  INDEX `fk_exposures_mpointing1_idx` (`mpointings_mpointingID`),
   CONSTRAINT `fk_exposures_pointings1`
     FOREIGN KEY (`pointings_pointingID`)
     REFERENCES `pointings` (`pointingID`)
@@ -297,11 +297,11 @@ CREATE TABLE `image_logs` (
   `exposure_sets_expID` INT NULL DEFAULT NULL,
   `pointings_pointingID` INT NULL DEFAULT NULL,
   `mpointings_mpointingID` INT NULL DEFAULT NULL,
-  INDEX `fk_image_logs_exposure_sets1_idx` (`exposure_sets_expID` ASC),
-  INDEX `fk_image_logs_pointings1_idx` (`pointings_pointingID` ASC),
-  INDEX `fk_image_logs_mpointings1_idx` (`mpointings_mpointingID` ASC),
-  INDEX `runNumber_idx` (`runNumber` ASC),
-  INDEX `writeUTC_idx` (`writeUTC` ASC),
+  INDEX `fk_image_logs_exposure_sets1_idx` (`exposure_sets_expID`),
+  INDEX `fk_image_logs_pointings1_idx` (`pointings_pointingID`),
+  INDEX `fk_image_logs_mpointings1_idx` (`mpointings_mpointingID`),
+  INDEX `runNumber_idx` (`runNumber`),
+  INDEX `writeUTC_idx` (`writeUTC`),
   CONSTRAINT `fk_image_logs_exposure_sets1`
     FOREIGN KEY (`exposure_sets_expID`)
     REFERENCES `exposure_sets` (`expID`)

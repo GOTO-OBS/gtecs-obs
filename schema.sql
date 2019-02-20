@@ -100,8 +100,8 @@ CREATE TABLE `mpointings` (
   `minTime` FLOAT NOT NULL,
   `maxMoon` CHAR(1) NOT NULL,
   `minMoonSep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
-  `ToO` TINYINT(1) NOT NULL DEFAULT 0,
-  `infinite` TINYINT(1) NOT NULL DEFAULT 0,
+  `ToO` BOOLEAN NOT NULL DEFAULT FALSE,
+  `infinite` BOOLEAN NOT NULL DEFAULT FALSE,
   `startUTC` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'only works on mysql later than 5.6.5',
   `stopUTC` DATETIME NULL COMMENT 'If Null then the Mpointing will continue until it is complete',
   `num_todo` INT NOT NULL,
@@ -142,7 +142,7 @@ DROP TABLE IF EXISTS `observing_blocks` ;
 CREATE TABLE `observing_blocks` (
   `blockID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `blockNum` INT NOT NULL,
-  `current` INT NOT NULL DEFAULT 0,
+  `current` BOOLEAN NOT NULL DEFAULT FALSE,
   `valid_time` FLOAT NOT NULL COMMENT 'how long after the startUTC the pointing should be valid for in minutes',
   `wait_time` FLOAT NOT NULL COMMENT 'time to wait after this pointing before scheduling the next',
   `mpointings_mpointingID` INT NOT NULL,
@@ -169,7 +169,7 @@ CREATE TABLE `pointings` (
   `minTime` FLOAT NOT NULL,
   `maxMoon` CHAR(1) NOT NULL,
   `minMoonSep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
-  `ToO` TINYINT(1) UNSIGNED NOT NULL,
+  `ToO` BOOLEAN NOT NULL DEFAULT FALSE,
   `startUTC` DATETIME NOT NULL,
   `stopUTC` DATETIME NULL COMMENT 'If Null then the pointing will never expire, and will remain until observed',
   `startedUTC` DATETIME NULL,
@@ -356,8 +356,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_INSERT` AFTER INSERT ON `
     -- Mark all other blocks for this Mpointing as current=False,
     -- and the one for this Pointing as current=True
     IF (NEW.`observing_blocks_blockID` is not NULL) AND (NEW.status = 'pending') THEN
-      UPDATE `observing_blocks` SET `current` = 0 WHERE (NEW.`mpointings_mpointingID` = `observing_blocks`.`mpointings_mpointingID`);
-      UPDATE `observing_blocks` SET `current` = 1 WHERE (NEW.`observing_blocks_blockID` = `observing_blocks`.`blockID`);
+      UPDATE `observing_blocks` SET `current` = FALSE WHERE (NEW.`mpointings_mpointingID` = `observing_blocks`.`mpointings_mpointingID`);
+      UPDATE `observing_blocks` SET `current` = TRUE WHERE (NEW.`observing_blocks_blockID` = `observing_blocks`.`blockID`);
     END IF;
     -- Mark any linked Mpointing as scheduled
     IF (NEW.`mpointings_mpointingID` is not NULL) AND (NEW.status = 'pending') THEN

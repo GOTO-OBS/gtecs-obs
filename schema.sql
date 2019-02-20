@@ -24,9 +24,9 @@ CREATE TABLE IF NOT EXISTS `users` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
-  `user_name` VARCHAR(255) NOT NULL UNIQUE,
+  `username` VARCHAR(255) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
-  `fullName` TEXT NOT NULL
+  `full_name` TEXT NOT NULL
   -- indexes
   -- foreign keys
   )
@@ -44,21 +44,21 @@ CREATE TABLE `pointings` (
   `ra` FLOAT NOT NULL COMMENT 'in decimal degrees',
   `decl` FLOAT NOT NULL COMMENT 'in decimal degrees',
   `rank` INT(1) UNSIGNED NOT NULL,
-  `minAlt` FLOAT NOT NULL,
-  `maxSunAlt` FLOAT NOT NULL DEFAULT -15 COMMENT 'degrees',
-  `minTime` FLOAT NOT NULL,
-  `maxMoon` CHAR(1) NOT NULL,
-  `minMoonSep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
-  `ToO` BOOLEAN NOT NULL DEFAULT FALSE,
-  `startUTC` DATETIME NOT NULL,
-  `stopUTC` DATETIME NULL COMMENT 'If Null then the pointing will never expire, and will remain until observed',
-  `startedUTC` DATETIME NULL,
-  `stoppedUTC` DATETIME NULL,
+  `min_alt` FLOAT NOT NULL,
+  `max_sunalt` FLOAT NOT NULL DEFAULT -15 COMMENT 'degrees',
+  `min_time` FLOAT NOT NULL,
+  `max_moon` CHAR(1) NOT NULL,
+  `min_moonsep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
+  `too` BOOLEAN NOT NULL DEFAULT FALSE,
+  `start_time` DATETIME NOT NULL,
+  `stop_time` DATETIME NULL COMMENT 'If NULL then the pointing will never expire, and will remain until observed',
+  `started_time` DATETIME NULL,
+  `stopped_time` DATETIME NULL,
   `ts` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   -- indexes
   INDEX `status_idx` (`status`),
-  INDEX `startUTC_idx` (`startUTC`),
-  INDEX `stopUTC_idx` (`stopUTC`),
+  INDEX `start_time_idx` (`start_time`),
+  INDEX `stop_time_idx` (`stop_time`),
   -- foreign keys
   `user_id` INT NOT NULL,
   `mpointing_id` INT NULL,
@@ -84,14 +84,14 @@ CREATE TABLE `exposure_sets` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
-  `utMask` INT NULL COMMENT 'bit mask to allocate to individual UTs. NULL means send to all',
-  `typeFlag` ENUM('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD') NOT NULL,
-  `filter` CHAR(1) NOT NULL,
+  `num_exp` INT UNSIGNED NOT NULL,
   `exptime` FLOAT NOT NULL,
+  `filter` CHAR(1) NOT NULL,
   `binning` INT UNSIGNED NOT NULL,
-  `numexp` INT UNSIGNED NOT NULL,
-  `raoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'arcsecs',
-  `decoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'arcsec',
+  `imgtype` ENUM('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD') NOT NULL,
+  `ut_mask` INT NULL COMMENT 'bit mask to allocate to individual UTs, NULL means send to all',
+  `ra_offset` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'arcsecs',
+  `dec_offset` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'arcsec',
   -- indexes
   -- foreign keys
   `pointing_id` INT NULL,
@@ -114,21 +114,21 @@ CREATE TABLE `mpointings` (
   `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
   `rank` INT NOT NULL,
   `start_rank` INT NOT NULL,
-  `minAlt` FLOAT NOT NULL,
-  `maxSunAlt` FLOAT NOT NULL DEFAULT -15,
-  `minTime` FLOAT NOT NULL,
-  `maxMoon` CHAR(1) NOT NULL,
-  `minMoonSep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
-  `ToO` BOOLEAN NOT NULL DEFAULT FALSE,
-  `infinite` BOOLEAN NOT NULL DEFAULT FALSE,
-  `startUTC` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'only works on mysql later than 5.6.5',
-  `stopUTC` DATETIME NULL COMMENT 'If Null then the Mpointing will continue until it is complete',
   `num_todo` INT NOT NULL,
   `num_completed` INT NOT NULL DEFAULT 0,
+  `infinite` BOOLEAN NOT NULL DEFAULT FALSE,
+  `min_alt` FLOAT NOT NULL,
+  `max_sunalt` FLOAT NOT NULL DEFAULT -15,
+  `min_time` FLOAT NOT NULL,
+  `max_moon` CHAR(1) NOT NULL,
+  `min_moonsep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
+  `too` BOOLEAN NOT NULL DEFAULT FALSE,
+  `start_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'only works on mysql later than 5.6.5',
+  `stop_time` DATETIME NULL COMMENT 'If Null then the Mpointing will continue until it is complete',
   -- indexes
   INDEX `status_idx` (`status`),
-  INDEX `startUTC_idx` (`startUTC`),
-  INDEX `stopUTC_idx` (`stopUTC`),
+  INDEX `start_time_idx` (`start_time`),
+  INDEX `stop_time_idx` (`stop_time`),
   -- foreign keys
   `user_id` INT NOT NULL,
   `survey_id` INT NULL,
@@ -149,12 +149,12 @@ CREATE TABLE `observing_blocks` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
-  `blockNum` INT NOT NULL,
-  `current` BOOLEAN NOT NULL DEFAULT FALSE,
-  `valid_time` FLOAT NOT NULL COMMENT 'how long after the startUTC the pointing should be valid for in minutes',
+  `block_num` INT NOT NULL,
+  `valid_time` FLOAT NOT NULL COMMENT 'how long after the start_time the pointing should be valid for in minutes',
   `wait_time` FLOAT NOT NULL COMMENT 'time to wait after this pointing before scheduling the next',
+  `current` BOOLEAN NOT NULL DEFAULT FALSE,
   -- indexes
-  INDEX `blockNum_idx` (`blockNum`),
+  INDEX `block_num_idx` (`block_num`),
   INDEX `current_idx` (`current`),
   -- foreign keys
   `mpointing_id` INT NOT NULL,
@@ -170,7 +170,7 @@ CREATE TABLE `events` (
   -- columns
   `name` VARCHAR(255) NOT NULL,
   `source` VARCHAR(255) NOT NULL COMMENT 'LIGO, SWIFT etc.',
-  `ivo` VARCHAR(255) NOT NULL UNIQUE,
+  `ivorn` VARCHAR(255) NOT NULL UNIQUE,
   `skymap` VARCHAR(255) NULL
   -- indexes
   -- foreign keys
@@ -231,16 +231,16 @@ CREATE TABLE `image_logs` (
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `filename` VARCHAR(30) NOT NULL UNIQUE COMMENT 'full FITS file name, including extension',
-  `runNumber` INT NOT NULL,
+  `run_number` INT NOT NULL,
   `ut` INT NOT NULL,
-  `utMask` INT NOT NULL,
-  `startUTC` DATETIME NOT NULL,
-  `writeUTC` DATETIME NOT NULL,
+  `ut_mask` INT NOT NULL,
+  `start_time` DATETIME NOT NULL,
+  `write_time` DATETIME NOT NULL,
   `set_position` INT NOT NULL DEFAULT 1,
   `set_total` INT NOT NULL DEFAULT 1,
   -- indexes
-  INDEX `runNumber_idx` (`runNumber`),
-  INDEX `writeUTC_idx` (`writeUTC`),
+  INDEX `run_number_idx` (`run_number`),
+  INDEX `write_time_idx` (`write_time`),
   -- foreign keys
   `exposure_set_id` INT NULL DEFAULT NULL,
   `pointing_id` INT NULL DEFAULT NULL,
@@ -352,11 +352,11 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_UPDATE`
   BEGIN
     -- Store time when set running
     IF (OLD.`status` != 'running' AND NEW.`status` = 'running') THEN
-      SET NEW.`startedUTC` = UTC_TIMESTAMP();
+      SET NEW.`started_time` = UTC_TIMESTAMP();
     END IF;
     -- Store time when finished (completed, aborted, interrupted, expired...)
     IF (OLD.`status` IN ('pending', 'running') AND NEW.`status` NOT IN ('pending', 'running')) THEN
-      SET NEW.`stoppedUTC` = UTC_TIMESTAMP();
+      SET NEW.`stopped_time` = UTC_TIMESTAMP();
     END IF;
   END$$
 

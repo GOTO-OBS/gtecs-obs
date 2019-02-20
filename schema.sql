@@ -62,8 +62,6 @@ CREATE TABLE `survey_tiles` (
   CONSTRAINT `fk_survey_tiles_surveys1`
     FOREIGN KEY (`surveys_surveyID`)
     REFERENCES `surveys` (`surveyID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
   )
   ENGINE = InnoDB;
 
@@ -81,14 +79,10 @@ CREATE TABLE`event_tiles` (
   INDEX `fk_event_tiles_survey_tiles1_idx` (`survey_tiles_tileID`),
   CONSTRAINT `fk_event_tiles_events1`
     FOREIGN KEY (`events_eventID`)
-    REFERENCES `events` (`eventID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `events` (`eventID`),
   CONSTRAINT `fk_event_tiles_survey_tiles1`
     FOREIGN KEY (`survey_tiles_tileID`)
     REFERENCES `survey_tiles` (`tileID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
   )
   ENGINE = InnoDB;
 
@@ -128,29 +122,19 @@ CREATE TABLE `mpointings` (
   INDEX `stopUTC_idx` (`stopUTC`),
   CONSTRAINT `fk_mpointing_events1`
     FOREIGN KEY (`events_eventID`)
-    REFERENCES `events` (`eventID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `events` (`eventID`),
   CONSTRAINT `fk_mpointing_users1`
     FOREIGN KEY (`users_userKey`)
-    REFERENCES `users` (`userKey`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `users` (`userKey`),
   CONSTRAINT `fk_mpointings_survey_tiles1`
     FOREIGN KEY (`survey_tiles_tileID`)
-    REFERENCES `survey_tiles` (`tileID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `survey_tiles` (`tileID`),
   CONSTRAINT `fk_mpointings_event_tiles1`
     FOREIGN KEY (`event_tiles_tileID`)
-    REFERENCES `event_tiles` (`tileID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `event_tiles` (`tileID`),
   CONSTRAINT `fk_mpointings_surveys1`
     FOREIGN KEY (`surveys_surveyID`)
     REFERENCES `surveys` (`surveyID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
   )
   ENGINE = InnoDB;
 
@@ -169,8 +153,6 @@ CREATE TABLE `observing_blocks` (
   CONSTRAINT `fk_observing_blocks_mpointing1`
     FOREIGN KEY (`mpointings_mpointingID`)
     REFERENCES `mpointings` (`mpointingID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
   )
   ENGINE = InnoDB;
 
@@ -213,39 +195,25 @@ CREATE TABLE `pointings` (
   INDEX `fk_pointings_surveys1_idx` (`surveys_surveyID`),
   CONSTRAINT `fk_pointings_events1`
     FOREIGN KEY (`events_eventID`)
-    REFERENCES `events` (`eventID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `events` (`eventID`),
   CONSTRAINT `fk_pointings_users1`
     FOREIGN KEY (`users_userKey`)
-    REFERENCES `users` (`userKey`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `users` (`userKey`),
   CONSTRAINT `fk_pointings_observing_blocks1`
     FOREIGN KEY (`observing_blocks_blockID`)
-    REFERENCES `observing_blocks` (`blockID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `observing_blocks` (`blockID`),
   CONSTRAINT `fk_pointings_mpointings1`
     FOREIGN KEY (`mpointings_mpointingID`)
-    REFERENCES `mpointings` (`mpointingID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `mpointings` (`mpointingID`),
   CONSTRAINT `fk_pointings_event_tiles1`
     FOREIGN KEY (`event_tiles_tileID`)
-    REFERENCES `event_tiles` (`tileID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `event_tiles` (`tileID`),
   CONSTRAINT `fk_pointings_survey_tiles1`
     FOREIGN KEY (`survey_tiles_tileID`)
-    REFERENCES `survey_tiles` (`tileID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `survey_tiles` (`tileID`),
   CONSTRAINT `fk_pointings_surveys1`
     FOREIGN KEY (`surveys_surveyID`)
     REFERENCES `surveys` (`surveyID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
   )
   ENGINE = InnoDB
   AUTO_INCREMENT = 17073
@@ -269,14 +237,10 @@ CREATE TABLE `exposure_sets` (
   INDEX `fk_exposures_mpointing1_idx` (`mpointings_mpointingID`),
   CONSTRAINT `fk_exposures_pointings1`
     FOREIGN KEY (`pointings_pointingID`)
-    REFERENCES `pointings` (`pointingID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `pointings` (`pointingID`),
   CONSTRAINT `fk_exposures_mpointing1`
     FOREIGN KEY (`mpointings_mpointingID`)
     REFERENCES `mpointings` (`mpointingID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
   )
   ENGINE = InnoDB
   AUTO_INCREMENT = 126598
@@ -304,19 +268,13 @@ CREATE TABLE `image_logs` (
   INDEX `writeUTC_idx` (`writeUTC`),
   CONSTRAINT `fk_image_logs_exposure_sets1`
     FOREIGN KEY (`exposure_sets_expID`)
-    REFERENCES `exposure_sets` (`expID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `exposure_sets` (`expID`),
   CONSTRAINT `fk_image_logs_pointings1`
     FOREIGN KEY (`pointings_pointingID`)
-    REFERENCES `pointings` (`pointingID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    REFERENCES `pointings` (`pointingID`),
   CONSTRAINT `fk_image_logs_mpointings1`
     FOREIGN KEY (`mpointings_mpointingID`)
     REFERENCES `mpointings` (`mpointingID`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
   )
   ENGINE = InnoDB
   AUTO_INCREMENT = 204285

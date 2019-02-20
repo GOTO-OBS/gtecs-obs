@@ -11,48 +11,53 @@ SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
 
 -- -----------------------------------------------------
 -- Create database
-CREATE SCHEMA IF NOT EXISTS `goto_obs` DEFAULT CHARACTER SET utf8 ;
+DROP DATABASE IF EXISTS `goto_obs`;
+CREATE DATABASE `goto_obs` DEFAULT CHARACTER SET utf8 ;
 USE `goto_obs` ;
+
 
 -- -----------------------------------------------------
 -- Create tables
 
 -- Events table
-DROP TABLE IF EXISTS `goto_obs`.`events` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`events` (
+DROP TABLE IF EXISTS `events` ;
+CREATE TABLE `events` (
   `eventID` INT NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   `source` VARCHAR(255) NOT NULL COMMENT 'LIGO, SWIFT etc.',
   `ivo` VARCHAR(255) NOT NULL,
   `skymap` VARCHAR(255) NULL,
   PRIMARY KEY (`eventID`),
-  UNIQUE INDEX `ivo_UNIQUE` (`ivo` ASC))
+  UNIQUE INDEX `ivo_UNIQUE` (`ivo` ASC)
+  )
   ENGINE = InnoDB;
 
 -- Users table
-DROP TABLE IF EXISTS `goto_obs`.`users` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`users` (
+DROP TABLE IF EXISTS `users` ;
+CREATE TABLE IF NOT EXISTS `users` (
   `userKey` INT(11) NOT NULL AUTO_INCREMENT,
   `user_name` TEXT NOT NULL,
   `password` TEXT NOT NULL,
   `fullName` TEXT NOT NULL,
   PRIMARY KEY (`userKey`),
-  UNIQUE INDEX `user_name_UNIQUE` (`user_name`(10) ASC))
+  UNIQUE INDEX `user_name_UNIQUE` (`user_name`(10) ASC)
+  )
   ENGINE = InnoDB
   AUTO_INCREMENT = 24
   DEFAULT CHARACTER SET = latin1;
 
 -- Surveys table
-DROP TABLE IF EXISTS `goto_obs`.`surveys` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`surveys` (
+DROP TABLE IF EXISTS `surveys` ;
+CREATE TABLE `surveys` (
   `surveyID` INT NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`surveyID`))
+  PRIMARY KEY (`surveyID`)
+  )
   ENGINE = InnoDB;
 
 -- Survey tiles table
-DROP TABLE IF EXISTS `goto_obs`.`survey_tiles` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`survey_tiles` (
+DROP TABLE IF EXISTS `survey_tiles` ;
+CREATE TABLE `survey_tiles` (
   `tileID` INT NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
@@ -62,14 +67,15 @@ CREATE TABLE IF NOT EXISTS `goto_obs`.`survey_tiles` (
   INDEX `fk_survey_tiles_surveys1_idx` (`surveys_surveyID` ASC),
   CONSTRAINT `fk_survey_tiles_surveys1`
     FOREIGN KEY (`surveys_surveyID`)
-    REFERENCES `goto_obs`.`surveys` (`surveyID`)
+    REFERENCES `surveys` (`surveyID`)
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
+    ON UPDATE NO ACTION
+  )
   ENGINE = InnoDB;
 
 -- Event tiles table
-DROP TABLE IF EXISTS `goto_obs`.`event_tiles` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`event_tiles` (
+DROP TABLE IF EXISTS `event_tiles` ;
+CREATE TABLE`event_tiles` (
   `tileID` INT NOT NULL AUTO_INCREMENT,
   `ra` FLOAT NOT NULL,
   `decl` FLOAT NOT NULL,
@@ -82,19 +88,20 @@ CREATE TABLE IF NOT EXISTS `goto_obs`.`event_tiles` (
   INDEX `fk_event_tiles_survey_tiles1_idx` (`survey_tiles_tileID` ASC),
   CONSTRAINT `fk_event_tiles_events1`
     FOREIGN KEY (`events_eventID`)
-    REFERENCES `goto_obs`.`events` (`eventID`)
+    REFERENCES `events` (`eventID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_event_tiles_survey_tiles1`
     FOREIGN KEY (`survey_tiles_tileID`)
-    REFERENCES `goto_obs`.`survey_tiles` (`tileID`)
+    REFERENCES `survey_tiles` (`tileID`)
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
+    ON UPDATE NO ACTION
+  )
   ENGINE = InnoDB;
 
 -- Mpointings table
-DROP TABLE IF EXISTS `goto_obs`.`mpointings` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`mpointings` (
+DROP TABLE IF EXISTS `mpointings` ;
+CREATE TABLE `mpointings` (
   `mpointingID` INT NOT NULL AUTO_INCREMENT,
   `status` ENUM('unscheduled', 'scheduled', 'completed', 'aborted', 'expired', 'deleted') NOT NULL DEFAULT 'unscheduled',
   `object` TEXT NOT NULL,
@@ -129,34 +136,35 @@ CREATE TABLE IF NOT EXISTS `goto_obs`.`mpointings` (
   INDEX `stopUTC_idx` (`stopUTC` ASC),
   CONSTRAINT `fk_mpointing_events1`
     FOREIGN KEY (`events_eventID`)
-    REFERENCES `goto_obs`.`events` (`eventID`)
+    REFERENCES `events` (`eventID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_mpointing_users1`
     FOREIGN KEY (`users_userKey`)
-    REFERENCES `goto_obs`.`users` (`userKey`)
+    REFERENCES `users` (`userKey`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_mpointings_survey_tiles1`
     FOREIGN KEY (`survey_tiles_tileID`)
-    REFERENCES `goto_obs`.`survey_tiles` (`tileID`)
+    REFERENCES `survey_tiles` (`tileID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_mpointings_event_tiles1`
     FOREIGN KEY (`event_tiles_tileID`)
-    REFERENCES `goto_obs`.`event_tiles` (`tileID`)
+    REFERENCES `event_tiles` (`tileID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_mpointings_surveys1`
     FOREIGN KEY (`surveys_surveyID`)
-    REFERENCES `goto_obs`.`surveys` (`surveyID`)
+    REFERENCES `surveys` (`surveyID`)
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
+    ON UPDATE NO ACTION
+  )
   ENGINE = InnoDB;
 
 -- Observing blocks table
-DROP TABLE IF EXISTS `goto_obs`.`observing_blocks` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`observing_blocks` (
+DROP TABLE IF EXISTS `observing_blocks` ;
+CREATE TABLE `observing_blocks` (
   `blockID` INT NOT NULL AUTO_INCREMENT,
   `blockNum` INT NOT NULL,
   `current` INT NOT NULL DEFAULT 0,
@@ -169,14 +177,15 @@ CREATE TABLE IF NOT EXISTS `goto_obs`.`observing_blocks` (
   INDEX `current_idx` (`current` ASC),
   CONSTRAINT `fk_observing_blocks_mpointing1`
     FOREIGN KEY (`mpointings_mpointingID`)
-    REFERENCES `goto_obs`.`mpointings` (`mpointingID`)
+    REFERENCES `mpointings` (`mpointingID`)
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
+    ON UPDATE NO ACTION
+  )
   ENGINE = InnoDB;
 
 -- Pointings table
-DROP TABLE IF EXISTS `goto_obs`.`pointings` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`pointings` (
+DROP TABLE IF EXISTS `pointings` ;
+CREATE TABLE `pointings` (
   `pointingID` INT(24) NOT NULL AUTO_INCREMENT,
   `status` ENUM('pending', 'running', 'completed', 'aborted', 'interrupted', 'expired', 'deleted') NOT NULL DEFAULT 'pending',
   `object` TEXT NOT NULL COMMENT 'object name',
@@ -214,46 +223,47 @@ CREATE TABLE IF NOT EXISTS `goto_obs`.`pointings` (
   INDEX `fk_pointings_surveys1_idx` (`surveys_surveyID` ASC),
   CONSTRAINT `fk_pointings_events1`
     FOREIGN KEY (`events_eventID`)
-    REFERENCES `goto_obs`.`events` (`eventID`)
+    REFERENCES `events` (`eventID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_pointings_users1`
     FOREIGN KEY (`users_userKey`)
-    REFERENCES `goto_obs`.`users` (`userKey`)
+    REFERENCES `users` (`userKey`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_pointings_observing_blocks1`
     FOREIGN KEY (`observing_blocks_blockID`)
-    REFERENCES `goto_obs`.`observing_blocks` (`blockID`)
+    REFERENCES `observing_blocks` (`blockID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_pointings_mpointings1`
     FOREIGN KEY (`mpointings_mpointingID`)
-    REFERENCES `goto_obs`.`mpointings` (`mpointingID`)
+    REFERENCES `mpointings` (`mpointingID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_pointings_event_tiles1`
     FOREIGN KEY (`event_tiles_tileID`)
-    REFERENCES `goto_obs`.`event_tiles` (`tileID`)
+    REFERENCES `event_tiles` (`tileID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_pointings_survey_tiles1`
     FOREIGN KEY (`survey_tiles_tileID`)
-    REFERENCES `goto_obs`.`survey_tiles` (`tileID`)
+    REFERENCES `survey_tiles` (`tileID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_pointings_surveys1`
     FOREIGN KEY (`surveys_surveyID`)
-    REFERENCES `goto_obs`.`surveys` (`surveyID`)
+    REFERENCES `surveys` (`surveyID`)
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
+    ON UPDATE NO ACTION
+  )
   ENGINE = InnoDB
   AUTO_INCREMENT = 17073
   DEFAULT CHARACTER SET = latin1;
 
 -- Exposure sets table
-DROP TABLE IF EXISTS `goto_obs`.`exposure_sets` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`exposure_sets` (
+DROP TABLE IF EXISTS `exposure_sets` ;
+CREATE TABLE `exposure_sets` (
   `expID` INT(24) NOT NULL AUTO_INCREMENT,
   `utMask` INT NULL COMMENT 'bit mask to allocate to individual UTs. NULL means send to all',
   `typeFlag` ENUM('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD') NOT NULL,
@@ -270,21 +280,22 @@ CREATE TABLE IF NOT EXISTS `goto_obs`.`exposure_sets` (
   INDEX `fk_exposures_mpointing1_idx` (`mpointings_mpointingID` ASC),
   CONSTRAINT `fk_exposures_pointings1`
     FOREIGN KEY (`pointings_pointingID`)
-    REFERENCES `goto_obs`.`pointings` (`pointingID`)
+    REFERENCES `pointings` (`pointingID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_exposures_mpointing1`
     FOREIGN KEY (`mpointings_mpointingID`)
-    REFERENCES `goto_obs`.`mpointings` (`mpointingID`)
+    REFERENCES `mpointings` (`mpointingID`)
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
+    ON UPDATE NO ACTION
+  )
   ENGINE = InnoDB
   AUTO_INCREMENT = 126598
   DEFAULT CHARACTER SET = latin1;
 
 -- Image logs table
-DROP TABLE IF EXISTS `goto_obs`.`image_logs` ;
-CREATE TABLE IF NOT EXISTS `goto_obs`.`image_logs` (
+DROP TABLE IF EXISTS `image_logs` ;
+CREATE TABLE `image_logs` (
   `logID` INT(24) NOT NULL AUTO_INCREMENT,
   `filename` VARCHAR(30) NOT NULL COMMENT 'full FITS file name, including extension',
   `runNumber` INT NOT NULL,
@@ -306,19 +317,20 @@ CREATE TABLE IF NOT EXISTS `goto_obs`.`image_logs` (
   INDEX `writeUTC_idx` (`writeUTC` ASC),
   CONSTRAINT `fk_image_logs_exposure_sets1`
     FOREIGN KEY (`exposure_sets_expID`)
-    REFERENCES `goto_obs`.`exposure_sets` (`expID`)
+    REFERENCES `exposure_sets` (`expID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_image_logs_pointings1`
     FOREIGN KEY (`pointings_pointingID`)
-    REFERENCES `goto_obs`.`pointings` (`pointingID`)
+    REFERENCES `pointings` (`pointingID`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_image_logs_mpointings1`
     FOREIGN KEY (`mpointings_mpointingID`)
-    REFERENCES `goto_obs`.`mpointings` (`mpointingID`)
+    REFERENCES `mpointings` (`mpointingID`)
     ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
+    ON UPDATE NO ACTION
+  )
   ENGINE = InnoDB
   AUTO_INCREMENT = 204285
   DEFAULT CHARACTER SET = latin1;
@@ -330,14 +342,12 @@ GRANT USAGE ON *.* TO goto;
  DROP USER goto;
 SET SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
 CREATE USER 'goto' IDENTIFIED BY 'gotoobs';
-
 GRANT ALL ON `goto_obs`.* TO 'goto';
 
 -- -----------------------------------------------------
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
-USE `goto_obs`;
 
 -- -----------------------------------------------------
 -- Create triggers
@@ -345,10 +355,8 @@ DELIMITER $$
 
 -- Event tiles triggers
 -- Before insert
-USE `goto_obs`$$
-DROP TRIGGER IF EXISTS `goto_obs`.`event_tiles_BEFORE_INSERT` $$
-USE `goto_obs`$$
-CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`event_tiles_BEFORE_INSERT` BEFORE INSERT ON `event_tiles` FOR EACH ROW
+DROP TRIGGER IF EXISTS `event_tiles_BEFORE_INSERT` $$
+CREATE DEFINER = CURRENT_USER TRIGGER `event_tiles_BEFORE_INSERT` BEFORE INSERT ON `event_tiles` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
     IF ((NEW.survey_tiles_tileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
@@ -364,10 +372,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`event_tiles_BEFORE_INSERT` BEF
 
 -- Mpointings triggers
 -- Before insert
-USE `goto_obs`$$
-DROP TRIGGER IF EXISTS `goto_obs`.`mpointings_BEFORE_INSERT` $$
-USE `goto_obs`$$
-CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`mpointings_BEFORE_INSERT` BEFORE INSERT ON `mpointings` FOR EACH ROW
+DROP TRIGGER IF EXISTS `mpointings_BEFORE_INSERT` $$
+CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_INSERT` BEFORE INSERT ON `mpointings` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
     IF ((NEW.survey_tiles_tileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
@@ -378,10 +384,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`mpointings_BEFORE_INSERT` BEFO
 
 
 -- Before update
-USE `goto_obs`$$
-DROP TRIGGER IF EXISTS `goto_obs`.`mpointings_BEFORE_UPDATE` $$
-USE `goto_obs`$$
-CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`mpointings_BEFORE_UPDATE` BEFORE UPDATE ON `mpointings` FOR EACH ROW
+DROP TRIGGER IF EXISTS `mpointings_BEFORE_UPDATE` $$
+CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_UPDATE` BEFORE UPDATE ON `mpointings` FOR EACH ROW
   BEGIN
     -- Set status to completed if finished
     -- NB infinite Mpointings can never be completed
@@ -393,10 +397,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`mpointings_BEFORE_UPDATE` BEFO
 
 -- Pointings triggers
 -- Before insert
-USE `goto_obs`$$
-DROP TRIGGER IF EXISTS `goto_obs`.`pointings_BEFORE_INSERT` $$
-USE `goto_obs`$$
-CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`pointings_BEFORE_INSERT` BEFORE INSERT ON `pointings` FOR EACH ROW
+DROP TRIGGER IF EXISTS `pointings_BEFORE_INSERT` $$
+CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_INSERT` BEFORE INSERT ON `pointings` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
     IF ((NEW.survey_tiles_tileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
@@ -407,10 +409,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`pointings_BEFORE_INSERT` BEFOR
 
 
 -- After insert
-USE `goto_obs`$$
-DROP TRIGGER IF EXISTS `goto_obs`.`pointings_AFTER_INSERT` $$
-USE `goto_obs`$$
-CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`pointings_AFTER_INSERT` AFTER INSERT ON `pointings` FOR EACH ROW
+DROP TRIGGER IF EXISTS `pointings_AFTER_INSERT` $$
+CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_INSERT` AFTER INSERT ON `pointings` FOR EACH ROW
   BEGIN
     -- Mark all other blocks for this Mpointing as current=False,
     -- and the one for this Pointing as current=True
@@ -426,10 +426,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`pointings_AFTER_INSERT` AFTER 
 
 
 -- Before update
-USE `goto_obs`$$
-DROP TRIGGER IF EXISTS `goto_obs`.`pointings_BEFORE_UPDATE` $$
-USE `goto_obs`$$
-CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`pointings_BEFORE_UPDATE` BEFORE UPDATE ON `pointings` FOR EACH ROW
+DROP TRIGGER IF EXISTS `pointings_BEFORE_UPDATE` $$
+CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_UPDATE` BEFORE UPDATE ON `pointings` FOR EACH ROW
   BEGIN
     -- Store time when set running
     IF (OLD.`status` != 'running' AND NEW.`status` = 'running') THEN
@@ -442,10 +440,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`pointings_BEFORE_UPDATE` BEFOR
   END$$
 
 -- After update
-USE `goto_obs`$$
-DROP TRIGGER IF EXISTS `goto_obs`.`pointings_AFTER_UPDATE` $$
-USE `goto_obs`$$
-CREATE DEFINER = CURRENT_USER TRIGGER `goto_obs`.`pointings_AFTER_UPDATE` AFTER UPDATE ON `pointings` FOR EACH ROW
+DROP TRIGGER IF EXISTS `pointings_AFTER_UPDATE` $$
+CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_UPDATE` AFTER UPDATE ON `pointings` FOR EACH ROW
   BEGIN
     DECLARE isinfinite INT;
     -- Only trigger if the timestamp has changed

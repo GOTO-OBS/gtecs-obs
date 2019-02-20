@@ -122,7 +122,7 @@ mp = db.Mpointing(objectName='M31',
                   maxMoon='B',
                   minMoonSep=30,
                   num_todo=5,
-                  userKey=24,
+                  userKey=userKey,
                   valid_time=[60, 120],
                   wait_time=60)
 # and add RGBL exposure set

@@ -15,7 +15,6 @@ DROP DATABASE IF EXISTS `goto_obs`;
 CREATE DATABASE `goto_obs` DEFAULT CHARACTER SET utf8 ;
 USE `goto_obs` ;
 
-
 -- -----------------------------------------------------
 -- Create tables
 
@@ -165,7 +164,7 @@ CREATE TABLE `pointings` (
   `decl` FLOAT NOT NULL COMMENT 'in decimal degrees',
   `rank` INT(1) UNSIGNED NOT NULL,
   `minAlt` FLOAT NOT NULL,
-  `maxSunAlt` FLOAT NOT NULL DEFAULT -15 COMMENT 'degrees  ',
+  `maxSunAlt` FLOAT NOT NULL DEFAULT -15 COMMENT 'degrees',
   `minTime` FLOAT NOT NULL,
   `maxMoon` CHAR(1) NOT NULL,
   `minMoonSep` FLOAT NOT NULL DEFAULT 30 COMMENT 'degrees',
@@ -276,11 +275,12 @@ CREATE TABLE `image_logs` (
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
 
+
 -- -----------------------------------------------------
 -- Create user
 SET SQL_MODE = '';
 GRANT USAGE ON *.* TO goto;
- DROP USER goto;
+DROP USER goto;
 SET SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
 CREATE USER 'goto' IDENTIFIED BY 'gotoobs';
 GRANT ALL ON `goto_obs`.* TO 'goto';
@@ -297,7 +297,8 @@ DELIMITER $$
 -- Event tiles triggers
 -- Before insert
 DROP TRIGGER IF EXISTS `event_tiles_BEFORE_INSERT` $$
-CREATE DEFINER = CURRENT_USER TRIGGER `event_tiles_BEFORE_INSERT` BEFORE INSERT ON `event_tiles` FOR EACH ROW
+CREATE DEFINER = CURRENT_USER TRIGGER `event_tiles_BEFORE_INSERT`
+  BEFORE INSERT ON `event_tiles` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
     IF ((NEW.survey_tiles_tileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
@@ -314,19 +315,20 @@ CREATE DEFINER = CURRENT_USER TRIGGER `event_tiles_BEFORE_INSERT` BEFORE INSERT 
 -- Mpointings triggers
 -- Before insert
 DROP TRIGGER IF EXISTS `mpointings_BEFORE_INSERT` $$
-CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_INSERT` BEFORE INSERT ON `mpointings` FOR EACH ROW
+CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_INSERT`
+  BEFORE INSERT ON `mpointings` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
     IF ((NEW.survey_tiles_tileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
       SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.survey_tiles_tileID = `survey_tiles`.`tileID`);
       SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tiles_tileID = `survey_tiles`.`tileID`);
-   END IF;
+    END IF;
   END$$
-
 
 -- Before update
 DROP TRIGGER IF EXISTS `mpointings_BEFORE_UPDATE` $$
-CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_UPDATE` BEFORE UPDATE ON `mpointings` FOR EACH ROW
+CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_UPDATE`
+  BEFORE UPDATE ON `mpointings` FOR EACH ROW
   BEGIN
     -- Set status to completed if finished
     -- NB infinite Mpointings can never be completed
@@ -339,7 +341,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_UPDATE` BEFORE UPDATE O
 -- Pointings triggers
 -- Before insert
 DROP TRIGGER IF EXISTS `pointings_BEFORE_INSERT` $$
-CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_INSERT` BEFORE INSERT ON `pointings` FOR EACH ROW
+CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_INSERT`
+  BEFORE INSERT ON `pointings` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
     IF ((NEW.survey_tiles_tileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
@@ -348,10 +351,10 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_INSERT` BEFORE INSERT ON
     END IF;
   END$$
 
-
 -- After insert
 DROP TRIGGER IF EXISTS `pointings_AFTER_INSERT` $$
-CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_INSERT` AFTER INSERT ON `pointings` FOR EACH ROW
+CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_INSERT`
+  AFTER INSERT ON `pointings` FOR EACH ROW
   BEGIN
     -- Mark all other blocks for this Mpointing as current=False,
     -- and the one for this Pointing as current=True
@@ -365,10 +368,10 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_INSERT` AFTER INSERT ON `
     END IF;
   END$$
 
-
 -- Before update
 DROP TRIGGER IF EXISTS `pointings_BEFORE_UPDATE` $$
-CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_UPDATE` BEFORE UPDATE ON `pointings` FOR EACH ROW
+CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_UPDATE`
+  BEFORE UPDATE ON `pointings` FOR EACH ROW
   BEGIN
     -- Store time when set running
     IF (OLD.`status` != 'running' AND NEW.`status` = 'running') THEN
@@ -382,7 +385,8 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_UPDATE` BEFORE UPDATE ON
 
 -- After update
 DROP TRIGGER IF EXISTS `pointings_AFTER_UPDATE` $$
-CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_UPDATE` AFTER UPDATE ON `pointings` FOR EACH ROW
+CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_UPDATE`
+  AFTER UPDATE ON `pointings` FOR EACH ROW
   BEGIN
     DECLARE isinfinite INT;
     -- Only trigger if the timestamp has changed
@@ -405,6 +409,5 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_UPDATE` AFTER UPDATE ON `
       END IF;
     END IF;
   END$$
-
 
 DELIMITER ;

@@ -239,8 +239,8 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
 
         # is latitude ever greater than limit?
         lat = location.lat.deg
-        queue = queue.filter(Pointing.decl > lat - 90 + altitude_limit,
-                             Pointing.decl < lat + 90 - altitude_limit)
+        queue = queue.filter(Pointing.dec > lat - 90 + altitude_limit,
+                             Pointing.dec < lat + 90 - altitude_limit)
 
     queue = queue.order_by('rank')
 

@@ -107,7 +107,7 @@ def run(fov, overlap, centre, area, name):
             mp = db.Mpointing(userKey=user_key,
                               objectName='{}_survey_T{}'.format(name, tile_num),
                               ra=float(ra),
-                              decl=float(dec),
+                              dec=float(dec),
                               **MP_SETTINGS)
             for filt in ['L', 'R', 'G', 'B']:
                 if filt == 'L':

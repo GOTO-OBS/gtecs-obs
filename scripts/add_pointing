@@ -221,11 +221,11 @@ def fill_mpointing(mpointing):
 
         print('    Using coords for {}: ra={:.4f}, dec={:.4f}'.format(db_tile.name,
                                                                       db_tile.ra,
-                                                                      db_tile.decl,
+                                                                      db_tile.dec,
                                                                       ))
         mpointing['objectName'] = db_survey.name + '_' + db_tile.name + '_' + 'EXTRA'
         mpointing['ra'] = db_tile.ra
-        mpointing['decl'] = db_tile.decl
+        mpointing['dec'] = db_tile.dec
         mpointing['surveyID'] = db_survey.surveyID
         mpointing['surveyTileID'] = db_tile.tileID
 
@@ -251,7 +251,7 @@ def fill_mpointing(mpointing):
                 use_coords = input('Use these coordinates? [y/n]: ')
             if use_coords in ['y', 'Y']:
                 mpointing['ra'] = coord.ra.value
-                mpointing['decl'] = coord.dec.value
+                mpointing['dec'] = coord.dec.value
 
         # Enter coords
         while mpointing['ra'] is None:
@@ -260,10 +260,10 @@ def fill_mpointing(mpointing):
                 mpointing['ra'] = parse_ra(ra_str)
             except Exception:
                 pass
-        while mpointing['decl'] is None:
+        while mpointing['dec'] is None:
             dec_str = input('Target Dec [d m s OR deg]: ')
             try:
-                mpointing['decl'] = parse_dec(dec_str)
+                mpointing['dec'] = parse_dec(dec_str)
             except Exception:
                 pass
 
@@ -394,7 +394,7 @@ if __name__ == '__main__':
     default_mpointing = {'userKey': None,
                          'objectName': None,
                          'ra': None,
-                         'decl': None,
+                         'dec': None,
                          'ToO': None,
                          'start_rank': None,
                          'num_todo': None,

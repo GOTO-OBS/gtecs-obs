@@ -43,7 +43,7 @@ def make_random_pointing(userkey, numexps=None, time=None):
     t2 = t1 + np.random.randint(1, 10) * u.day
     p = Pointing(objectName='randObj',
                  ra=np.random.uniform(lst - 3, lst + 3),
-                 decl=np.random.uniform(10, 89),
+                 dec=np.random.uniform(10, 89),
                  rank=np.random.randint(1, 100),
                  minAlt=30,
                  maxSunAlt=-15,

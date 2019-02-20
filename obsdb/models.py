@@ -75,7 +75,7 @@ class User(Base):
         >>> session.add(pointing)
         >>> session.commit()
         >>> bob.pointings
-        [Pointing(pointingID=None, status='pending', objectName=randObj, ra=352.133, decl=28.464,
+        [Pointing(pointingID=None, status='pending', objectName=randObj, ra=352.133, dec=28.464,
         rank=84, minAlt=30, maxSunAlt=-15, minTime=1575.8310236068696, maxMoon=D, minMoonSep=30,
         ToO=True, startUTC=2018-01-16 16:46:12, stopUTC=2018-01-18 16:46:12, startedUTC=None,
         stoppedUTC=None, userKey=25, mpointingID=None, blockID=None, eventID=None, eventTileID=None,
@@ -124,10 +124,10 @@ class Pointing(Base):
             J2000 right ascension in decimal degrees
             if ra is not given and this Pointing is linked to a SurveyTile
             then the ra will be extracted from the SurveyTile
-        decl : float, optional
+        dec : float, optional
             J2000 declination in decimal degrees
-            if decl is not given and this Pointing is linked to a SurveyTile
-            then the decl will be extracted from the SurveyTile
+            if dec is not given and this Pointing is linked to a SurveyTile
+            then the dec will be extracted from the SurveyTile
         rank : Integer
             rank to use for pointing
         minAlt : float
@@ -198,11 +198,11 @@ class Pointing(Base):
 
         Create a pointing:
 
-        >>> p = Pointing(objectName='IP Peg', ra=350.785625, decl=18.416472, rank=9, minAlt=30,
+        >>> p = Pointing(objectName='IP Peg', ra=350.785625, dec=18.416472, rank=9, minAlt=30,
         ... maxSunAlt=-15, minTime=3600, maxMoon='G', minMoonSep=30, ToO=0, startUTC=Time.now(),
         ... stopUTC=Time.now()+3*u.day, userKey=24)
         >>> p
-        Pointing(pointingID=None, status='None', objectName=IP Peg, ra=350.785625, decl=18.416472,
+        Pointing(pointingID=None, status='None', objectName=IP Peg, ra=350.785625, dec=18.416472,
         rank=9, minAlt=30, maxSunAlt=-15, minTime=3600, maxMoon=G, minMoonSep=None, ToO=False,
         startUTC=2018-01-12 17:39:54, stopUTC=2018-01-15 17:39:54, startedUTC=None, stoppedUTC=None,
         userKey=24, mpointingID=None, blockID=None, eventID=None, eventTileID=None, surveyID=None,
@@ -251,7 +251,7 @@ class Pointing(Base):
     # Columns
     objectName = Column('object', String)
     ra = Column(Float)
-    decl = Column(Float)
+    dec = Column('decl', Float)
     rank = Column(Integer)
     minAlt = Column(Float)
     maxSunAlt = Column(Float, default=-15)
@@ -285,13 +285,13 @@ class Pointing(Base):
 
     def __repr__(self):
         template = ("Pointing(pointingID={}, status='{}', " +
-                    "objectName={}, ra={}, decl={}, rank={}, " +
+                    "objectName={}, ra={}, dec={}, rank={}, " +
                     "minAlt={}, maxSunAlt={}, minTime={}, maxMoon={}, minMoonSep={}, " +
                     "ToO={}, startUTC={}, stopUTC={}, startedUTC={}, stoppedUTC={}, " +
                     "userKey={}, mpointingID={}, blockID={}, " +
                     "eventID={}, eventTileID={}, surveyID={}, surveyTileID={})")
         return template.format(
-            self.pointingID, self.status, self.objectName, self.ra, self.decl, self.rank,
+            self.pointingID, self.status, self.objectName, self.ra, self.dec, self.rank,
             self.minAlt, self.maxSunAlt, self.minTime, self.maxMoon, self.minMoonSep,
             bool(self.ToO), self.startUTC, self.stopUTC, self.startedUTC, self.stoppedUTC,
             self.userKey, self.mpointingID, self.blockID,
@@ -440,10 +440,10 @@ class Mpointing(Base):
             J2000 right ascension in decimal degrees
             if ra is not given and this Mpointing is linked to a SurveyTile
             then the ra will be extracted from the SurveyTile
-        decl : float, optional
+        dec : float, optional
             J2000 declination in decimal degrees
-            if decl is not given and this Mpointing is linked to a SurveyTile
-            then the decl will be extracted from the SurveyTile
+            if dec is not given and this Mpointing is linked to a SurveyTile
+            then the dec will be extracted from the SurveyTile
         start_rank : Integer
             rank to use for first pointing in series
         minAlt : float
@@ -521,12 +521,12 @@ class Mpointing(Base):
         make an Mpointing - starting at midnight, 5 pointings that stay in the queue
         for 5 minutes and the next one is valid 10 minutes after the previous.
 
-        >>> mp = Mpointing(objectName='M31', ra=22, decl=-5, start_rank=9, minAlt=30, minTime=3600,
+        >>> mp = Mpointing(objectName='M31', ra=22, dec=-5, start_rank=9, minAlt=30, minTime=3600,
         ... maxSunAlt=-15, ToO=0, maxMoon='B', minMoonSep=30, num_todo=5, userKey=24, valid_time=5,
         ... wait_time=10, startUTC=Time('2018-01-01 00:00:00'))
         >>> mp
         Mpointing(mpointingID=None, status='unscheduled', num_todo=5, num_completed=0,
-        num_remaining=5, infinite=False, objectName=M31, ra=22, decl=-5, rank=9, start_rank=9,
+        num_remaining=5, infinite=False, objectName=M31, ra=22, dec=-5, rank=9, start_rank=9,
         minAlt=30, maxSunAlt=-15, minTime=3600, maxMoon=B, minMoonSep=30, ToO=False,
         startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
         surveyID=None, surveyTileID=None)
@@ -547,12 +547,12 @@ class Mpointing(Base):
         For a more complicated example, give a list to wait_time to have the intervals between
         pointings increase.
 
-        >>> mp = Mpointing(objectName='M31', ra=22, decl=-5, start_rank=9, minAlt=30, minTime=3600,
+        >>> mp = Mpointing(objectName='M31', ra=22, dec=-5, start_rank=9, minAlt=30, minTime=3600,
         ... maxSunAlt=-15, ToO=0, maxMoon='B', minMoonSep=30, num_todo=5, userKey=24, valid_time=5,
         ... wait_time=[10,20,30], startUTC=Time('2018-01-01 00:00:00'))
         >>> mp
         Mpointing(mpointingID=None, status='unscheduled', num_todo=5, num_completed=0,
-        num_remaining=5, infinite=False, objectName=M31, ra=22, decl=-5, rank=9, start_rank=9,
+        num_remaining=5, infinite=False, objectName=M31, ra=22, dec=-5, rank=9, start_rank=9,
         minAlt=30, maxSunAlt=-15, minTime=3600, maxMoon=B, minMoonSep=30, ToO=False,
         startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
         surveyID=None, surveyTileID=None)
@@ -589,7 +589,7 @@ class Mpointing(Base):
         >>> s.add(p)
         >>> s.commit()
         >>> mp.pointings
-        [Pointing(pointingID=17100, status='pending', objectName=M31, ra=22.0, decl=-5.0, rank=9,
+        [Pointing(pointingID=17100, status='pending', objectName=M31, ra=22.0, dec=-5.0, rank=9,
         minAlt=30.0, maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
         startUTC=2018-01-01 00:00:00, stopUTC=2018-01-01 00:05:00, startedUTC=None, stoppedUTC=None,
         userKey=24, mpointingID=2, blockID=1, eventID=None, eventTileID=None, surveyID=None,
@@ -604,7 +604,7 @@ class Mpointing(Base):
         >>> s.commit()
         >>> mp
         Mpointing(mpointingID=2, status='unscheduled', num_todo=5, num_completed=1, num_remaining=4,
-        infinite=False, objectName=M31, ra=22.0, decl=-5.0, rank=19, start_rank=9, minAlt=30.0,
+        infinite=False, objectName=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, minAlt=30.0,
         maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
         startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
         surveyID=None, surveyTileID=None)
@@ -618,14 +618,14 @@ class Mpointing(Base):
         >>> s.add(p)
         >>> s.commit()
         >>> p
-        Pointing(pointingID=17102, status='pending', objectName=M31, ra=22.0, decl=-5.0, rank=19,
+        Pointing(pointingID=17102, status='pending', objectName=M31, ra=22.0, dec=-5.0, rank=19,
         minAlt=30.0, maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
         startUTC=2018-01-01 00:15:00, stopUTC=2018-01-01 00:20:00, startedUTC=None, stoppedUTC=None,
         userKey=24, mpointingID=2, blockID=2, eventID=None, eventTileID=None, surveyID=None,
         surveyTileID=None)
         >>> mp
         Mpointing(mpointingID=2, status='scheduled', num_todo=5, num_completed=1, num_remaining=4,
-        infinite=False, objectName=M31, ra=22.0, decl=-5.0, rank=19, start_rank=9, minAlt=30.0,
+        infinite=False, objectName=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, minAlt=30.0,
         maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
         startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
         surveyID=None, surveyTileID=None)
@@ -701,7 +701,7 @@ class Mpointing(Base):
         'completed'
         >>> mp
         Mpointing(mpointingID=2, status='completed', num_todo=5, num_completed=5, num_remaining=0,
-        infinite=False, objectName=M31, ra=22.0, decl=-5.0, rank=59, start_rank=9, minAlt=30.0,
+        infinite=False, objectName=M31, ra=22.0, dec=-5.0, rank=59, start_rank=9, minAlt=30.0,
         maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
         startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
         surveyID=None, surveyTileID=None)
@@ -748,7 +748,7 @@ class Mpointing(Base):
     # Columns
     objectName = Column('object', String)
     ra = Column(Float)
-    decl = Column(Float)
+    dec = Column('decl', Float)
     rank = Column(Integer)
     start_rank = Column(Integer)
     minAlt = Column(Float)
@@ -782,26 +782,26 @@ class Mpointing(Base):
     def __repr__(self):
         template = ("Mpointing(mpointingID={}, status='{}', num_todo={}, num_completed={}," +
                     "num_remaining={}, infinite={}, " +
-                    "objectName={}, ra={}, decl={}, rank={}, start_rank={}, " +
+                    "objectName={}, ra={}, dec={}, rank={}, start_rank={}, " +
                     "minAlt={}, maxSunAlt={}, minTime={}, maxMoon={}, minMoonSep={}, " +
                     "ToO={}, startUTC={}, stopUTC={}, " +
                     "userKey={}, eventID={}, eventTileID={}, surveyID={}, surveyTileID={})")
         return template.format(
             self.mpointingID, self.status, self.num_todo, self.num_completed,
             self.num_remaining, bool(self.infinite),
-            self.objectName, self.ra, self.decl, self.rank, self.start_rank,
+            self.objectName, self.ra, self.dec, self.rank, self.start_rank,
             self.minAlt, self.maxSunAlt, self.minTime, self.maxMoon, self.minMoonSep,
             bool(self.ToO), self.startUTC, self.stopUTC,
             self.userKey, self.eventID, self.eventTileID, self.surveyID, self.surveyTileID
         )
 
-    def __init__(self, objectName=None, ra=None, decl=None,
+    def __init__(self, objectName=None, ra=None, dec=None,
                  start_rank=None, minAlt=None, minTime=None,
                  maxMoon=None, minMoonSep=None, maxSunAlt=None, ToO=None, startUTC=None,
                  stopUTC=None, num_todo=None, valid_time=None, wait_time=None,
                  status='unscheduled', **kwargs):
         self.ra = ra
-        self.decl = decl
+        self.dec = dec
         self.objectName = objectName
         self.start_rank = start_rank
         self.maxMoon = maxMoon
@@ -1068,7 +1068,7 @@ class Mpointing(Base):
         # now create a pointing
         p = Pointing(objectName=self.objectName,
                      ra=self.ra,
-                     decl=self.decl,
+                     dec=self.dec,
                      rank=self.rank,
                      minAlt=self.minAlt,
                      maxSunAlt=self.maxSunAlt,
@@ -1261,7 +1261,7 @@ class EventTile(Base):
             J2000 right ascension in decimal degrees
             if ra is not given and this EventTile is linked to a SurveyTile
             then the ra will be extracted from the SurveyTile
-        decl : float, optional
+        dec : float, optional
             J2000 declination in decimal degrees
             if dec is not given and this EventTile is linked to a SurveyTile
             then the dec will be extracted from the SurveyTile
@@ -1301,16 +1301,16 @@ class EventTile(Base):
 
         construct without eventID
 
-        >>> event_tile = EventTile(ra=122.34, decl=22.01, probability=0.01)
+        >>> event_tile = EventTile(ra=122.34, dec=22.01, probability=0.01)
         >>> event_tile
-        EventTile(tileID=None, ra=122.34, decl=22.01, probability=0.01, eventID=None,
+        EventTile(tileID=None, ra=122.34, dec=22.01, probability=0.01, eventID=None,
         surveytileID=None)
 
         set the eventID
 
         >>> event_tile.eventID = 1
         >>> event_tile
-        EventTile(tileID=None, ra=122.34, decl=22.01, probability=0.01, eventID=None,
+        EventTile(tileID=None, ra=122.34, dec=22.01, probability=0.01, eventID=None,
         surveytileID=None)
 
         add to the database
@@ -1318,37 +1318,37 @@ class EventTile(Base):
         >>> session.add(event_tile)
         >>> session.commit()
         >>> event_tile  # note how tileID is populated now tile is in DB
-        EventTile(tileID=1, ra=122.34, decl=22.01, probability=0.01, eventID=1, surveytileID=None)
+        EventTile(tileID=1, ra=122.34, dec=22.01, probability=0.01, eventID=1, surveytileID=None)
         >>> e.eventTiles  # and event knows about all associated tiles
-        [EventTile(tileID=1, ra=122.34, decl=22.01, probability=0.01, eventID=1, surveytileID=None)]
+        [EventTile(tileID=1, ra=122.34, dec=22.01, probability=0.01, eventID=1, surveytileID=None)]
         >>> session.close()
 
         make a survey and a survey tile, and add them to the database
 
         >>> s = Survey(name='GOTO survey')
-        >>> st = SurveyTile(ra=22, decl=-2, name='Tile1')
+        >>> st = SurveyTile(ra=22, dec=-2, name='Tile1')
         >>> st.survey = s
         >>> session.add(s, st)
         >>> session.commit()
 
-        make a new event tile that has no ra and decl,
+        make a new event tile that has no ra and dec,
         but is linked to the survey tile
 
         >>> et2 = EventTile(probability=0.01)
         >>> et2.event = e
         >>> et2.surveyTile = st
         >>> et2
-        EventTile(tileID=None, ra=None, decl=None, probability=0.01, eventID=None,
+        EventTile(tileID=None, ra=None, dec=None, probability=0.01, eventID=None,
         surveytileID=None)
 
         add to the database
 
         >>> session.add(event_tile)
         >>> session.commit()
-        >>> et2  # note how the ra and decl have been copied from the surveyTile
-        EventTile(tileID=2, ra=22.0, decl=-2.0, probability=0.01, eventID=1, surveytileID=1)
+        >>> et2  # note how the ra and dec have been copied from the surveyTile
+        EventTile(tileID=2, ra=22.0, dec=-2.0, probability=0.01, eventID=1, surveytileID=1)
         >>> st.eventTiles # and the surveyTile knows about the linked eventTiles
-        [EventTile(tileID=2, ra=22.0, decl=-2.0, probability=0.01, eventID=1, surveytileID=1)]
+        [EventTile(tileID=2, ra=22.0, dec=-2.0, probability=0.01, eventID=1, surveytileID=1)]
 
     """
 
@@ -1360,7 +1360,7 @@ class EventTile(Base):
 
     # Columns
     ra = Column(Float)
-    decl = Column(Float)
+    dec = Column('decl', Float)
     probability = Column(Float)
     unobserved_probability = Column(Float)
 
@@ -1375,10 +1375,10 @@ class EventTile(Base):
     surveyTile = relationship('SurveyTile', back_populates='eventTiles', uselist=False)
 
     def __repr__(self):
-        template = ("EventTile(tileID={}, ra={}, decl={}, " +
+        template = ("EventTile(tileID={}, ra={}, dec={}, " +
                     "probability={}, eventID={}, surveytileID={})")
         return template.format(
-            self.tileID, self.ra, self.decl, self.probability, self.eventID,
+            self.tileID, self.ra, self.dec, self.probability, self.eventID,
             self.surveyTileID)
 
 
@@ -1456,7 +1456,7 @@ class SurveyTile(Base):
     ----
         ra : float
             J2000 right ascension in decimal degrees
-        decl : float
+        dec : float
             J2000 declination in decimal degrees
         surveyID : int, optional
             the ID number of the Survey this tile is associated with
@@ -1493,15 +1493,15 @@ class SurveyTile(Base):
 
         construct without surveyID
 
-        >>> tile = SurveyTile(ra=100, decl=20)
+        >>> tile = SurveyTile(ra=100, dec=20)
         >>> tile
-        SurveyTile(tileID=None, ra=100.00, decl=20.00)
+        SurveyTile(tileID=None, ra=100.00, dec=20.00)
 
         set the surveyID
 
         >>> event_tile.eventID = 1
         >>> event_tile
-        EventTile(tileID=None, ra=122.34, decl=22.01, probability=0.01, eventID=None)
+        EventTile(tileID=None, ra=122.34, dec=22.01, probability=0.01, eventID=None)
 
         add to the database, demonstrating the open_session context manager,
         which will handle committing changes for you:
@@ -1509,10 +1509,10 @@ class SurveyTile(Base):
         >>> with open_session as session():
         >>>     insert_items([tile])
         >>>     tile  # note how tileID is populated now tile is in DB
-        SurveyTile(tileID=1, ra=100.00, decl=20.00, surveyID=1)
+        SurveyTile(tileID=1, ra=100.00, dec=20.00, surveyID=1)
         >>> with open_session as session():
         >>>     s.surveyTiles  # and survey knows about all associated tiles
-        [SurveyTile(tileID=1, ra=100.00, decl=20.00, surveyID=1)]
+        [SurveyTile(tileID=1, ra=100.00, dec=20.00, surveyID=1)]
 
     """
 
@@ -1524,7 +1524,7 @@ class SurveyTile(Base):
 
     # Columns
     ra = Column(Float)
-    decl = Column(Float)
+    dec = Column('decl', Float)
     name = Column(String)
 
     # Foreign keys
@@ -1537,10 +1537,10 @@ class SurveyTile(Base):
     pointings = relationship('Pointing', back_populates='surveyTile')
 
     def __repr__(self):
-        template = ("SurveyTile(tileID={}, ra={}, decl={}, " +
+        template = ("SurveyTile(tileID={}, ra={}, dec={}, " +
                     ", name={}, surveyID={})")
         return template.format(
-            self.tileID, self.ra, self.decl, self.name, self.surveyID)
+            self.tileID, self.ra, self.dec, self.name, self.surveyID)
 
 
 class ImageLog(Base):

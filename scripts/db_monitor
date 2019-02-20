@@ -51,7 +51,7 @@ with db.open_session() as session:
                 pointing.objectName,
                 pointing.rank,
                 '!' if pointing.ToO else ' ',
-                pointing.ra, pointing.decl,
+                pointing.ra, pointing.dec,
                 pointing.startUTC)
 
             print(string, end=' ')

@@ -28,14 +28,14 @@ with db.open_session() as session:
     e = db.Event(ivo='ivo://gotoTest', name='gotoVar3', source='made-up')
 
     # and an event tile
-    et = db.EventTile(ra=100, decl=20, probability=0.1)
+    et = db.EventTile(ra=100, dec=20, probability=0.1)
     et.event = e
 
     # and a survey
     s = db.Survey(name='GOTO survey')
 
     # and a survey tile
-    st = db.SurveyTile(ra=22, decl=-2, name='Tile1')
+    st = db.SurveyTile(ra=22, dec=-2, name='Tile1')
     st.survey = s
 
     # and an event tile linked to that survey tile
@@ -49,14 +49,14 @@ with db.open_session() as session:
 
     # check the second event tile updated correctly
     assert et2.ra == st.ra
-    assert et2.decl == st.decl
+    assert et2.dec == st.dec
 
 # OK, new Session. Let's make a Pointing
 with db.open_session() as session:
     userKey = db.get_userkey(session, 'goto')
     p = db.Pointing(objectName='IP Peg',
                     ra=350.785625,
-                    decl=18.416472,
+                    dec=18.416472,
                     rank=9,
                     minAlt=30,
                     maxSunAlt=-15,
@@ -113,7 +113,7 @@ print("{} marked expired pointings\n".format(len(marked)))
 # create an Mpointing
 mp = db.Mpointing(objectName='M31',
                   ra=10.685,
-                  decl=41.2875,
+                  dec=41.2875,
                   start_rank=9,
                   minAlt=30,
                   maxSunAlt=-15,

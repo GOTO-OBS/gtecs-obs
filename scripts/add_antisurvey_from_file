@@ -115,7 +115,7 @@ def run(filename):
             mp = db.Mpointing(userKey=user_key,
                               objectName=name,
                               ra=float(ra),
-                              decl=float(dec),
+                              dec=float(dec),
                               **MP_SETTINGS)
 
             mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))

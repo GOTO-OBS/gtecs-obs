@@ -71,7 +71,7 @@ def run(fov, overlap):
             dec = coord.dec.value
             if abs(dec) < 0.00001:  # GOTO-tile rounding errors
                 dec = 0
-            tile = db.SurveyTile(ra=float(ra), decl=float(dec), name=str(name))
+            tile = db.SurveyTile(ra=float(ra), dec=float(dec), name=str(name))
             tile.survey = survey
             tiles.append(tile)
         print('  took {:.2f} secs'.format(time.time() - start))

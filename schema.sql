@@ -67,13 +67,13 @@ CREATE TABLE `pointings` (
   `surveyTileID` INT NULL,
   `eventID` INT NULL,
   `eventTileID` INT NULL,
-  CONSTRAINT FOREIGN KEY (`userKey`) REFERENCES `users` (`userKey`),
-  CONSTRAINT FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`),
-  CONSTRAINT FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
-  CONSTRAINT FOREIGN KEY (`blockID`) REFERENCES `observing_blocks` (`blockID`),
-  CONSTRAINT FOREIGN KEY (`eventTileID`) REFERENCES `event_tiles` (`tileID`),
-  CONSTRAINT FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`),
-  CONSTRAINT FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
+  FOREIGN KEY (`userKey`) REFERENCES `users` (`userKey`),
+  FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`),
+  FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
+  FOREIGN KEY (`blockID`) REFERENCES `observing_blocks` (`blockID`),
+  FOREIGN KEY (`eventTileID`) REFERENCES `event_tiles` (`tileID`),
+  FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`),
+  FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -96,8 +96,8 @@ CREATE TABLE `exposure_sets` (
   -- foreign keys
   `pointingID` INT NULL,
   `mpointingID` INT NULL,
-  CONSTRAINT FOREIGN KEY (`pointingID`) REFERENCES `pointings` (`pointingID`),
-  CONSTRAINT FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  FOREIGN KEY (`pointingID`) REFERENCES `pointings` (`pointingID`),
+  FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -135,11 +135,11 @@ CREATE TABLE `mpointings` (
   `surveyTileID` INT NULL,
   `eventID` INT NULL,
   `eventTileID` INT NULL,
-  CONSTRAINT FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
-  CONSTRAINT FOREIGN KEY (`userKey`) REFERENCES `users` (`userKey`),
-  CONSTRAINT FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`),
-  CONSTRAINT FOREIGN KEY (`eventTileID`) REFERENCES `event_tiles` (`tileID`),
-  CONSTRAINT FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
+  FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
+  FOREIGN KEY (`userKey`) REFERENCES `users` (`userKey`),
+  FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`),
+  FOREIGN KEY (`eventTileID`) REFERENCES `event_tiles` (`tileID`),
+  FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
   )
   ENGINE = InnoDB;
 
@@ -158,7 +158,7 @@ CREATE TABLE `observing_blocks` (
   INDEX `current_idx` (`current`),
   -- foreign keys
   `mpointingID` INT NOT NULL,
-  CONSTRAINT FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
   )
   ENGINE = InnoDB;
 
@@ -191,8 +191,8 @@ CREATE TABLE`event_tiles` (
   -- foreign keys
   `eventID` INT NOT NULL,
   `surveyTileID` INT NULL,
-  CONSTRAINT FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
-  CONSTRAINT FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`)
+  FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
+  FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`)
   )
   ENGINE = InnoDB;
 
@@ -220,7 +220,7 @@ CREATE TABLE `survey_tiles` (
   -- indexes
   -- foreign keys
   `surveyID` INT NOT NULL,
-  CONSTRAINT FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
+  FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
   )
   ENGINE = InnoDB;
 
@@ -245,9 +245,9 @@ CREATE TABLE `image_logs` (
   `expID` INT NULL DEFAULT NULL,
   `pointingID` INT NULL DEFAULT NULL,
   `mpointingID` INT NULL DEFAULT NULL,
-  CONSTRAINT FOREIGN KEY (`expID`) REFERENCES `exposure_sets` (`expID`),
-  CONSTRAINT FOREIGN KEY (`pointingID`) REFERENCES `pointings` (`pointingID`),
-  CONSTRAINT FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  FOREIGN KEY (`expID`) REFERENCES `exposure_sets` (`expID`),
+  FOREIGN KEY (`pointingID`) REFERENCES `pointings` (`pointingID`),
+  FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;

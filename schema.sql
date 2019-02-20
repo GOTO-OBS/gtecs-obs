@@ -21,8 +21,9 @@ USE `goto_obs` ;
 -- Users table
 DROP TABLE IF EXISTS `users` ;
 CREATE TABLE IF NOT EXISTS `users` (
-  -- columns
+  -- primary key
   `userKey` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `user_name` VARCHAR(255) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
   `fullName` TEXT NOT NULL
@@ -35,8 +36,9 @@ CREATE TABLE IF NOT EXISTS `users` (
 -- Pointings table
 DROP TABLE IF EXISTS `pointings` ;
 CREATE TABLE `pointings` (
-  -- columns
+  -- primary key
   `pointingID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `status` ENUM('pending', 'running', 'completed', 'aborted', 'interrupted', 'expired', 'deleted') NOT NULL DEFAULT 'pending',
   `object` TEXT NOT NULL COMMENT 'object name',
   `ra` FLOAT NOT NULL COMMENT 'in decimal degrees',
@@ -79,8 +81,9 @@ CREATE TABLE `pointings` (
 -- Exposure sets table
 DROP TABLE IF EXISTS `exposure_sets` ;
 CREATE TABLE `exposure_sets` (
-  -- columns
+  -- primary key
   `expID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `utMask` INT NULL COMMENT 'bit mask to allocate to individual UTs. NULL means send to all',
   `typeFlag` ENUM('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD') NOT NULL,
   `filter` CHAR(1) NOT NULL,
@@ -102,8 +105,9 @@ CREATE TABLE `exposure_sets` (
 -- Mpointings table
 DROP TABLE IF EXISTS `mpointings` ;
 CREATE TABLE `mpointings` (
-  -- columns
+  -- primary key
   `mpointingID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `status` ENUM('unscheduled', 'scheduled', 'completed', 'aborted', 'expired', 'deleted') NOT NULL DEFAULT 'unscheduled',
   `object` TEXT NOT NULL,
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
@@ -142,8 +146,9 @@ CREATE TABLE `mpointings` (
 -- Observing blocks table
 DROP TABLE IF EXISTS `observing_blocks` ;
 CREATE TABLE `observing_blocks` (
-  -- columns
+  -- primary key
   `blockID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `blockNum` INT NOT NULL,
   `current` BOOLEAN NOT NULL DEFAULT FALSE,
   `valid_time` FLOAT NOT NULL COMMENT 'how long after the startUTC the pointing should be valid for in minutes',
@@ -160,8 +165,9 @@ CREATE TABLE `observing_blocks` (
 -- Events table
 DROP TABLE IF EXISTS `events` ;
 CREATE TABLE `events` (
-  -- columns
+  -- primary key
   `eventID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `name` VARCHAR(255) NOT NULL,
   `source` VARCHAR(255) NOT NULL COMMENT 'LIGO, SWIFT etc.',
   `ivo` VARCHAR(255) NOT NULL UNIQUE,
@@ -174,8 +180,9 @@ CREATE TABLE `events` (
 -- Event tiles table
 DROP TABLE IF EXISTS `event_tiles` ;
 CREATE TABLE`event_tiles` (
-  -- columns
+  -- primary key
   `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `ra` FLOAT NOT NULL,
   `decl` FLOAT NOT NULL,
   `probability` FLOAT NOT NULL,
@@ -192,8 +199,9 @@ CREATE TABLE`event_tiles` (
 -- Surveys table
 DROP TABLE IF EXISTS `surveys` ;
 CREATE TABLE `surveys` (
-  -- columns
+  -- primary key
   `surveyID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `name` VARCHAR(255) NOT NULL
   -- indexes
   -- foreign keys
@@ -203,8 +211,9 @@ CREATE TABLE `surveys` (
 -- Survey tiles table
 DROP TABLE IF EXISTS `survey_tiles` ;
 CREATE TABLE `survey_tiles` (
-  -- columns
+  -- primary key
   `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `name` VARCHAR(255) NOT NULL,
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
   `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
@@ -218,8 +227,9 @@ CREATE TABLE `survey_tiles` (
 -- Image logs table
 DROP TABLE IF EXISTS `image_logs` ;
 CREATE TABLE `image_logs` (
-  -- columns
+  -- primary key
   `logID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- columns
   `filename` VARCHAR(30) NOT NULL UNIQUE COMMENT 'full FITS file name, including extension',
   `runNumber` INT NOT NULL,
   `ut` INT NOT NULL,

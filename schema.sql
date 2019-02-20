@@ -22,7 +22,7 @@ USE `goto_obs` ;
 DROP TABLE IF EXISTS `users` ;
 CREATE TABLE IF NOT EXISTS `users` (
   -- primary key
-  `userKey` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `user_name` VARCHAR(255) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 DROP TABLE IF EXISTS `pointings` ;
 CREATE TABLE `pointings` (
   -- primary key
-  `pointingID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `status` ENUM('pending', 'running', 'completed', 'aborted', 'interrupted', 'expired', 'deleted') NOT NULL DEFAULT 'pending',
   `object` TEXT NOT NULL COMMENT 'object name',
@@ -60,20 +60,20 @@ CREATE TABLE `pointings` (
   INDEX `startUTC_idx` (`startUTC`),
   INDEX `stopUTC_idx` (`stopUTC`),
   -- foreign keys
-  `userKey` INT NOT NULL,
-  `mpointingID` INT NULL,
-  `blockID` INT NULL,
-  `surveyID` INT NULL,
-  `surveyTileID` INT NULL,
-  `eventID` INT NULL,
-  `eventTileID` INT NULL,
-  FOREIGN KEY (`userKey`) REFERENCES `users` (`userKey`),
-  FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`),
-  FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
-  FOREIGN KEY (`blockID`) REFERENCES `observing_blocks` (`blockID`),
-  FOREIGN KEY (`eventTileID`) REFERENCES `event_tiles` (`tileID`),
-  FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`),
-  FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
+  `user_id` INT NOT NULL,
+  `mpointing_id` INT NULL,
+  `observing_block_id` INT NULL,
+  `survey_id` INT NULL,
+  `survey_tile_id` INT NULL,
+  `event_id` INT NULL,
+  `event_tile_id` INT NULL,
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
+  FOREIGN KEY (`mpointing_id`) REFERENCES `mpointings` (`id`),
+  FOREIGN KEY (`observing_block_id`) REFERENCES `observing_blocks` (`id`),
+  FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`),
+  FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`),
+  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`),
+  FOREIGN KEY (`event_tile_id`) REFERENCES `event_tiles` (`id`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -82,7 +82,7 @@ CREATE TABLE `pointings` (
 DROP TABLE IF EXISTS `exposure_sets` ;
 CREATE TABLE `exposure_sets` (
   -- primary key
-  `expID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `utMask` INT NULL COMMENT 'bit mask to allocate to individual UTs. NULL means send to all',
   `typeFlag` ENUM('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD') NOT NULL,
@@ -94,10 +94,10 @@ CREATE TABLE `exposure_sets` (
   `decoff` FLOAT NOT NULL DEFAULT 0.0 COMMENT 'arcsec',
   -- indexes
   -- foreign keys
-  `pointingID` INT NULL,
-  `mpointingID` INT NULL,
-  FOREIGN KEY (`pointingID`) REFERENCES `pointings` (`pointingID`),
-  FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  `pointing_id` INT NULL,
+  `mpointing_id` INT NULL,
+  FOREIGN KEY (`pointing_id`) REFERENCES `pointings` (`id`),
+  FOREIGN KEY (`mpointing_id`) REFERENCES `mpointings` (`id`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -106,7 +106,7 @@ CREATE TABLE `exposure_sets` (
 DROP TABLE IF EXISTS `mpointings` ;
 CREATE TABLE `mpointings` (
   -- primary key
-  `mpointingID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `status` ENUM('unscheduled', 'scheduled', 'completed', 'aborted', 'expired', 'deleted') NOT NULL DEFAULT 'unscheduled',
   `object` TEXT NOT NULL,
@@ -130,16 +130,16 @@ CREATE TABLE `mpointings` (
   INDEX `startUTC_idx` (`startUTC`),
   INDEX `stopUTC_idx` (`stopUTC`),
   -- foreign keys
-  `userKey` INT NOT NULL,
-  `surveyID` INT NULL,
-  `surveyTileID` INT NULL,
-  `eventID` INT NULL,
-  `eventTileID` INT NULL,
-  FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
-  FOREIGN KEY (`userKey`) REFERENCES `users` (`userKey`),
-  FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`),
-  FOREIGN KEY (`eventTileID`) REFERENCES `event_tiles` (`tileID`),
-  FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
+  `user_id` INT NOT NULL,
+  `survey_id` INT NULL,
+  `survey_tile_id` INT NULL,
+  `event_id` INT NULL,
+  `event_tile_id` INT NULL,
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
+  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`),
+  FOREIGN KEY (`event_tile_id`) REFERENCES `event_tiles` (`id`),
+  FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`),
+  FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`)
   )
   ENGINE = InnoDB;
 
@@ -147,7 +147,7 @@ CREATE TABLE `mpointings` (
 DROP TABLE IF EXISTS `observing_blocks` ;
 CREATE TABLE `observing_blocks` (
   -- primary key
-  `blockID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `blockNum` INT NOT NULL,
   `current` BOOLEAN NOT NULL DEFAULT FALSE,
@@ -157,8 +157,8 @@ CREATE TABLE `observing_blocks` (
   INDEX `blockNum_idx` (`blockNum`),
   INDEX `current_idx` (`current`),
   -- foreign keys
-  `mpointingID` INT NOT NULL,
-  FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  `mpointing_id` INT NOT NULL,
+  FOREIGN KEY (`mpointing_id`) REFERENCES `mpointings` (`id`)
   )
   ENGINE = InnoDB;
 
@@ -166,7 +166,7 @@ CREATE TABLE `observing_blocks` (
 DROP TABLE IF EXISTS `events` ;
 CREATE TABLE `events` (
   -- primary key
-  `eventID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `name` VARCHAR(255) NOT NULL,
   `source` VARCHAR(255) NOT NULL COMMENT 'LIGO, SWIFT etc.',
@@ -181,7 +181,7 @@ CREATE TABLE `events` (
 DROP TABLE IF EXISTS `event_tiles` ;
 CREATE TABLE`event_tiles` (
   -- primary key
-  `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `ra` FLOAT NOT NULL,
   `decl` FLOAT NOT NULL,
@@ -189,10 +189,10 @@ CREATE TABLE`event_tiles` (
   `unobserved_probability` FLOAT NOT NULL,
   -- indexes
   -- foreign keys
-  `eventID` INT NOT NULL,
-  `surveyTileID` INT NULL,
-  FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`),
-  FOREIGN KEY (`surveyTileID`) REFERENCES `survey_tiles` (`tileID`)
+  `event_id` INT NOT NULL,
+  `survey_tile_id` INT NULL,
+  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`),
+  FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`)
   )
   ENGINE = InnoDB;
 
@@ -200,7 +200,7 @@ CREATE TABLE`event_tiles` (
 DROP TABLE IF EXISTS `surveys` ;
 CREATE TABLE `surveys` (
   -- primary key
-  `surveyID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `name` VARCHAR(255) NOT NULL
   -- indexes
@@ -212,15 +212,15 @@ CREATE TABLE `surveys` (
 DROP TABLE IF EXISTS `survey_tiles` ;
 CREATE TABLE `survey_tiles` (
   -- primary key
-  `tileID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `name` VARCHAR(255) NOT NULL,
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
   `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
   -- indexes
   -- foreign keys
-  `surveyID` INT NOT NULL,
-  FOREIGN KEY (`surveyID`) REFERENCES `surveys` (`surveyID`)
+  `survey_id` INT NOT NULL,
+  FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`)
   )
   ENGINE = InnoDB;
 
@@ -228,7 +228,7 @@ CREATE TABLE `survey_tiles` (
 DROP TABLE IF EXISTS `image_logs` ;
 CREATE TABLE `image_logs` (
   -- primary key
-  `logID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `filename` VARCHAR(30) NOT NULL UNIQUE COMMENT 'full FITS file name, including extension',
   `runNumber` INT NOT NULL,
@@ -242,12 +242,12 @@ CREATE TABLE `image_logs` (
   INDEX `runNumber_idx` (`runNumber`),
   INDEX `writeUTC_idx` (`writeUTC`),
   -- foreign keys
-  `expID` INT NULL DEFAULT NULL,
-  `pointingID` INT NULL DEFAULT NULL,
-  `mpointingID` INT NULL DEFAULT NULL,
-  FOREIGN KEY (`expID`) REFERENCES `exposure_sets` (`expID`),
-  FOREIGN KEY (`pointingID`) REFERENCES `pointings` (`pointingID`),
-  FOREIGN KEY (`mpointingID`) REFERENCES `mpointings` (`mpointingID`)
+  `exposure_set_id` INT NULL DEFAULT NULL,
+  `pointing_id` INT NULL DEFAULT NULL,
+  `mpointing_id` INT NULL DEFAULT NULL,
+  FOREIGN KEY (`exposure_set_id`) REFERENCES `exposure_sets` (`id`),
+  FOREIGN KEY (`pointing_id`) REFERENCES `pointings` (`id`),
+  FOREIGN KEY (`mpointing_id`) REFERENCES `mpointings` (`id`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -278,9 +278,9 @@ CREATE DEFINER = CURRENT_USER TRIGGER `event_tiles_BEFORE_INSERT`
   BEFORE INSERT ON `event_tiles` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
-    IF ((NEW.surveyTileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
-      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.surveyTileID = `survey_tiles`.`tileID`);
-      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.surveyTileID = `survey_tiles`.`tileID`);
+    IF ((NEW.survey_tile_id is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
+      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
+      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
     END IF;
     -- Set unobserved_probability from probability
     IF ((NEW.unobserved_probability is NULL) and (NEW.probability is not NULL)) THEN
@@ -296,9 +296,9 @@ CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_INSERT`
   BEFORE INSERT ON `mpointings` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
-    IF ((NEW.surveyTileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
-      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.surveyTileID = `survey_tiles`.`tileID`);
-      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.surveyTileID = `survey_tiles`.`tileID`);
+    IF ((NEW.survey_tile_id is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
+      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
+      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
     END IF;
   END$$
 
@@ -322,9 +322,9 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_INSERT`
   BEFORE INSERT ON `pointings` FOR EACH ROW
   BEGIN
     -- Select RA and Dec from linked survey tile if not given
-    IF ((NEW.surveyTileID is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
-      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.surveyTileID = `survey_tiles`.`tileID`);
-      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.surveyTileID = `survey_tiles`.`tileID`);
+    IF ((NEW.survey_tile_id is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
+      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
+      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`tileID`);
     END IF;
   END$$
 
@@ -335,13 +335,13 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_INSERT`
   BEGIN
     -- Mark all other blocks for this Mpointing as current=False,
     -- and the one for this Pointing as current=True
-    IF (NEW.`blockID` is not NULL) AND (NEW.status = 'pending') THEN
-      UPDATE `observing_blocks` SET `current` = FALSE WHERE (NEW.`mpointingID` = `observing_blocks`.`mpointingID`);
-      UPDATE `observing_blocks` SET `current` = TRUE WHERE (NEW.`blockID` = `observing_blocks`.`blockID`);
+    IF (NEW.`observing_block_id` is not NULL) AND (NEW.status = 'pending') THEN
+      UPDATE `observing_blocks` SET `current` = FALSE WHERE (NEW.`mpointing_id` = `observing_blocks`.`mpointing_id`);
+      UPDATE `observing_blocks` SET `current` = TRUE WHERE (NEW.`observing_block_id` = `observing_blocks`.`id`);
     END IF;
     -- Mark any linked Mpointing as scheduled
-    IF (NEW.`mpointingID` is not NULL) AND (NEW.status = 'pending') THEN
-      UPDATE `mpointings` SET `status` = 'scheduled' WHERE (NEW.`mpointingID` = `mpointings`.`mpointingID`);
+    IF (NEW.`mpointing_id` is not NULL) AND (NEW.status = 'pending') THEN
+      UPDATE `mpointings` SET `status` = 'scheduled' WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
     END IF;
   END$$
 
@@ -371,17 +371,17 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_UPDATE`
       -- Mark Mpointing as unscheduled when the pointing is finished somehow
       -- NB only if the Mpointing is scheduled
       IF NEW.`status` NOT IN ('pending', 'running') THEN
-        UPDATE `mpointings` SET `status` = 'unscheduled' WHERE (`mpointings`.`mpointingID` = NEW.`mpointingID` and `mpointings`.`status` = 'scheduled');
+        UPDATE `mpointings` SET `status` = 'unscheduled' WHERE (`mpointings`.`id` = NEW.`mpointing_id` and `mpointings`.`status` = 'scheduled');
       END IF;
       -- If the pointing was completed...
       IF NEW.`status` = 'completed' THEN
         -- Increase the Mpointing's completed count
-        UPDATE `mpointings` SET `num_completed` = `num_completed` + 1 WHERE (NEW.`mpointingID` = `mpointings`.`mpointingID`);
+        UPDATE `mpointings` SET `num_completed` = `num_completed` + 1 WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
         -- Add 10 to the rank
         -- NB only if the Mpointing is not infinite
-        SELECT `infinite` INTO isinfinite FROM `mpointings` WHERE (NEW.`mpointingID` = `mpointings`.`mpointingID`);
+        SELECT `infinite` INTO isinfinite FROM `mpointings` WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
         IF isinfinite = 0 THEN
-          UPDATE `mpointings` SET `rank` = `rank` + 10 WHERE (NEW.`mpointingID` = `mpointings`.`mpointingID`);
+          UPDATE `mpointings` SET `rank` = `rank` + 10 WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
         END IF;
       END IF;
     END IF;

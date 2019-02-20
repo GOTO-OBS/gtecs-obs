@@ -88,7 +88,7 @@ class User(Base):
     __tablename__ = 'users'
 
     # Primary key
-    userKey = Column(Integer, primary_key=True)
+    userKey = Column('id', Integer, primary_key=True)
 
     # Columns
     userName = Column('user_name', String)
@@ -246,7 +246,7 @@ class Pointing(Base):
     __tablename__ = 'pointings'
 
     # Primary key
-    pointingID = Column(Integer, primary_key=True)
+    pointingID = Column('id', Integer, primary_key=True)
 
     # Columns
     objectName = Column('object', String)
@@ -266,13 +266,13 @@ class Pointing(Base):
     status = Column(pointing_status_list, default='pending')
 
     # Foreign keys
-    userKey = Column('userKey', Integer, ForeignKey('users.userKey'), nullable=False)
-    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'), nullable=True)
-    blockID = Column('blockID', Integer, ForeignKey('observing_blocks.blockID'), nullable=True)
-    eventID = Column('eventID', Integer, ForeignKey('events.eventID'), nullable=True)
-    eventTileID = Column('eventTileID', Integer, ForeignKey('event_tiles.tileID'), nullable=True)
-    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'), nullable=True)
-    surveyTileID = Column('surveyTileID', Integer, ForeignKey('survey_tiles.tileID'), nullable=True)
+    userKey = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
+    mpointingID = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
+    blockID = Column('observing_block_id', Integer, ForeignKey('observing_blocks.id'), nullable=True)
+    eventID = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
+    eventTileID = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
+    surveyID = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
+    surveyTileID = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     user = relationship('User', backref='pointings', uselist=False)
@@ -386,7 +386,7 @@ class ExposureSet(Base):
     __tablename__ = 'exposure_sets'
 
     # Primary key
-    expID = Column(Integer, primary_key=True)
+    expID = Column('id', Integer, primary_key=True)
 
     # Columns
     raoff = Column(Float, server_default='0.0')
@@ -399,8 +399,8 @@ class ExposureSet(Base):
     utMask = Column(Integer, nullable=True)
 
     # Foreign keys
-    pointingID = Column('pointingID', Integer, ForeignKey('pointings.pointingID'), nullable=False)
-    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'), nullable=False)
+    pointingID = Column('pointing_id', Integer, ForeignKey('pointings.id'), nullable=False)
+    mpointingID = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
     pointing = relationship('Pointing', backref='exposure_sets', uselist=False)
@@ -743,7 +743,7 @@ class Mpointing(Base):
     __tablename__ = 'mpointings'
 
     # Primary key
-    mpointingID = Column(Integer, primary_key=True)
+    mpointingID = Column('id', Integer, primary_key=True)
 
     # Columns
     objectName = Column('object', String)
@@ -765,11 +765,11 @@ class Mpointing(Base):
     status = Column(mpointing_status_list, default='unscheduled')
 
     # Foreign keys
-    userKey = Column('userKey', Integer, ForeignKey('users.userKey'), nullable=False)
-    eventID = Column('eventID', Integer, ForeignKey('events.eventID'), nullable=True)
-    eventTileID = Column('eventTileID', Integer, ForeignKey('event_tiles.tileID'), nullable=True)
-    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'), nullable=True)
-    surveyTileID = Column('surveyTileID', Integer, ForeignKey('survey_tiles.tileID'), nullable=True)
+    userKey = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
+    eventID = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
+    eventTileID = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
+    surveyID = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
+    surveyTileID = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     user = relationship('User', backref='mpointings', uselist=False)
@@ -1152,7 +1152,7 @@ class ObservingBlock(Base):
     __tablename__ = 'observing_blocks'
 
     # Primary key
-    blockID = Column(Integer, primary_key=True)
+    blockID = Column('id', Integer, primary_key=True)
 
     # Columns
     blockNum = Column(Integer)
@@ -1161,9 +1161,7 @@ class ObservingBlock(Base):
     current = Column(Integer, default=False)
 
     # Foreign keys
-    mpointingID = Column('mpointingID', Integer,
-                         ForeignKey('mpointings.mpointingID'),
-                         nullable=False)
+    mpointingID = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
     mpointing = relationship('Mpointing', back_populates='observing_blocks', uselist=False)
@@ -1225,7 +1223,7 @@ class Event(Base):
     __tablename__ = 'events'
 
     # Primary key
-    eventID = Column(Integer, primary_key=True)
+    eventID = Column('id', Integer, primary_key=True)
 
     # Columns
     name = Column(String)
@@ -1358,7 +1356,7 @@ class EventTile(Base):
     __tablename__ = 'event_tiles'
 
     # Primary key
-    tileID = Column(Integer, primary_key=True)
+    tileID = Column('id', Integer, primary_key=True)
 
     # Columns
     ra = Column(Float)
@@ -1367,8 +1365,8 @@ class EventTile(Base):
     unobserved_probability = Column(Float)
 
     # Foreign keys
-    eventID = Column('eventID', Integer, ForeignKey('events.eventID'), nullable=False)
-    surveyTileID = Column('surveyTileID', Integer, ForeignKey('survey_tiles.tileID'), nullable=True)
+    eventID = Column('event_id', Integer, ForeignKey('events.id'), nullable=False)
+    surveyTileID = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     pointings = relationship('Pointing', back_populates='eventTile')
@@ -1427,7 +1425,7 @@ class Survey(Base):
     __tablename__ = 'surveys'
 
     # Primary key
-    surveyID = Column(Integer, primary_key=True)
+    surveyID = Column('id', Integer, primary_key=True)
 
     # Columns
     name = Column(String)
@@ -1522,7 +1520,7 @@ class SurveyTile(Base):
     __tablename__ = 'survey_tiles'
 
     # Primary key
-    tileID = Column(Integer, primary_key=True)
+    tileID = Column('id', Integer, primary_key=True)
 
     # Columns
     ra = Column(Float)
@@ -1530,7 +1528,7 @@ class SurveyTile(Base):
     name = Column(String)
 
     # Foreign keys
-    surveyID = Column('surveyID', Integer, ForeignKey('surveys.surveyID'), nullable=False)
+    surveyID = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=False)
 
     # Foreign relationships
     survey = relationship('Survey', back_populates='surveyTiles', uselist=False)
@@ -1614,7 +1612,7 @@ class ImageLog(Base):
     __tablename__ = 'image_logs'
 
     # Primary key
-    logID = Column(Integer, primary_key=True)
+    logID = Column('id', Integer, primary_key=True)
 
     # Columns
     filename = Column(String)
@@ -1627,9 +1625,9 @@ class ImageLog(Base):
     set_total = Column(Integer, default=1)
 
     # Foreign keys
-    expID = Column('expID', Integer, ForeignKey('exposure_sets.expID'), nullable=True)
-    pointingID = Column('pointingID', Integer, ForeignKey('pointings.pointingID'), nullable=True)
-    mpointingID = Column('mpointingID', Integer, ForeignKey('mpointings.mpointingID'), nullable=True)
+    expID = Column('exposure_set_id', Integer, ForeignKey('exposure_sets.id'), nullable=True)
+    pointingID = Column('pointing_id', Integer, ForeignKey('pointings.id'), nullable=True)
+    mpointingID = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
 
     # Foreign relationships
     exposure_set = relationship('ExposureSet', backref='image_logs', uselist=False)

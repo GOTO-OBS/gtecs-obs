@@ -62,14 +62,14 @@ CREATE TABLE `pointings` (
   -- foreign keys
   `user_id` INT NOT NULL,
   `mpointing_id` INT NULL,
-  `observing_block_id` INT NULL,
+  `time_block_id` INT NULL,
   `survey_id` INT NULL,
   `survey_tile_id` INT NULL,
   `event_id` INT NULL,
   `event_tile_id` INT NULL,
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
   FOREIGN KEY (`mpointing_id`) REFERENCES `mpointings` (`id`),
-  FOREIGN KEY (`observing_block_id`) REFERENCES `observing_blocks` (`id`),
+  FOREIGN KEY (`time_block_id`) REFERENCES `time_blocks` (`id`),
   FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`),
   FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`),
   FOREIGN KEY (`event_id`) REFERENCES `events` (`id`),
@@ -143,9 +143,9 @@ CREATE TABLE `mpointings` (
   )
   ENGINE = InnoDB;
 
--- Observing blocks table
-DROP TABLE IF EXISTS `observing_blocks` ;
-CREATE TABLE `observing_blocks` (
+-- Time blocks table
+DROP TABLE IF EXISTS `time_blocks` ;
+CREATE TABLE `time_blocks` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
@@ -335,9 +335,9 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_INSERT`
   BEGIN
     -- Mark all other blocks for this Mpointing as current=False,
     -- and the one for this Pointing as current=True
-    IF (NEW.`observing_block_id` is not NULL) AND (NEW.status = 'pending') THEN
-      UPDATE `observing_blocks` SET `current` = FALSE WHERE (NEW.`mpointing_id` = `observing_blocks`.`mpointing_id`);
-      UPDATE `observing_blocks` SET `current` = TRUE WHERE (NEW.`observing_block_id` = `observing_blocks`.`id`);
+    IF (NEW.`time_block_id` is not NULL) AND (NEW.status = 'pending') THEN
+      UPDATE `time_blocks` SET `current` = FALSE WHERE (NEW.`mpointing_id` = `time_blocks`.`mpointing_id`);
+      UPDATE `time_blocks` SET `current` = TRUE WHERE (NEW.`time_block_id` = `time_blocks`.`id`);
     END IF;
     -- Mark any linked Mpointing as scheduled
     IF (NEW.`mpointing_id` is not NULL) AND (NEW.status = 'pending') THEN

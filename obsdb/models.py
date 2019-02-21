@@ -12,7 +12,7 @@ from sqlalchemy.orm import relationship, validates
 
 
 __all__ = ['User', 'Event', 'EventTile', 'Survey', 'SurveyTile', 'ExposureSet',
-           'Pointing', 'ObservingBlock', 'Mpointing', 'ImageLog']
+           'Pointing', 'TimeBlock', 'Mpointing', 'ImageLog']
 
 
 Base = declarative_base()
@@ -78,7 +78,7 @@ class User(Base):
         [Pointing(db_id=None, status='pending', object_name=randObj, ra=352.133, dec=28.464,
         rank=84, min_alt=30, max_sunalt=-15, min_time=1575.8310236, max_moon=D, min_moonsep=30,
         too=True, start_time=2018-01-16 16:46:12, stop_time=2018-01-18 16:46:12, started_time=None,
-        stopped_time=None, user_id=25, mpointing_id=None, observing_block_id=None, event_id=None,
+        stopped_time=None, user_id=25, mpointing_id=None, time_block_id=None, event_id=None,
         event_tile_id=None, survey_id=None, survey_tile_id=None)]
         >>> session.close()
 
@@ -205,7 +205,7 @@ class Pointing(Base):
         Pointing(db_id=None, status='None', object_name=IP Peg, ra=350.785625, dec=18.416472,
         rank=9, min_alt=30, max_sunalt=-15, min_time=3600, max_moon=G, min_moonsep=None, too=False,
         start_time=2018-01-12 17:39:54, stop_time=2018-01-15 17:39:54, started_time=None,
-        stopped_time=None, user_id=24, mpointing_id=None, observing_block_id=None, event_id=None,
+        stopped_time=None, user_id=24, mpointing_id=None, time_block_id=None, event_id=None,
         event_tile_id=None, survey_id=None, survey_tile_id=None)
 
         We can insert it into the database and the status and db_id will be set:
@@ -268,7 +268,7 @@ class Pointing(Base):
     # Foreign keys
     user_id = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
     mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
-    observing_block_id = Column('observing_block_id', Integer, ForeignKey('observing_blocks.id'), nullable=True)
+    time_block_id = Column('time_block_id', Integer, ForeignKey('time_blocks.id'), nullable=True)
     event_id = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
     event_tile_id = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
     survey_id = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
@@ -277,7 +277,7 @@ class Pointing(Base):
     # Foreign relationships
     user = relationship('User', backref='pointings', uselist=False)
     mpointing = relationship('Mpointing', backref='pointings', uselist=False)
-    observing_block = relationship('ObservingBlock', back_populates='pointings', uselist=False)
+    time_block = relationship('TimeBlock', back_populates='pointings', uselist=False)
     event = relationship('Event', backref='pointings')
     event_tile = relationship('EventTile', back_populates='pointings', uselist=False)
     survey = relationship('Survey', backref='pointings')
@@ -288,13 +288,13 @@ class Pointing(Base):
                     "object_name={}, ra={}, dec={}, rank={}, " +
                     "min_alt={}, max_sunalt={}, min_time={}, max_moon={}, min_moonsep={}, " +
                     "too={}, start_time={}, stop_time={}, started_time={}, stopped_time={}, " +
-                    "user_id={}, mpointing_id={}, observing_block_id={}, " +
+                    "user_id={}, mpointing_id={}, time_block_id={}, " +
                     "event_id={}, event_tile_id={}, survey_id={}, survey_tile_id={})")
         return template.format(
             self.db_id, self.status, self.object_name, self.ra, self.dec, self.rank,
             self.min_alt, self.max_sunalt, self.min_time, self.max_moon, self.min_moonsep,
             bool(self.too), self.start_time, self.stop_time, self.started_time, self.stopped_time,
-            self.user_id, self.mpointing_id, self.observing_block_id,
+            self.user_id, self.mpointing_id, self.time_block_id,
             self.event_id, self.event_tile_id, self.survey_id, self.survey_tile_id
         )
 
@@ -503,8 +503,8 @@ class Mpointing(Base):
             number of pointings still to do (same as num_todo - num_completed)
         exposure_sets : list of `ExposureSet`
             the `ExposureSet` objects associated with this `Mpointing`, if any
-        observing_blocks : list of `ObservingBlock`
-            the `ObservingBlock` objects associated with this `Mpointing`, if any
+        time_blocks : list of `TimeBlock`
+            the `TimeBlock` objects associated with this `Mpointing`, if any
         survey_tile : `SurveyTile`
             the `SurveyTile` associated with this `Mpointing`, if any
         event_tile : `EventTile`
@@ -535,10 +535,10 @@ class Mpointing(Base):
         Note that the db_id is None, because that will be filled out when we add it to the
         database.
 
-        Looking at the ObservingBlocks you can see that we only need one, and it has been generated
+        Looking at the TimeBlocks you can see that we only need one, and it has been generated
 
-        >>> mp.observing_blocks
-        [ObservingBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
+        >>> mp.time_blocks
+        [TimeBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
         mpointing_id=None)]
 
         This block will be repeated 5 times, as requested.
@@ -557,12 +557,12 @@ class Mpointing(Base):
         min_alt=30, max_sunalt=-15, min_time=3600, max_moon=B, min_moonsep=30, too=False,
         start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
         event_tile_id=None, survey_id=None, survey_tile_id=None)
-        >>> mp.observing_blocks
-        [ObservingBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
+        >>> mp.time_blocks
+        [TimeBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
         mpointing_id=None),
-        ObservingBlock(db_id=None, block_num=2, valid_time=5, wait_time=20, current=None,
+        TimeBlock(db_id=None, block_num=2, valid_time=5, wait_time=20, current=None,
         mpointing_id=None),
-        ObservingBlock(db_id=None, block_num=3, valid_time=5, wait_time=30, current=None,
+        TimeBlock(db_id=None, block_num=3, valid_time=5, wait_time=30, current=None,
         mpointing_id=None)]
 
         Note this time that we only created 3 blocks, but are asking for 5 observations.
@@ -593,11 +593,11 @@ class Mpointing(Base):
         [Pointing(db_id=17100, status='pending', object_name=M31, ra=22.0, dec=-5.0, rank=9,
         min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
         start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:05:00, started_time=None,
-        stopped_time=None, user_id=24, mpointing_id=2, observing_block_id=1, event_id=None,
+        stopped_time=None, user_id=24, mpointing_id=2, time_block_id=1, event_id=None,
         event_tile_id=None, survey_id=None, survey_tile_id=None)]
 
-        Note that the db_id, mpointing_id and observing_block_id have been filled out,
-        and this Pointing has observing_block_id=1.
+        Note that the db_id, mpointing_id and time_block_id have been filled out,
+        and this Pointing has time_block_id=1.
         Also that the start time is midnight and the stop time is 5 past, as expected.
         See what happens if we mark the pointing as completed:
 
@@ -622,7 +622,7 @@ class Mpointing(Base):
         Pointing(db_id=17102, status='pending', object_name=M31, ra=22.0, dec=-5.0, rank=19,
         min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
         start_time=2018-01-01 00:15:00, stop_time=2018-01-01 00:20:00, started_time=None,
-        stopped_time=None, user_id=24, mpointing_id=2, observing_block_id=2, event_id=None,
+        stopped_time=None, user_id=24, mpointing_id=2, time_block_id=2, event_id=None,
         event_tile_id=None, survey_id=None, survey_tile_id=None)
         >>> mp
         Mpointing(db_id=2, status='scheduled', num_todo=5, num_completed=1, num_remaining=4,
@@ -633,17 +633,17 @@ class Mpointing(Base):
 
         See that the Mpointing is back to scheduled.
         Also, note that the new pointing has start time of 00:15 and stop of 00:20. That's as we
-        expected, because it's linked to the second observing block not the first
-        (see observing_block_id=2).
+        expected, because it's linked to the second time block not the first
+        (see time_block_id=2).
 
-        If you look at the observing blocks you can see the next one is now marked as current.
+        If you look at the time blocks you can see the next one is now marked as current.
 
-        >>> mp.observing_blocks
-        [ObservingBlock(db_id=1, block_num=1, valid_time=5.0, wait_time=10.0, current=0,
+        >>> mp.time_blocks
+        [TimeBlock(db_id=1, block_num=1, valid_time=5.0, wait_time=10.0, current=0,
         mpointing_id=2),
-        ObservingBlock(db_id=2, block_num=2, valid_time=5.0, wait_time=20.0, current=1,
+        TimeBlock(db_id=2, block_num=2, valid_time=5.0, wait_time=20.0, current=1,
         mpointing_id=2),
-        ObservingBlock(db_id=3, block_num=3, valid_time=5.0, wait_time=30.0, current=0,
+        TimeBlock(db_id=3, block_num=3, valid_time=5.0, wait_time=30.0, current=0,
         mpointing_id=2)]
 
         Mark this one as completed, and you'll see the Mpointing is updated.
@@ -660,7 +660,7 @@ class Mpointing(Base):
         >>> p = mp.get_next_pointing() # Pointing 3 of 5
         >>> s.add(p)
         >>> s.commit()
-        >>> p.observing_block_id
+        >>> p.time_block_id
         3
         >>> mp.status
         'scheduled'
@@ -675,7 +675,7 @@ class Mpointing(Base):
         >>> p = mp.get_next_pointing() # Pointing 4 of 5
         >>> s.add(p)
         >>> s.commit()
-        >>> p.observing_block_id
+        >>> p.time_block_id
         1
         >>> mp.status
         'scheduled'
@@ -690,7 +690,7 @@ class Mpointing(Base):
         >>> p = mp.get_next_pointing() # Pointing 5 of 5
         >>> s.add(p)
         >>> s.commit()
-        >>> p.observing_block_id
+        >>> p.time_block_id
         2
         >>> mp.status
         'scheduled'
@@ -779,7 +779,7 @@ class Mpointing(Base):
     survey = relationship('Survey', backref='mpointings')
     event_tile = relationship('EventTile', back_populates='mpointing', uselist=False)
     survey_tile = relationship('SurveyTile', back_populates='mpointing', uselist=False)
-    observing_blocks = relationship('ObservingBlock', back_populates='mpointing', viewonly=True)
+    time_blocks = relationship('TimeBlock', back_populates='mpointing', viewonly=True)
 
     def __repr__(self):
         template = ("Mpointing(db_id={}, status='{}', num_todo={}, num_completed={}," +
@@ -820,7 +820,7 @@ class Mpointing(Base):
         self.num_todo = num_todo
         self.num_completed = 0
 
-        # now add observing blocks
+        # now add time blocks
         if valid_time is not None and wait_time is not None:
 
             # first convert to lists
@@ -838,7 +838,7 @@ class Mpointing(Base):
                 self.infinite = True
                 self.num_todo = -1
 
-            # create ObservingBlock objects
+            # create TimeBlock objects
             for i in range(max(len(valid_times), len(wait_times))):
                 valid = valid_times[i % len(valid_times)]
                 wait = wait_times[i % len(wait_times)]
@@ -847,10 +847,10 @@ class Mpointing(Base):
                 if valid < 0:
                     valid = -1
 
-                block = ObservingBlock(block_num=i + 1, valid_time=valid, wait_time=wait)
-                self.observing_blocks.append(block)
-            if len(self.observing_blocks):
-                self.observing_blocks[0].current = 1
+                block = TimeBlock(block_num=i + 1, valid_time=valid, wait_time=wait)
+                self.time_blocks.append(block)
+            if len(self.time_blocks):
+                self.time_blocks[0].current = 1
 
         if 'user' in kwargs:
             self.user = kwargs['user']
@@ -917,32 +917,32 @@ class Mpointing(Base):
             return self.num_todo - self.num_completed
 
     def get_current_block(self):
-        """Return the current observing block.
+        """Return the current time block.
 
         Assumes this object is still associated to an active session.
 
         Returns
         -------
-        current : `obsdb.ObservingBlock`
-            The current observing block (may be None).
+        current : `obsdb.TimeBlock`
+            The current time block (may be None).
 
         """
-        current_block = [block for block in self.observing_blocks if block.current]
+        current_block = [block for block in self.time_blocks if block.current]
         if len(current_block) == 0:
             return None
         elif len(current_block) > 1:
-            raise ValueError('Multiple observing blocks marked as current')
+            raise ValueError('Multiple time blocks marked as current')
         else:
             return current_block[0]
 
     def get_last_block(self):
-        """Return the last observing block executed.
+        """Return the last time block executed.
 
         Assumes this object is still associated to an active session.
 
         Returns
         -------
-        last : `obsdb.ObservingBlock`
+        last : `obsdb.TimeBlock`
             The last block done (may be None).
 
         """
@@ -952,22 +952,22 @@ class Mpointing(Base):
 
         current_num = current_block.block_num
         if current_num == 1:
-            last_num = len(self.observing_blocks)
+            last_num = len(self.time_blocks)
         else:
             last_num = current_num - 1
 
-        last_block = [block for block in self.observing_blocks
+        last_block = [block for block in self.time_blocks
                       if block.block_num == last_num][0]
         return last_block
 
     def get_next_block(self):
-        """Return the next observing block to be executed.
+        """Return the next time block to be executed.
 
         Assumes this object is still associated to an active session.
 
         Returns
         -------
-        next : `obsdb.ObservingBlock`
+        next : `obsdb.TimeBlock`
             The next block to do after the current one (may be None).
 
         """
@@ -988,11 +988,11 @@ class Mpointing(Base):
             current_num = current_block.block_num
             latest_pointing = current_block.pointings[-1]
             if latest_pointing.status in ['completed', 'expired']:
-                next_num = (current_num % len(self.observing_blocks)) + 1
+                next_num = (current_num % len(self.time_blocks)) + 1
             else:
                 next_num = current_num
 
-        next_block = [block for block in self.observing_blocks
+        next_block = [block for block in self.time_blocks
                       if block.block_num == next_num][0]
         return next_block
 
@@ -1083,7 +1083,7 @@ class Mpointing(Base):
                      status='pending',
                      user_id=self.user_id,
                      mpointing_id=self.db_id,
-                     observing_block=next_block,
+                     time_block=next_block,
                      event_id=self.event_id,
                      event_tile_id=self.event_tile_id,
                      survey_id=self.survey_id,
@@ -1094,20 +1094,24 @@ class Mpointing(Base):
         return p
 
 
-class ObservingBlock(Base):
-    """A class to represent a block of observing time.
+class TimeBlock(Base):
+    """A class to represent a block of time.
+
+    Specifically, these represent a time period made up of a valid time and a wait time.
+    The valid time is the time that the pointing will be valid for, and the wait time will be the
+    time after the pointing is observed/invalid to wait until the next valid period.
 
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create a ObservingBlock, and set its attributes
+    underlying database. You can create a TimeBlock, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the ObservingBlock is added to the database.
+    will be None until the TimeBlock is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
     See Examples for details.
 
-    Note you shouldn't ever have to manually create ObservingBlocks.
+    Note you shouldn't ever have to manually create TimeBlocks.
     They're used internally by Mpointings to keep track of Pointings and all
     the ones an Mpointing requires are created when the Mpointing is.
 
@@ -1121,12 +1125,12 @@ class ObservingBlock(Base):
             time to wait after this block before allowing the next pointing, in minutes
 
         mpointing_id : int, optional
-            unique key linking this ObservingBlock to an Mpointing
+            unique key linking this TimeBlock to an Mpointing
         current : bool, optional
-            True if this ObservingBlock is the one that is currently linked to
+            True if this TimeBlock is the one that is currently linked to
             a Pointing in the queue
 
-    An ObservingBlock also has the following properties which are
+    An TimeBlock also has the following properties which are
     populated through database queries, but not needed for
     object creation:
 
@@ -1139,19 +1143,19 @@ class ObservingBlock(Base):
     --------
         >>> from obsdb import *
 
-        make an ObservingBlock
+        make an TimeBlock
         (an Mpointing with mpointing_id = 1 is already in the database)
 
-        >>> b = ObservingBlock(block_num=1, valid_time=60, wait_time=120, mpointing_id=1)
+        >>> b = TimeBlock(block_num=1, valid_time=60, wait_time=120, mpointing_id=1)
         >>> session = load_session()
         >>> session.add(b)
-        ObservingBlock(db_id=7, block_num=1, valid_time=60.0, wait_time=120.0, current=False,
+        TimeBlock(db_id=7, block_num=1, valid_time=60.0, wait_time=120.0, current=False,
         mpointing_id=1)
 
     """
 
     # Set corresponding SQL table name
-    __tablename__ = 'observing_blocks'
+    __tablename__ = 'time_blocks'
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -1166,11 +1170,11 @@ class ObservingBlock(Base):
     mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
-    mpointing = relationship('Mpointing', back_populates='observing_blocks', uselist=False)
-    pointings = relationship('Pointing', back_populates='observing_block')
+    mpointing = relationship('Mpointing', back_populates='time_blocks', uselist=False)
+    pointings = relationship('Pointing', back_populates='time_block')
 
     def __repr__(self):
-        template = ("ObservingBlock(db_id={}, block_num={}, valid_time={}, " +
+        template = ("TimeBlock(db_id={}, block_num={}, valid_time={}, " +
                     "wait_time={}, current={}, mpointing_id={})")
         return template.format(self.db_id, self.block_num, self.valid_time,
                                self.wait_time, bool(self.current), self.mpointing_id)

@@ -162,7 +162,7 @@ def summary(mp):
     """Print a summary of the database."""
     print('{}, num_remaining = {}'.format(mp.status.upper(), mp.num_remaining))
     print([p.status for p in mp.pointings])
-    print([(b.block_num, b.valid_time, b.wait_time, b.current) for b in mp.observing_blocks], '\n')
+    print([(b.block_num, b.valid_time, b.wait_time, b.current) for b in mp.time_blocks], '\n')
 
 
 with db.open_session() as s:

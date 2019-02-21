@@ -324,7 +324,7 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_INSERT`
     -- Select RA and Dec from linked survey tile if not given
     IF ((NEW.survey_tile_id is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
       SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
-      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`tileID`);
+      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
     END IF;
   END$$
 

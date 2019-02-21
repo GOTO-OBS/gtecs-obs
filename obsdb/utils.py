@@ -458,7 +458,7 @@ def get_exposure_set_by_id(session, expset_id):
 
 
 def get_grid_tile_by_name(session, grid_name, tile_name):
-    """Get a tile in a survey from the name of the survey and tile.
+    """Get a tile in a grid from the name of the grid and tile.
 
     Parameters
     ----------

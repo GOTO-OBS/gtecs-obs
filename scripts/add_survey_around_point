@@ -11,25 +11,22 @@ import obsdb as db
 
 
 MP_SETTINGS = dict(start_rank=998,
-                   minAlt=35,
-                   minTime=(120 + 30) * 3,
-                   maxSunAlt=-12,
-                   maxMoon='B',
-                   minMoonSep=30,
-                   ToO=0,
+                   min_alt=35,
+                   min_time=(120 + 30) * 3,
+                   max_sunalt=-12,
+                   max_moon='B',
+                   min_moonsep=30,
+                   too=0,
                    num_todo=-1,
                    valid_time=-1,
                    wait_time=4320,  # 3 days
                    )
 
-EXP_SETTINGS = dict(expTime=120,
-                    raoff=0.,
-                    decoff=0.,
-                    # numexp=3,
-                    typeFlag='SCIENCE',
-                    # filt='L',
+EXP_SETTINGS = dict(num_exp=None,
+                    exptime=120,
+                    filt=None,
                     binning=1,
-                    utMask=None)
+                    imgtype='SCIENCE')
 
 
 def get_user_id(username, description=''):
@@ -105,16 +102,16 @@ def run(fov, overlap, centre, area, name):
         start = time.time()
         for ra, dec, tile_num in zip(ras, decs, names):
             mp = db.Mpointing(user_id=user_id,
-                              objectName='{}_survey_T{}'.format(name, tile_num),
+                              object_name='{}_survey_T{}'.format(name, tile_num),
                               ra=float(ra),
                               dec=float(dec),
                               **MP_SETTINGS)
             for filt in ['L', 'R', 'G', 'B']:
                 if filt == 'L':
-                    numexp = 3
+                    num_exp = 3
                 else:
-                    numexp = 1
-                mp.exposure_sets.append(db.ExposureSet(numexp=numexp,
+                    num_exp = 1
+                mp.exposure_sets.append(db.ExposureSet(num_exp=num_exp,
                                                        filt=filt,
                                                        **EXP_SETTINGS))
             mpointings.append(mp)

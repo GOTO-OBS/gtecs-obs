@@ -24,25 +24,22 @@ DB_NAME = 'GOTO GW alerts'
 
 # Constant Pointing values
 MPOINTING_SETTINGS = dict(start_rank=2,
-                          minAlt=30,
-                          minTime=360,
-                          maxSunAlt=-18,
-                          maxMoon='B',
-                          minMoonSep=30,
-                          ToO=0,
+                          min_alt=30,
+                          min_time=360,
+                          max_sunalt=-18,
+                          max_moon='B',
+                          min_moonsep=30,
+                          too=0,
                           num_todo=5,
                           valid_time=1440,
                           wait_time=0)
 
 # Constant ExposureSet values
-EXP_SETTINGS = dict(expTime=120,
-                    raoff=0.,
-                    decoff=0.,
-                    numexp=3,
-                    typeFlag='SCIENCE',
+EXP_SETTINGS = dict(num_exp=3,
+                    exptime=120,
                     filt='L',
                     binning=1,
-                    utMask=None)
+                    imgtype='SCIENCE')
 
 
 def add_to_database(pointings, event_time, event_name, survey_name, filename):
@@ -75,7 +72,7 @@ def add_to_database(pointings, event_time, event_name, survey_name, filename):
             # Create an EventTile and add to the database
             tile = db.EventTile(probability=prob)
             tile.event = event
-            tile.surveyTile = survey_tile
+            tile.survey_tile = survey_tile
 
             session.add(tile)
 
@@ -83,11 +80,11 @@ def add_to_database(pointings, event_time, event_name, survey_name, filename):
             object_name = '{} {}'.format(event_name, tile_name)
 
             mpointing = db.Mpointing(user_id=user_id,
-                                     objectName=object_name,
+                                     object_name=object_name,
                                      **MPOINTING_SETTINGS)
-            mpointing.surveyTile = survey_tile
+            mpointing.survey_tile = survey_tile
             mpointing.event = event
-            mpointing.eventTile = tile
+            mpointing.event_tile = tile
             mpointing.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
 
             session.add(mpointing)

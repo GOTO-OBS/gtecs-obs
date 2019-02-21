@@ -41,7 +41,7 @@ with db.open_session() as session:
     # and an event tile linked to that survey tile
     et2 = db.EventTile(probability=0.2)
     et2.event = e
-    et2.surveyTile = st
+    et2.survey_tile = st
 
     # add them
     db.insert_items(session, [e, et, s, st, et2])
@@ -54,23 +54,23 @@ with db.open_session() as session:
 # OK, new Session. Let's make a Pointing
 with db.open_session() as session:
     user_id = db.get_user_id(session, 'goto')
-    p = db.Pointing(objectName='IP Peg',
+    p = db.Pointing(object_name='IP Peg',
                     ra=350.785625,
                     dec=18.416472,
                     rank=9,
-                    minAlt=30,
-                    maxSunAlt=-15,
-                    minTime=3600,
-                    maxMoon='G',
-                    minMoonSep=30,
-                    ToO=0,
-                    startUTC=Time.now(),
-                    stopUTC=Time.now() + 3 * u.day,
+                    min_alt=30,
+                    max_sunalt=-15,
+                    min_time=3600,
+                    max_moon='G',
+                    min_moonsep=30,
+                    too=0,
+                    start_time=Time.now(),
+                    stop_time=Time.now() + 3 * u.day,
                     user_id=user_id)
-    e = db.ExposureSet(typeFlag='SCIENCE',
+    e = db.ExposureSet(imgtype='SCIENCE',
                        filt='G',
-                       expTime=20,
-                       numexp=20,
+                       exptime=20,
+                       num_exp=20,
                        binning=2)
     p.exposure_sets.append(e)
     session.add(p)
@@ -111,25 +111,25 @@ print("{} unmarked expired pointings".format(len(expired)))
 print("{} marked expired pointings\n".format(len(marked)))
 
 # create an Mpointing
-mp = db.Mpointing(objectName='M31',
+mp = db.Mpointing(object_name='M31',
                   ra=10.685,
                   dec=41.2875,
                   start_rank=9,
-                  minAlt=30,
-                  maxSunAlt=-15,
-                  minTime=3600,
-                  ToO=0,
-                  maxMoon='B',
-                  minMoonSep=30,
+                  min_alt=30,
+                  max_sunalt=-15,
+                  min_time=3600,
+                  too=0,
+                  max_moon='B',
+                  min_moonsep=30,
                   num_todo=5,
                   user_id=user_id,
                   valid_time=[60, 120],
                   wait_time=60)
 # and add RGBL exposure set
-L = db.ExposureSet(typeFlag='SCIENCE', filt='L', expTime=120, numexp=3, binning=2)
-R = db.ExposureSet(typeFlag='SCIENCE', filt='R', expTime=120, numexp=3, binning=2)
-G = db.ExposureSet(typeFlag='SCIENCE', filt='G', expTime=120, numexp=3, binning=2)
-B = db.ExposureSet(typeFlag='SCIENCE', filt='B', expTime=120, numexp=3, binning=2)
+L = db.ExposureSet(imgtype='SCIENCE', filt='L', exptime=120, num_exp=3, binning=2)
+R = db.ExposureSet(imgtype='SCIENCE', filt='R', exptime=120, num_exp=3, binning=2)
+G = db.ExposureSet(imgtype='SCIENCE', filt='G', exptime=120, num_exp=3, binning=2)
+B = db.ExposureSet(imgtype='SCIENCE', filt='B', exptime=120, num_exp=3, binning=2)
 mp.exposure_sets = [L, R, G, B]
 with db.open_session() as s:
     s.add(mp)
@@ -162,7 +162,7 @@ def summary(mp):
     """Print a summary of the database."""
     print('{}, num_remaining = {}'.format(mp.status.upper(), mp.num_remaining))
     print([p.status for p in mp.pointings])
-    print([(b.blockNum, b.valid_time, b.wait_time, b.current) for b in mp.observing_blocks], '\n')
+    print([(b.block_num, b.valid_time, b.wait_time, b.current) for b in mp.observing_blocks], '\n')
 
 
 with db.open_session() as s:

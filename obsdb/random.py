@@ -8,7 +8,7 @@ from .models import ExposureSet, Pointing
 __all__ = ['make_random_pointing']
 
 
-def make_random_pointing(user_id, numexps=None, time=None):
+def make_random_pointing(user_id, num_expsets=None, time=None):
     """Make a random pointing for testing.
 
     It should be observable from La Palma at the time of creation.
@@ -17,7 +17,7 @@ def make_random_pointing(user_id, numexps=None, time=None):
 
     Parameters
     ----------
-    numexps : int
+    num_expsets : int
         if None, a random number of exposure_sets between 1 and 5 will be added
 
     time : `~astropy.time.Time`
@@ -41,32 +41,32 @@ def make_random_pointing(user_id, numexps=None, time=None):
     lst = time.sidereal_time('mean', longitude=lapalma.lon).deg
     t1 = time + np.random.randint(-5, 2) * u.day
     t2 = t1 + np.random.randint(1, 10) * u.day
-    p = Pointing(objectName='randObj',
+    p = Pointing(object_name='randObj',
                  ra=np.random.uniform(lst - 3, lst + 3),
                  dec=np.random.uniform(10, 89),
                  rank=np.random.randint(1, 100),
-                 minAlt=30,
-                 maxSunAlt=-15,
-                 minTime=np.random.uniform(100, 3600),
-                 maxMoon=np.random.choice(['D', 'G', 'B']),
-                 minMoonSep=30,
-                 ToO=np.random.randint(0, 2),
-                 startUTC=t1,
-                 stopUTC=t2,
+                 min_alt=30,
+                 max_sunalt=-15,
+                 min_time=np.random.uniform(100, 3600),
+                 max_moon=np.random.choice(['D', 'G', 'B']),
+                 min_moonsep=30,
+                 too=np.random.randint(0, 2),
+                 start_time=t1,
+                 stop_time=t2,
                  status='pending',
                  user_id=user_id,
                  )
 
-    if numexps is None:
-        numexps = np.random.randint(1, 6)
-    for _ in range(numexps):
-        exposure_set = ExposureSet(expTime=np.random.uniform(10., 360.),
-                                   numexp=1,
-                                   typeFlag="SCIENCE",
+    if num_expsets is None:
+        num_expsets = np.random.randint(1, 6)
+    for _ in range(num_expsets):
+        exposure_set = ExposureSet(exptime=np.random.uniform(10., 360.),
+                                   num_exp=1,
+                                   imgtype="SCIENCE",
                                    filt=np.random.choice(['L', 'R', 'G', 'B']),
                                    binning=1,
-                                   raoff=0,
-                                   decoff=0,
+                                   ra_offset=0,
+                                   dec_offset=0,
                                    )
         p.exposure_sets.append(exposure_set)
 

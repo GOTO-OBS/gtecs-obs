@@ -8,25 +8,22 @@ import time
 import obsdb as db
 
 
-MP_SETTINGS = dict(minAlt=35,
-                   minTime=(60 + 5) * 3,
-                   maxSunAlt=-12,
-                   maxMoon='B',
-                   minMoonSep=50,
-                   ToO=0,
+MP_SETTINGS = dict(min_alt=35,
+                   min_time=(60 + 5) * 3,
+                   max_sunalt=-12,
+                   max_moon='B',
+                   min_moonsep=50,
+                   too=0,
                    num_todo=-1,
                    valid_time=-1,
                    wait_time=4320,  # 3 days
                    )
 
-EXP_SETTINGS = dict(expTime=60,
-                    raoff=0.,
-                    decoff=0.,
-                    numexp=3,
-                    typeFlag='SCIENCE',
+EXP_SETTINGS = dict(num_exp=3,
+                    exptime=60,
                     filt='L',
                     binning=1,
-                    utMask=None)
+                    imgtype='SCIENCE')
 
 
 def get_user_id(username, description=''):
@@ -84,7 +81,7 @@ def run(filename):
         start = time.time()
         for ra, dec, rank, name in zip(ras, decs, ranks, names):
             mp = db.Mpointing(user_id=user_id,
-                              objectName=name,
+                              object_name=name,
                               ra=float(ra),
                               dec=float(dec),
                               start_rank=rank,

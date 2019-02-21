@@ -41,7 +41,7 @@ def add_user(session, username, password, fullname):
 
     """
     password_hash = hashlib.sha512(password.encode()).hexdigest()
-    new_user = User(userName=username, password=password_hash, fullName=fullname)
+    new_user = User(username=username, password=password_hash, full_name=fullname)
     session.add(new_user)
 
 
@@ -69,7 +69,7 @@ def get_user_id(session, username):
 
     """
     query = session.query(User)
-    query = query.filter(User.userName == username)
+    query = query.filter(User.username == username)
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
@@ -101,7 +101,7 @@ def get_username(session, user_id):
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
-    return user.userName
+    return user.username
 
 
 def validate_user(session, username, password):
@@ -129,7 +129,7 @@ def validate_user(session, username, password):
     password_hash = hashlib.sha512(password.encode()).hexdigest()
 
     query = session.query(User)
-    query = query.filter(User.userName == username)
+    query = query.filter(User.username == username)
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
@@ -220,9 +220,9 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     now = time.iso
 
     # are we after the start time?
-    queue = queue.filter(Pointing.startUTC < now)
+    queue = queue.filter(Pointing.start_time < now)
     # are we before the stop time (if any)?
-    queue = queue.filter(or_(Pointing.stopUTC > now, Pointing.stopUTC == None))  # noqa: E711
+    queue = queue.filter(or_(Pointing.stop_time > now, Pointing.stop_time == None))  # noqa: E711
 
     # now limit by RA and Dec
     if location is not None:
@@ -512,7 +512,7 @@ def get_expired_pointing_ids(session, time=None):
 
     query = session.query(Pointing.db_id)
     query = query.filter(Pointing.status == 'pending',
-                         Pointing.stopUTC < now)
+                         Pointing.stop_time < now)
 
     # return values, unpacking tuples
     return [pointing_id for (pointing_id,) in query.all()]
@@ -542,7 +542,7 @@ def get_expired_mpointing_ids(session, time=None):
 
     query = session.query(Mpointing.db_id)
     query = query.filter(Mpointing.status == 'unscheduled',
-                         Mpointing.stopUTC < now)
+                         Mpointing.stop_time < now)
 
     # return values, unpacking tuples
     return [mpointing_id for (mpointing_id,) in query.all()]

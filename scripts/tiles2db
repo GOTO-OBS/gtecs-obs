@@ -95,20 +95,20 @@ def save_pointing(session, ra, dec, num, event, event_time, tile):
     user_id = db.get_user_id(session, 'goto')
 
     pointing = db.Pointing(user_id=user_id,
-                           objectName='%s T%03i' % (event.name, num),
+                           object_name='%s T%03i' % (event.name, num),
                            ra=ra,
                            dec=dec,
                            rank=rank,
-                           minAlt=minalt,
-                           maxSunAlt=sunalt,
-                           minTime=mintime,
-                           maxMoon=maxmoon,
-                           minMoonSep=minmoonsep,
-                           startUTC=start_time,
-                           stopUTC=stop_time,
-                           ToO=too,
+                           min_alt=minalt,
+                           max_sunalt=sunalt,
+                           min_time=mintime,
+                           max_moon=maxmoon,
+                           min_moonsep=minmoonsep,
+                           start_time=start_time,
+                           stop_time=stop_time,
+                           too=too,
                            event=event,
-                           eventTile=tile)
+                           event_tile=tile)
     session.add(pointing)
 
     save_exposure_set(session, pointing)
@@ -116,23 +116,11 @@ def save_pointing(session, ra, dec, num, event, event_time, tile):
 
 def save_exposure_set(session, pointing):
     """Save an exposure set to the database."""
-    exptime = 120
-    numexp = 3
-    exptype = 'SCIENCE'
-    filt = 'L'
-    binfac = 1
-    utmask = None
-    raoff = 0
-    decoff = 0
-
-    exposure_set = db.ExposureSet(expTime=exptime,
-                                  numexp=numexp,
-                                  typeFlag=exptype,
-                                  filt=filt,
-                                  binning=binfac,
-                                  utMask=utmask,
-                                  raoff=raoff,
-                                  decoff=decoff,
+    exposure_set = db.ExposureSet(num_exp=3,
+                                  exptime=120,
+                                  filt='L',
+                                  binning=1,
+                                  imgtype='SCIENCE',
                                   pointing=pointing)
     session.add(exposure_set)
 

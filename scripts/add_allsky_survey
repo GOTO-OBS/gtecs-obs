@@ -13,24 +13,21 @@ import obsdb as db
 
 
 SURVEY_SETTINGS = dict(start_rank=999,
-                       minAlt=35,
-                       minTime=120,
-                       maxSunAlt=-12,
-                       maxMoon='B',
-                       minMoonSep=30,
-                       ToO=0,
+                       min_alt=35,
+                       min_time=120,
+                       max_sunalt=-12,
+                       max_moon='B',
+                       min_moonsep=30,
+                       too=0,
                        num_todo=-1,
                        valid_time=-1,
                        wait_time=4320)
 
-EXP_SETTINGS = dict(expTime=120,
-                    raoff=0.,
-                    decoff=0.,
-                    numexp=3,
-                    typeFlag='SCIENCE',
+EXP_SETTINGS = dict(num_exp=3,
+                    exptime=120,
                     filt='L',
                     binning=1,
-                    utMask=None)
+                    imgtype='SCIENCE')
 
 
 def get_user_id(username, description=''):
@@ -87,9 +84,9 @@ def run(fov, overlap):
         start = time.time()
         for tile in tiles:
             mp = db.Mpointing(user_id=user_id,
-                              objectName=tile.name,
+                              object_name=tile.name,
                               **SURVEY_SETTINGS)
-            mp.objectName = survey.name + '_' + tile.name
+            mp.object_name = survey.name + '_' + tile.name
             mp.survey = survey
             mp.survey_tile = tile
             mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))

@@ -48,11 +48,11 @@ with db.open_session() as session:
         if show_all or (pointing.survey is None and pointing.status != 'expired'):
             string = '{: <6.0f} | {: >20} | {: >3.0f}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
                 pointing.db_id,
-                pointing.objectName,
+                pointing.object_name,
                 pointing.rank,
-                '!' if pointing.ToO else ' ',
+                '!' if pointing.too else ' ',
                 pointing.ra, pointing.dec,
-                pointing.startUTC)
+                pointing.start_time)
 
             print(string, end=' ')
 
@@ -61,10 +61,10 @@ with db.open_session() as session:
             elif pointing.status == 'completed':
                 status = gtxt('completed')
             elif pointing.status == 'pending':
-                if t > Time(pointing.startUTC):
+                if t > Time(pointing.start_time):
                     status = btxt('pending')
                 else:
-                    wait = Time(pointing.startUTC) - t
+                    wait = Time(pointing.start_time) - t
                     status = 'upcoming ({:.1f}h)'.format(wait.to('hour').value)
             else:
                 status = pointing.status

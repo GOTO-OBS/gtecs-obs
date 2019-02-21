@@ -222,7 +222,7 @@ def fill_mpointing(mpointing):
                                                                       db_tile.ra,
                                                                       db_tile.dec,
                                                                       ))
-        mpointing['objectName'] = db_survey.name + '_' + db_tile.name + '_' + 'EXTRA'
+        mpointing['object_name'] = db_survey.name + '_' + db_tile.name + '_' + 'EXTRA'
         mpointing['ra'] = db_tile.ra
         mpointing['dec'] = db_tile.dec
         mpointing['survey_id'] = db_survey.db_id
@@ -234,12 +234,12 @@ def fill_mpointing(mpointing):
         mpointing['survey_tile_id'] = None
 
         # Object name
-        while mpointing['objectName'] is None:
-            mpointing['objectName'] = input('Enter Target name: ')
+        while mpointing['object_name'] is None:
+            mpointing['object_name'] = input('Enter Target name: ')
 
         # Try coord lookup
         try:
-            coord = SkyCoord.from_name(mpointing['objectName'])
+            coord = SkyCoord.from_name(mpointing['object_name'])
         except Exception:
             coord = None
         if coord is not None:
@@ -271,11 +271,11 @@ def fill_mpointing(mpointing):
     while too not in ['y', 'n', 'Y', 'N']:
         too = input('Is the target a ToO (can interupt)? [y/n]: ')
     if too in ['y', 'Y']:
-        mpointing['ToO'] = 1
+        mpointing['too'] = 1
         print('    Setting ToO rank automatically to: high')
         mpointing['start_rank'] = 6
     else:
-        mpointing['ToO'] = 0
+        mpointing['too'] = 0
         rank_str = 'None'
         while rank_str.lower() not in ['low', 'medium', 'high', 'l', 'm', 'h']:
             rank_str = input('Enter rank [low/medium/high]: ')
@@ -323,36 +323,36 @@ def fill_mpointing(mpointing):
         string = 'Use default constraints (alt>30, sunalt<-15, moon<B, moonsep>30)? [y/n]: '
         default_cons = input(string)
     if default_cons in ['y', 'Y']:
-        mpointing['minAlt'] = 30
-        mpointing['maxSunAlt'] = -15
-        mpointing['maxMoon'] = 'B'
-        mpointing['minMoonSep'] = 30
+        mpointing['min_alt'] = 30
+        mpointing['max_sunalt'] = -15
+        mpointing['max_moon'] = 'B'
+        mpointing['min_moonsep'] = 30
     else:
-        while mpointing['minAlt'] is None:
+        while mpointing['min_alt'] is None:
             invalue = input('Minimum target altitude (degrees): ')
             try:
-                mpointing['minAlt'] = float(invalue)
+                mpointing['min_alt'] = float(invalue)
             except Exception:
                 pass
 
-        while mpointing['maxSunAlt'] is None:
+        while mpointing['max_sunalt'] is None:
             invalue = input('Maximum Sun altitude (degrees): ')
             try:
-                mpointing['maxSunAlt'] = float(invalue)
+                mpointing['max_sunalt'] = float(invalue)
             except Exception:
                 pass
 
-        while mpointing['maxMoon'] not in ['D', 'G', 'B']:
+        while mpointing['max_moon'] not in ['D', 'G', 'B']:
             invalue = input('Maximum Moon brightness [D/G/B]: ')
             try:
-                mpointing['maxMoon'] = invalue.upper()
+                mpointing['max_moon'] = invalue.upper()
             except Exception:
                 pass
 
-        while mpointing['minMoonSep'] is None:
+        while mpointing['min_moonsep'] is None:
             invalue = input('Minimum seperation from the Moon (degrees): ')
             try:
-                mpointing['minMoonSep'] = float(invalue)
+                mpointing['min_moonsep'] = float(invalue)
             except Exception:
                 pass
 
@@ -362,18 +362,18 @@ def fill_mpointing(mpointing):
 def fill_exposure_set(exposure_set):
     """Fill out an exposure set frame with user input."""
     # Number of exposures
-    while exposure_set['numexp'] is None:
-        numexp = input('Number of exposures: ')
+    while exposure_set['num_exp'] is None:
+        num_exp = input('Number of exposures: ')
         try:
-            exposure_set['numexp'] = int(numexp)
+            exposure_set['num_exp'] = int(num_exp)
         except Exception:
             pass
 
     # Exposure time
-    while exposure_set['expTime'] is None:
+    while exposure_set['exptime'] is None:
         exptime = input('Exposure time: ')
         try:
-            exposure_set['expTime'] = int(exptime)
+            exposure_set['exptime'] = int(exptime)
         except Exception:
             pass
 
@@ -391,33 +391,30 @@ def fill_exposure_set(exposure_set):
 if __name__ == '__main__':
 
     default_mpointing = {'user_id': None,
-                         'objectName': None,
+                         'object_name': None,
                          'ra': None,
                          'dec': None,
-                         'ToO': None,
+                         'too': None,
                          'start_rank': None,
                          'num_todo': None,
                          'valid_time': None,
                          'wait_time': None,
-                         'minAlt': None,
-                         'maxSunAlt': None,
-                         'maxMoon': None,
-                         'minMoonSep': None,
+                         'min_alt': None,
+                         'max_sunalt': None,
+                         'max_moon': None,
+                         'min_moonsep': None,
                          # auto filled values
-                         'minTime': None,
+                         'min_time': None,
                          }
 
     exposure_sets = []
 
-    default_exposure_set = {'numexp': None,
-                            'expTime': None,
+    default_exposure_set = {'num_exp': None,
+                            'exptime': None,
                             'filt': None,
                             # default values:
                             'binning': 1,
-                            'typeFlag': 'SCIENCE',
-                            'raoff': 0,
-                            'decoff': 0,
-                            'utMask': None,
+                            'imgtype': 'SCIENCE',
                             }
 
     with db.open_session() as session:
@@ -443,7 +440,7 @@ if __name__ == '__main__':
         while more_exposures is True:
             exposure_set = fill_exposure_set(default_exposure_set.copy())
 
-            total_exptime += (exposure_set['expTime'] + 30) * exposure_set['numexp']
+            total_exptime += (exposure_set['exptime'] + 30) * exposure_set['num_exp']
             exposure_sets.append(exposure_set)
 
             add_more = None
@@ -453,7 +450,7 @@ if __name__ == '__main__':
             if add_more not in ['y', 'Y']:
                 more_exposures = False
 
-        mpointing['minTime'] = total_exptime
+        mpointing['min_time'] = total_exptime
 
         mp = db.Mpointing(**mpointing)
         for exposure_set in exposure_sets:

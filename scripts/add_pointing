@@ -159,25 +159,27 @@ def get_user_id(session, username):
     return user_id
 
 
-def fill_mpointing(mpointing):
+def fill_mpointing(session, mpointing):
     """Fill out an mpointing frame with user input."""
     # On or off grid?
     ongrid = None
     while ongrid not in ['y', 'n', 'Y', 'N']:
         ongrid = input('Observe constrained to the grid? [y/n]: ')
     if ongrid in ['y', 'Y']:
-        # TODO: We should load the grid from the database
-        fov = {'ra': 5.5 * u.deg, 'dec': 2.6 * u.deg}
-        overlap = {'ra': 0.1, 'dec': 0.1}
-        grid = SkyGrid(fov, overlap, kind='minverlap')
-
-        db_surveys = session.query(db.Survey).filter(db.Survey.name == grid.name).all()
-        if not db_surveys:
-            db_survey = None
-            raise ValueError('Cannot find grid in the database')
+        # Find the current Grid in the database
+        db_grids = session.query(db.Grid).all()
+        if not db_grids:
+            raise ValueError('No defined grids found!')
         else:
-            db_survey = db_surveys[-1]
-        print('    Using grid {}'.format(db_survey.name))
+            # Might have multiple grids defined, just take the latest...
+            db_grid = db_grids[-1]
+
+        # Create a SkyGrid from the database Grid
+        fov = {'ra': db_grid.ra_fov * u.deg, 'dec': db_grid.dec_fov * u.deg}
+        overlap = {'ra': db_grid.ra_overlap, 'dec': db_grid.dec_overlap}
+        grid = SkyGrid(fov, overlap, kind=db_grid.algorithm)
+
+        print('    Using grid {}'.format(db_grid.name))
 
         obstile = None
         while obstile not in ['1', '2']:
@@ -210,28 +212,26 @@ def fill_mpointing(mpointing):
             tile_index = np.where(sep == (min(sep)))[0][0]
             tile_name = grid.tilenames[tile_index]
 
-        # Find the matching SurveyTile
-        query = session.query(db.SurveyTile)
-        query = query.filter(db.SurveyTile.survey == db_survey,
-                             db.SurveyTile.name == tile_name)
-        db_tile = query.one_or_none()
-        if not db_tile:
+        # Find the matching GridTile
+        query = session.query(db.GridTile)
+        query = query.filter(db.GridTile.grid == db_grid,
+                             db.GridTile.name == tile_name)
+        db_grid_tile = query.one_or_none()
+        if not db_grid_tile:
             raise ValueError('Cannot find tile in the database')
 
-        print('    Using coords for {}: ra={:.4f}, dec={:.4f}'.format(db_tile.name,
-                                                                      db_tile.ra,
-                                                                      db_tile.dec,
+        print('    Using coords for {}: ra={:.4f}, dec={:.4f}'.format(db_grid_tile.name,
+                                                                      db_grid_tile.ra,
+                                                                      db_grid_tile.dec,
                                                                       ))
-        mpointing['object_name'] = db_survey.name + '_' + db_tile.name + '_' + 'EXTRA'
-        mpointing['ra'] = db_tile.ra
-        mpointing['dec'] = db_tile.dec
-        mpointing['survey_id'] = db_survey.db_id
-        mpointing['survey_tile_id'] = db_tile.db_id
+        mpointing['object_name'] = db_grid.name + '_' + db_grid_tile.name + '_' + 'EXTRA'
+        mpointing['ra'] = db_grid_tile.ra
+        mpointing['dec'] = db_grid_tile.dec
+        mpointing['grid_tile_id'] = db_grid_tile.db_id
 
     else:
         # We're off grid
-        mpointing['survey_id'] = None
-        mpointing['survey_tile_id'] = None
+        mpointing['grid_tile_id'] = None
 
         # Object name
         while mpointing['object_name'] is None:
@@ -430,7 +430,7 @@ if __name__ == '__main__':
         # Fill Mpointing infomation
         mpointing = default_mpointing.copy()
         mpointing['user_id'] = get_user_id(session, username)
-        mpointing = fill_mpointing(mpointing)
+        mpointing = fill_mpointing(session, mpointing)
 
         # Fill Exposure Set infomation
         exposure_sets = []

@@ -5,9 +5,7 @@ import argparse
 import getpass
 import time
 
-import astropy.units as u
-
-from gototile.grid import SkyGrid
+from astropy.coordinates import SkyCoord
 
 import obsdb as db
 
@@ -74,18 +72,21 @@ def get_coords_from_file(filename):
 
 def run(filename):
     """Create the mpointings and add them to the database."""
-    ra_fov = 5.5
-    dec_fov = 2.6
-    ra_overlap = 0.1
-    dec_overlap = 0.1
+    # Find the current Grid in the database
+    with db.open_session() as session:
+        db_grids = session.query(db.Grid).all()
+        if not db_grids:
+            raise ValueError('No defined grids found!')
+        else:
+            # Might have multiple grids defined, just take the latest...
+            db_grid = db_grids[-1]
 
-    fov = {'ra': ra_fov * u.deg, 'dec': dec_fov * u.deg}
-    overlap = {'ra': ra_overlap, 'dec': dec_overlap}
+        # Get the tile names and coords
+        tile_ras = [grid_tile.ra for grid_tile in db_grid.grid_tiles]
+        tile_decs = [grid_tile.dec for grid_tile in db_grid.grid_tiles]
+        tile_coords = SkyCoord(tile_ras, tile_decs, unit='deg')
 
-    # Create an all-sky grid with GOTO-tile
-    grid = SkyGrid(fov, overlap)
-    tile_coords = grid.coords
-    tile_names = grid.tilenames
+        tile_names = [grid_tile.name for grid_tile in db_grid.grid_tiles]
 
     # Get the tiles that are in the survey file
     _, _, _, survey_names = get_coords_from_file(filename)

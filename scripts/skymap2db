@@ -43,7 +43,7 @@ EXP_SETTINGS = dict(num_exp=3,
                     imgtype='SCIENCE')
 
 
-def add_to_database(grid, pointings, event_time, event_name, filename):
+def add_to_database(db_grid, pointings, event_time, event_name, filename):
     """Add an event and its tiles to the GOTO database."""
     with db.open_session() as session:
         # Connect to the user, or create it if it doesn't exist
@@ -62,22 +62,6 @@ def add_to_database(grid, pointings, event_time, event_name, filename):
                          skymap=filename)
         session.add(event)
 
-        # Create Grid
-        db_grid = db.Grid(name=grid.name,
-                          ra_fov=grid.fov['ra'].value,
-                          dec_fov=grid.fov['dec'].value,
-                          ra_overlap=grid.overlap['ra'],
-                          dec_overlap=grid.overlap['dec'],
-                          algorithm=grid.algorithm,
-                          )
-        session.add(db_grid)
-
-        # Create grid tiles
-        for name, ra, dec in zip(grid.tilenames, grid.coords.ra, grid.coords.dec):
-            grid_tile = db.GridTile(name=name, ra=ra.value, dec=dec.value)
-            grid_tile.grid = db_grid
-            session.add(grid_tile)
-
         # Create Survey
         survey = db.Survey(name=event_name)
         survey.grid = db_grid
@@ -91,7 +75,7 @@ def add_to_database(grid, pointings, event_time, event_name, filename):
             prob = float(pointing['prob'])
 
             # Find the matched Grid tile
-            grid_tile = db.get_grid_tile_by_name(session, grid.name, tilename)
+            grid_tile = db.get_grid_tile_by_name(session, db_grid.name, tilename)
 
             # Create an SurveyTile and add to the database
             survey_tile = db.SurveyTile(weight=prob)
@@ -114,18 +98,21 @@ def add_to_database(grid, pointings, event_time, event_name, filename):
             session.add(mpointing)
 
 
-def run(filename, hp_lim=0.001, n_lim=200):
+def run(filename, hp_lim=0.001, n_lim=20):
     """Create the mpointings and add them to the database."""
-    ra_fov = 5.5
-    dec_fov = 2.6
-    ra_overlap = 0.1
-    dec_overlap = 0.1
+    with db.open_session() as session:
+        # Find the current Grid in the database
+        db_grids = session.query(db.Grid).all()
+        if not db_grids:
+            raise ValueError('No defined grids found!')
+        else:
+            # Might have multiple grids defined, just take the latest...
+            db_grid = db_grids[-1]
 
-    fov = {'ra': ra_fov * u.deg, 'dec': dec_fov * u.deg}
-    overlap = {'ra': ra_overlap, 'dec': dec_overlap}
-
-    # Create an all-sky grid with GOTO-tile
-    grid = SkyGrid(fov, overlap)
+        # Create a SkyGrid from the database Grid
+        fov = {'ra': db_grid.ra_fov * u.deg, 'dec': db_grid.dec_fov * u.deg}
+        overlap = {'ra': db_grid.ra_overlap, 'dec': db_grid.dec_overlap}
+        grid = SkyGrid(fov, overlap, kind=db_grid.algorithm)
 
     # open skymap and get event details
     print('Loading skymap...')
@@ -162,7 +149,7 @@ def run(filename, hp_lim=0.001, n_lim=200):
     # add pointings to the database
     print('Adding {} tiles to the database...'.format(len(selected_pointings)))
     start = time.time()
-    add_to_database(grid, selected_pointings, event_time, event_name, filename)
+    add_to_database(db_grid, selected_pointings, event_time, event_name, filename)
     print('  took {:.2f} secs'.format(time.time() - start))
 
 
@@ -176,7 +163,7 @@ if __name__ == '__main__':
 
     parser.add_argument('filename', help="skymap file")
     parser.add_argument('--priority', help="minimum priority", type=float, default=0.001)
-    parser.add_argument('--number', help="minimum number", type=int, default=200)
+    parser.add_argument('--number', help="minimum number", type=int, default=20)
 
     args = parser.parse_args()
 

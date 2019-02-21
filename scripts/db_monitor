@@ -40,14 +40,14 @@ with db.open_session() as session:
 
     running, _ = db.get_queue(session)
     if running:
-        print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running.pointingID))
+        print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running.db_id))
     else:
         print('\n')
 
     for pointing in all_pointings:
         if show_all or (pointing.survey is None and pointing.status != 'expired'):
             string = '{: <6.0f} | {: >20} | {: >3.0f}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
-                pointing.pointingID,
+                pointing.db_id,
                 pointing.objectName,
                 pointing.rank,
                 '!' if pointing.ToO else ' ',

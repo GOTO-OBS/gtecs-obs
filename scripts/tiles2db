@@ -92,9 +92,9 @@ def save_pointing(session, ra, dec, num, event, event_time, tile):
     stop_time = start_time + duration
     too = 0  # There will be ToO tiles, starting observations aren't
 
-    userkey = db.get_userkey(session, 'goto')
+    user_id = db.get_user_id(session, 'goto')
 
-    pointing = db.Pointing(userKey=userkey,
+    pointing = db.Pointing(user_id=user_id,
                            objectName='%s T%03i' % (event.name, num),
                            ra=ra,
                            dec=dec,
@@ -143,7 +143,7 @@ def run(filename, event_name):
 
     with db.open_session() as session:
         try:
-            db.get_userkey(session, 'goto')
+            db.get_user_id(session, 'goto')
         except Exception:
             db.add_user(session, 'goto', 'password', "GOTO alerts")
 

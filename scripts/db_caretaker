@@ -60,7 +60,7 @@ with db.open_session() as session:
         for mp in unscheduled_mps:
             statuses = [p.status for p in mp.pointings]
             if 'pending' in statuses or 'running' in statuses:
-                incorrect_mps += [mp.mpointingID]
+                incorrect_mps += [mp.db_id]
         if len(incorrect_mps) > 0:
             print('Found some incorrectly marked unscheduled Mpointings...')
             print('> Marking {} Mpointings as scheduled'.format(len(incorrect_mps)))

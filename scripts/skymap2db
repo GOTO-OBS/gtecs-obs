@@ -50,10 +50,10 @@ def add_to_database(pointings, event_time, event_name, survey_name, filename):
     with db.open_session() as session:
         # Connect to the user, or create it if it doesn't exist
         try:
-            userkey = db.get_userkey(session, DB_USER)
+            user_id = db.get_user_id(session, DB_USER)
         except Exception:
             db.add_user(session, DB_USER, DB_PW, DB_NAME)
-            userkey = db.get_userkey(session, DB_USER)
+            user_id = db.get_user_id(session, DB_USER)
 
         # Create Event
         event = db.Event(name=event_name,
@@ -82,7 +82,7 @@ def add_to_database(pointings, event_time, event_name, survey_name, filename):
             # Create Mpointing and add to the database
             object_name = '{} {}'.format(event_name, tile_name)
 
-            mpointing = db.Mpointing(userKey=userkey,
+            mpointing = db.Mpointing(user_id=user_id,
                                      objectName=object_name,
                                      **MPOINTING_SETTINGS)
             mpointing.surveyTile = survey_tile

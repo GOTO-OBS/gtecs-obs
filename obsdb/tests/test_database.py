@@ -15,8 +15,8 @@ import obsdb as db
 # add a user
 with db.open_session() as session:
     try:
-        userKey = db.get_userkey(session, 'goto')
-        if userKey:
+        user_id = db.get_user_id(session, 'goto')
+        if user_id:
             print('Error: Database is not empty')
             sys.exit()
     except ValueError:
@@ -53,7 +53,7 @@ with db.open_session() as session:
 
 # OK, new Session. Let's make a Pointing
 with db.open_session() as session:
-    userKey = db.get_userkey(session, 'goto')
+    user_id = db.get_user_id(session, 'goto')
     p = db.Pointing(objectName='IP Peg',
                     ra=350.785625,
                     dec=18.416472,
@@ -66,7 +66,7 @@ with db.open_session() as session:
                     ToO=0,
                     startUTC=Time.now(),
                     stopUTC=Time.now() + 3 * u.day,
-                    userKey=userKey)
+                    user_id=user_id)
     e = db.ExposureSet(typeFlag='SCIENCE',
                        filt='G',
                        expTime=20,
@@ -77,10 +77,10 @@ with db.open_session() as session:
 
 # new session, add random pointings
 with db.open_session() as session:
-    pointings = [db.make_random_pointing(userKey) for i in range(10)]
+    pointings = [db.make_random_pointing(user_id) for i in range(10)]
     db.insert_items(session, pointings)
 
-    more_pointings = [db.make_random_pointing(userKey) for i in range(10)]
+    more_pointings = [db.make_random_pointing(user_id) for i in range(10)]
     db.insert_items(session, more_pointings)
 
 # now check how many we have
@@ -122,7 +122,7 @@ mp = db.Mpointing(objectName='M31',
                   maxMoon='B',
                   minMoonSep=30,
                   num_todo=5,
-                  userKey=userKey,
+                  user_id=user_id,
                   valid_time=[60, 120],
                   wait_time=60)
 # and add RGBL exposure set
@@ -150,7 +150,7 @@ with db.open_session() as s:
 
     pointings_to_add = []
     for mp in mps_to_schedule:
-        print('Scheduling mp #{}'.format(mp.mpointingID))
+        print('Scheduling mp #{}'.format(mp.db_id))
         next_pointing = mp.get_next_pointing()
         if next_pointing:
             pointings_to_add.append(next_pointing)

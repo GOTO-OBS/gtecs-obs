@@ -30,7 +30,7 @@ class User(Base):
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an User, and set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the userKey)
+    an active database session, and some properties (like the db_id)
     will be None until the User is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -52,8 +52,8 @@ class User(Base):
 
     Attributes
     ----------
-        userKey : int
-            primary key for users
+        db_id : int
+            primary database key
         mpointings : list of `Mpointing`
             a list of any `Mpointing`s associated with this User
         pointings : list of `Pointing`
@@ -68,18 +68,18 @@ class User(Base):
         >>> session.add(bob)  # add bob to database
         >>> session.commit()  # commit changes (otherwise DB not changed)
         >>> bob
-        User(userKey=25, username=bob, fullName=Bob Marley)
+        User(db_id=25, username=bob, fullName=Bob Marley)
         >>> bob.pointings
         []
         >>> pointing = make_random_pointing(25)  # make a pointing for bob
         >>> session.add(pointing)
         >>> session.commit()
         >>> bob.pointings
-        [Pointing(pointingID=None, status='pending', objectName=randObj, ra=352.133, dec=28.464,
+        [Pointing(db_id=None, status='pending', objectName=randObj, ra=352.133, dec=28.464,
         rank=84, minAlt=30, maxSunAlt=-15, minTime=1575.8310236068696, maxMoon=D, minMoonSep=30,
         ToO=True, startUTC=2018-01-16 16:46:12, stopUTC=2018-01-18 16:46:12, startedUTC=None,
-        stoppedUTC=None, userKey=25, mpointingID=None, blockID=None, eventID=None, eventTileID=None,
-        surveyID=None, surveyTileID=None)]
+        stoppedUTC=None, user_id=25, mpointing_id=None, observing_block_id=None, event_id=None,
+        event_tile_id=None, survey_id=None, survey_tile_id=None)]
         >>> session.close()
 
     """
@@ -88,7 +88,7 @@ class User(Base):
     __tablename__ = 'users'
 
     # Primary key
-    userKey = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     userName = Column('username', String)
@@ -96,8 +96,8 @@ class User(Base):
     fullName = Column('full_name', String)
 
     def __repr__(self):
-        return "User(userKey={}, userName={}, fullName={})".format(
-            self.userKey, self.userName, self.fullName
+        return "User(db_id={}, userName={}, fullName={})".format(
+            self.db_id, self.userName, self.fullName
         )
 
 
@@ -107,7 +107,7 @@ class Pointing(Base):
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an Pointing, and set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the pointingID)
+    an active database session, and some properties (like the db_id)
     will be None until the Pointing is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -116,7 +116,7 @@ class Pointing(Base):
 
     Args
     ----
-        userKey : int
+        user_id : int
             unique key identifying user to whom this Pointing belongs
         objectName : String
             object name
@@ -151,15 +151,15 @@ class Pointing(Base):
 
         status : string, optional
             status of pointing, default 'pending'
-        eventTileID : int, optional
+        event_tile_id : int, optional
             unique key linking to a `EventTile`
-        surveyTileID : int, optional
+        survey_tile_id : int, optional
             unique key linking to a `SurveyTile`
-        eventID : int, optional
+        event_id : int, optional
             unique key linking to an `Event`
-        surveyID : int, optional
+        survey_id : int, optional
             unique key linking to a `Survey`
-        mpointingID : int, optional
+        mpointing_id : int, optional
             unique key linking to an `Mpointing`
 
     An Pointing also has the following properties which are
@@ -168,8 +168,8 @@ class Pointing(Base):
 
     Attributes
     ----------
-        pointingID : int
-            primary key for pointings
+        db_id : int
+            primary database key
         startedUTC : datetime.datetime, or None
             if the pointing has started (been marked running)
             this will give the time it was updated
@@ -200,19 +200,19 @@ class Pointing(Base):
 
         >>> p = Pointing(objectName='IP Peg', ra=350.785625, dec=18.416472, rank=9, minAlt=30,
         ... maxSunAlt=-15, minTime=3600, maxMoon='G', minMoonSep=30, ToO=0, startUTC=Time.now(),
-        ... stopUTC=Time.now()+3*u.day, userKey=24)
+        ... stopUTC=Time.now()+3*u.day, user_id=24)
         >>> p
-        Pointing(pointingID=None, status='None', objectName=IP Peg, ra=350.785625, dec=18.416472,
+        Pointing(db_id=None, status='None', objectName=IP Peg, ra=350.785625, dec=18.416472,
         rank=9, minAlt=30, maxSunAlt=-15, minTime=3600, maxMoon=G, minMoonSep=None, ToO=False,
         startUTC=2018-01-12 17:39:54, stopUTC=2018-01-15 17:39:54, startedUTC=None, stoppedUTC=None,
-        userKey=24, mpointingID=None, blockID=None, eventID=None, eventTileID=None, surveyID=None,
-        surveyTileID=None)
+        user_id=24, mpointing_id=None, observing_block_id=None, event_id=None, event_tile_id=None,
+        survey_id=None, survey_tile_id=None)
 
-        We can insert it into the database and the status and pointingID will be set:
+        We can insert it into the database and the status and db_id will be set:
 
         >>> session.add(p)
         >>> session.commit()
-        >>> p.status, p.pointingID
+        >>> p.status, p.db_id
         ('pending', 17073)
 
         At the moment, this pointing has no exposure sets. We can either add these to the
@@ -221,22 +221,22 @@ class Pointing(Base):
         >>> e1 = ExposureSet(typeFlag='SCIENCE', filt='L', expTime=20, numexp=20, binning=2)
         >>> p.exposure_sets.append(e1)
 
-        or create `ExposureSet` instances with the `pointingID` attribute set, and the database will
-        take care of the rest:
+        or create `ExposureSet` instances with the `pointing_id` attribute set, and the database
+        will take care of the rest:
 
         >>> e2 = ExposureSet(typeFlag='SCIENCE', filt='G', expTime=20, numexp=20, binning=2,
-        ... pointingID=17073)
+        ... pointing_id=17073)
         >>> e3 = ExposureSet(typeFlag='SCIENCE', filt='R', expTime=20, numexp=20, binning=2,
-        ... pointingID=17073)
+        ... pointing_id=17073)
         >>> insert_items(session, [e2, e3])
         >>> session.commit()
         >>> p.exposure_sets
-        [ExposureSet(expID=126601, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=L, expTime=20.0,
-        numexp=20, binning=2, utMask=None, pointingID=17073, mpointingID=None),
-        ExposureSet(expID=126602, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=G, expTime=20.0,
-        numexp=20, binning=2, utMask=None, pointingID=17073, mpointingID=None),
-        ExposureSet(expID=126603, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=R, expTime=20.0,
-        numexp=20, binning=2, utMask=None, pointingID=17073, mpointingID=None)]
+        [ExposureSet(db_id=126601, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=L, expTime=20.0,
+        numexp=20, binning=2, utMask=None, pointing_id=17073, mpointing_id=None),
+        ExposureSet(db_id=126602, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=G, expTime=20.0,
+        numexp=20, binning=2, utMask=None, pointing_id=17073, mpointing_id=None),
+        ExposureSet(db_id=126603, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=R, expTime=20.0,
+        numexp=20, binning=2, utMask=None, pointing_id=17073, mpointing_id=None)]
 
         >>> session.close()
 
@@ -246,7 +246,7 @@ class Pointing(Base):
     __tablename__ = 'pointings'
 
     # Primary key
-    pointingID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     status = Column('status', pointing_status_list, default='pending')
@@ -266,13 +266,13 @@ class Pointing(Base):
     stoppedUTC = Column('stopped_time', DateTime, default=None)
 
     # Foreign keys
-    userKey = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
-    mpointingID = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
-    blockID = Column('observing_block_id', Integer, ForeignKey('observing_blocks.id'), nullable=True)
-    eventID = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
-    eventTileID = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
-    surveyID = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
-    surveyTileID = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    user_id = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
+    mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
+    observing_block_id = Column('observing_block_id', Integer, ForeignKey('observing_blocks.id'), nullable=True)
+    event_id = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
+    event_tile_id = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
+    survey_id = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
+    survey_tile_id = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     user = relationship('User', backref='pointings', uselist=False)
@@ -284,18 +284,18 @@ class Pointing(Base):
     surveyTile = relationship('SurveyTile', back_populates='pointings', uselist=False)
 
     def __repr__(self):
-        template = ("Pointing(pointingID={}, status='{}', " +
+        template = ("Pointing(db_id={}, status='{}', " +
                     "objectName={}, ra={}, dec={}, rank={}, " +
                     "minAlt={}, maxSunAlt={}, minTime={}, maxMoon={}, minMoonSep={}, " +
                     "ToO={}, startUTC={}, stopUTC={}, startedUTC={}, stoppedUTC={}, " +
-                    "userKey={}, mpointingID={}, blockID={}, " +
-                    "eventID={}, eventTileID={}, surveyID={}, surveyTileID={})")
+                    "user_id={}, mpointing_id={}, observing_block_id={}, " +
+                    "event_id={}, event_tile_id={}, survey_id={}, survey_tile_id={})")
         return template.format(
-            self.pointingID, self.status, self.objectName, self.ra, self.dec, self.rank,
+            self.db_id, self.status, self.objectName, self.ra, self.dec, self.rank,
             self.minAlt, self.maxSunAlt, self.minTime, self.maxMoon, self.minMoonSep,
             bool(self.ToO), self.startUTC, self.stopUTC, self.startedUTC, self.stoppedUTC,
-            self.userKey, self.mpointingID, self.blockID,
-            self.eventID, self.eventTileID, self.surveyID, self.surveyTileID
+            self.user_id, self.mpointing_id, self.observing_block_id,
+            self.event_id, self.event_tile_id, self.survey_id, self.survey_tile_id
         )
 
     @validates('startUTC', 'stopUTC')
@@ -331,7 +331,7 @@ class ExposureSet(Base):
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an ExposureSet, and set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the expID)
+    an active database session, and some properties (like the db_id)
     will be None until the ExposureSet is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -362,9 +362,9 @@ class ExposureSet(Base):
             if set, this is a binary mask which will determine which unit
             telescopes carry out the exposure. A value of 5 (binary 0101) will
             be exposed by cameras 1 and 3.
-        mpointingID : int, optional
+        mpointing_id : int, optional
             unique key linking to an `Mpointing`
-        pointingID : int, optional
+        pointing_id : int, optional
             unique key linking to an `Pointing`
 
     An ExposureSet also has the following properties which are
@@ -373,8 +373,8 @@ class ExposureSet(Base):
 
     Attributes
     ----------
-        expID : int
-            primary key for ExposureSets
+        db_id : int
+            primary database key
         mpointing : `Mpointing`
             the `Mpointing` associated with this `ExposureSet`, if any
         pointing : `Pointing`
@@ -386,7 +386,7 @@ class ExposureSet(Base):
     __tablename__ = 'exposure_sets'
 
     # Primary key
-    expID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     numexp = Column('num_exp', Integer)
@@ -399,21 +399,21 @@ class ExposureSet(Base):
     decoff = Column('dec_offset', Float, server_default='0.0')
 
     # Foreign keys
-    pointingID = Column('pointing_id', Integer, ForeignKey('pointings.id'), nullable=False)
-    mpointingID = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
+    pointing_id = Column('pointing_id', Integer, ForeignKey('pointings.id'), nullable=False)
+    mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
     pointing = relationship('Pointing', backref='exposure_sets', uselist=False)
     mpointing = relationship('Mpointing', backref='exposure_sets', uselist=False)
 
     def __repr__(self):
-        template = ("ExposureSet(expID={}, raoff={}, decoff={}, typeFlag={}, " +
+        template = ("ExposureSet(db_id={}, raoff={}, decoff={}, typeFlag={}, " +
                     "filt={}, expTime={}, numexp={}, binning={}, utMask={}, " +
-                    "pointingID={}, mpointingID={})")
+                    "pointing_id={}, mpointing_id={})")
         return template.format(
-            self.expID, self.raoff, self.decoff, self.typeFlag, self.filt,
+            self.db_id, self.raoff, self.decoff, self.typeFlag, self.filt,
             self.expTime, self.numexp, self.binning, self.utMask,
-            self.pointingID, self.mpointingID
+            self.pointing_id, self.mpointing_id
         )
 
 
@@ -423,7 +423,7 @@ class Mpointing(Base):
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an Mpointing, and set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the mpointingID)
+    an active database session, and some properties (like the db_id)
     will be None until the Mpointing is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -432,7 +432,7 @@ class Mpointing(Base):
 
     Args
     ----
-        userKey : int
+        user_id : int
             unique key identifying user to whom this Mpointing belongs
         objectName : String
             object name
@@ -477,13 +477,13 @@ class Mpointing(Base):
             the latest UTC time after which pointings must stop
             if not given the Mpointing will continue creating pointings until
             it is completed
-        eventTileID : int, optional
+        event_tile_id : int, optional
             unique key linking to `EventTile`
-        surveyTileID : int, optional
+        survey_tile_id : int, optional
             unique key linking to `SurveyTile`
-        eventID : int, optional
+        event_id : int, optional
             unique key linking to `Event`
-        surveyID : int, optional
+        survey_id : int, optional
             unique key linking to `Survey`
 
     An Mpointing also has the following properties which are
@@ -492,8 +492,8 @@ class Mpointing(Base):
 
     Attributes
     ----------
-        mpointingID : int
-            primary key for mpointings
+        db_id : int
+            primary database key
         rank : int
             rank for next pointing to be scheduled
         num_completed : int
@@ -522,23 +522,23 @@ class Mpointing(Base):
         for 5 minutes and the next one is valid 10 minutes after the previous.
 
         >>> mp = Mpointing(objectName='M31', ra=22, dec=-5, start_rank=9, minAlt=30, minTime=3600,
-        ... maxSunAlt=-15, ToO=0, maxMoon='B', minMoonSep=30, num_todo=5, userKey=24, valid_time=5,
+        ... maxSunAlt=-15, ToO=0, maxMoon='B', minMoonSep=30, num_todo=5, user_id=24, valid_time=5,
         ... wait_time=10, startUTC=Time('2018-01-01 00:00:00'))
         >>> mp
-        Mpointing(mpointingID=None, status='unscheduled', num_todo=5, num_completed=0,
+        Mpointing(db_id=None, status='unscheduled', num_todo=5, num_completed=0,
         num_remaining=5, infinite=False, objectName=M31, ra=22, dec=-5, rank=9, start_rank=9,
         minAlt=30, maxSunAlt=-15, minTime=3600, maxMoon=B, minMoonSep=30, ToO=False,
-        startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
-        surveyID=None, surveyTileID=None)
+        startUTC=2018-01-01 00:00:00, stopUTC=None, user_id=24, event_id=None, event_tile_id=None,
+        survey_id=None, survey_tile_id=None)
 
-        Note that the mpointingID is None, because that will be filled out when we add it to the
+        Note that the db_id is None, because that will be filled out when we add it to the
         database.
 
         Looking at the ObservingBlocks you can see that we only need one, and it has been generated
 
         >>> mp.observing_blocks
-        [ObservingBlock(blockID=None, blockNum=1, valid_time=5, wait_time=10, current=1,
-        mpointingID=None)]
+        [ObservingBlock(db_id=None, blockNum=1, valid_time=5, wait_time=10, current=1,
+        mpointing_id=None)]
 
         This block will be repeated 5 times, as requested.
 
@@ -548,21 +548,21 @@ class Mpointing(Base):
         pointings increase.
 
         >>> mp = Mpointing(objectName='M31', ra=22, dec=-5, start_rank=9, minAlt=30, minTime=3600,
-        ... maxSunAlt=-15, ToO=0, maxMoon='B', minMoonSep=30, num_todo=5, userKey=24, valid_time=5,
+        ... maxSunAlt=-15, ToO=0, maxMoon='B', minMoonSep=30, num_todo=5, user_id=24, valid_time=5,
         ... wait_time=[10,20,30], startUTC=Time('2018-01-01 00:00:00'))
         >>> mp
-        Mpointing(mpointingID=None, status='unscheduled', num_todo=5, num_completed=0,
+        Mpointing(db_id=None, status='unscheduled', num_todo=5, num_completed=0,
         num_remaining=5, infinite=False, objectName=M31, ra=22, dec=-5, rank=9, start_rank=9,
         minAlt=30, maxSunAlt=-15, minTime=3600, maxMoon=B, minMoonSep=30, ToO=False,
-        startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
-        surveyID=None, surveyTileID=None)
+        startUTC=2018-01-01 00:00:00, stopUTC=None, user_id=24, event_id=None, event_tile_id=None,
+        survey_id=None, survey_tile_id=None)
         >>> mp.observing_blocks
-        [ObservingBlock(blockID=None, blockNum=1, valid_time=5, wait_time=10, current=1,
-        mpointingID=None),
-        ObservingBlock(blockID=None, blockNum=2, valid_time=5, wait_time=20, current=None,
-        mpointingID=None),
-        ObservingBlock(blockID=None, blockNum=3, valid_time=5, wait_time=30, current=None,
-        mpointingID=None)]
+        [ObservingBlock(db_id=None, blockNum=1, valid_time=5, wait_time=10, current=1,
+        mpointing_id=None),
+        ObservingBlock(db_id=None, blockNum=2, valid_time=5, wait_time=20, current=None,
+        mpointing_id=None),
+        ObservingBlock(db_id=None, blockNum=3, valid_time=5, wait_time=30, current=None,
+        mpointing_id=None)]
 
         Note this time that we only created 3 blocks, but are asking for 5 observations.
         That's not a problem, as the blocks will simply repeat.
@@ -589,25 +589,25 @@ class Mpointing(Base):
         >>> s.add(p)
         >>> s.commit()
         >>> mp.pointings
-        [Pointing(pointingID=17100, status='pending', objectName=M31, ra=22.0, dec=-5.0, rank=9,
+        [Pointing(db_id=17100, status='pending', objectName=M31, ra=22.0, dec=-5.0, rank=9,
         minAlt=30.0, maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
         startUTC=2018-01-01 00:00:00, stopUTC=2018-01-01 00:05:00, startedUTC=None, stoppedUTC=None,
-        userKey=24, mpointingID=2, blockID=1, eventID=None, eventTileID=None, surveyID=None,
-        surveyTileID=None)]
+        user_id=24, mpointing_id=2, observing_block_id=1, event_id=None, event_tile_id=None,
+        survey_id=None, survey_tile_id=None)]
 
-        Note that the pointingID, mpointingID and blockID have been filled out,
-        and this Pointing has blockID=1.
+        Note that the db_id, mpointing_id and observing_block_id have been filled out,
+        and this Pointing has observing_block_id=1.
         Also that the start time is midnight and the stop time is 5 past, as expected.
         See what happens if we mark the pointing as completed:
 
         >>> mp.pointings[0].status = 'completed'
         >>> s.commit()
         >>> mp
-        Mpointing(mpointingID=2, status='unscheduled', num_todo=5, num_completed=1, num_remaining=4,
+        Mpointing(db_id=2, status='unscheduled', num_todo=5, num_completed=1, num_remaining=4,
         infinite=False, objectName=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, minAlt=30.0,
         maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
-        startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
-        surveyID=None, surveyTileID=None)
+        startUTC=2018-01-01 00:00:00, stopUTC=None, user_id=24, event_id=None, event_tile_id=None,
+        survey_id=None, survey_tile_id=None)
 
         See that the num_completed atribute has gone up, the num_remaining has gone down
         and the mpointing status has changed to 'unscheduled'.
@@ -618,31 +618,32 @@ class Mpointing(Base):
         >>> s.add(p)
         >>> s.commit()
         >>> p
-        Pointing(pointingID=17102, status='pending', objectName=M31, ra=22.0, dec=-5.0, rank=19,
+        Pointing(db_id=17102, status='pending', objectName=M31, ra=22.0, dec=-5.0, rank=19,
         minAlt=30.0, maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
         startUTC=2018-01-01 00:15:00, stopUTC=2018-01-01 00:20:00, startedUTC=None, stoppedUTC=None,
-        userKey=24, mpointingID=2, blockID=2, eventID=None, eventTileID=None, surveyID=None,
-        surveyTileID=None)
+        user_id=24, mpointing_id=2, observing_block_id=2, event_id=None, event_tile_id=None,
+        survey_id=None, survey_tile_id=None)
         >>> mp
-        Mpointing(mpointingID=2, status='scheduled', num_todo=5, num_completed=1, num_remaining=4,
+        Mpointing(db_id=2, status='scheduled', num_todo=5, num_completed=1, num_remaining=4,
         infinite=False, objectName=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, minAlt=30.0,
         maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
-        startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
-        surveyID=None, surveyTileID=None)
+        startUTC=2018-01-01 00:00:00, stopUTC=None, user_id=24, event_id=None, event_tile_id=None,
+        survey_id=None, survey_tile_id=None)
 
         See that the Mpointing is back to scheduled.
         Also, note that the new pointing has start time of 00:15 and stop of 00:20. That's as we
-        expected, because it's linked to the second observing block not the first (see blockID=2).
+        expected, because it's linked to the second observing block not the first
+        (see observing_block_id=2).
 
         If you look at the observing blocks you can see the next one is now marked as current.
 
         >>> mp.observing_blocks
-        [ObservingBlock(blockID=1, blockNum=1, valid_time=5.0, wait_time=10.0, current=0,
-        mpointingID=2),
-        ObservingBlock(blockID=2, blockNum=2, valid_time=5.0, wait_time=20.0, current=1,
-        mpointingID=2),
-        ObservingBlock(blockID=3, blockNum=3, valid_time=5.0, wait_time=30.0, current=0,
-        mpointingID=2)]
+        [ObservingBlock(db_id=1, blockNum=1, valid_time=5.0, wait_time=10.0, current=0,
+        mpointing_id=2),
+        ObservingBlock(db_id=2, blockNum=2, valid_time=5.0, wait_time=20.0, current=1,
+        mpointing_id=2),
+        ObservingBlock(db_id=3, blockNum=3, valid_time=5.0, wait_time=30.0, current=0,
+        mpointing_id=2)]
 
         Mark this one as completed, and you'll see the Mpointing is updated.
 
@@ -658,7 +659,7 @@ class Mpointing(Base):
         >>> p = mp.get_next_pointing() # Pointing 3 of 5
         >>> s.add(p)
         >>> s.commit()
-        >>> p.blockID
+        >>> p.observing_block_id
         3
         >>> mp.status
         'scheduled'
@@ -673,7 +674,7 @@ class Mpointing(Base):
         >>> p = mp.get_next_pointing() # Pointing 4 of 5
         >>> s.add(p)
         >>> s.commit()
-        >>> p.blockID
+        >>> p.observing_block_id
         1
         >>> mp.status
         'scheduled'
@@ -688,7 +689,7 @@ class Mpointing(Base):
         >>> p = mp.get_next_pointing() # Pointing 5 of 5
         >>> s.add(p)
         >>> s.commit()
-        >>> p.blockID
+        >>> p.observing_block_id
         2
         >>> mp.status
         'scheduled'
@@ -700,11 +701,11 @@ class Mpointing(Base):
         >>> mp.status
         'completed'
         >>> mp
-        Mpointing(mpointingID=2, status='completed', num_todo=5, num_completed=5, num_remaining=0,
+        Mpointing(db_id=2, status='completed', num_todo=5, num_completed=5, num_remaining=0,
         infinite=False, objectName=M31, ra=22.0, dec=-5.0, rank=59, start_rank=9, minAlt=30.0,
         maxSunAlt=-15.0, minTime=3600.0, maxMoon=B, minMoonSep=30.0, ToO=False,
-        startUTC=2018-01-01 00:00:00, stopUTC=None, userKey=24, eventID=None, eventTileID=None,
-        surveyID=None, surveyTileID=None)
+        startUTC=2018-01-01 00:00:00, stopUTC=None, user_id=24, event_id=None, event_tile_id=None,
+        survey_id=None, survey_tile_id=None)
 
         And the Mpointing is completed.
 
@@ -716,22 +717,22 @@ class Mpointing(Base):
         >>> e1 = ExposureSet(typeFlag='SCIENCE', filt='L', expTime=20, numexp=20, binning=2)
         >>> mp.exposure_sets.append(e1)
 
-        or create `ExposureSet` instances with the `mpointingID` attribute set, and the database
+        or create `ExposureSet` instances with the `mpointing_id` attribute set, and the database
         will take care of the rest:
 
         >>> e2 = ExposureSet(typeFlag='SCIENCE', filt='G', expTime=20, numexp=20, binning=2,
-        ... mpointingID=1)
+        ... mpointing_id=1)
         >>> e3 = ExposureSet(typeFlag='SCIENCE', filt='R', expTime=20, numexp=20, binning=2,
-        ... mpointingID=1)
+        ... mpointing_id=1)
         >>> insert_items(session, [e2, e3])
         >>> session.commit()
         >>> mp.exposure_sets
-        [ExposureSet(expID=126598, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=L, expTime=20.0,
-        numexp=20, binning=2, utMask=None, pointingID=None, mpointingID=1),
-        ExposureSet(expID=126599, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=G, expTime=20.0,
-        numexp=20, binning=2, utMask=None, pointingID=None, mpointingID=1),
-        ExposureSet(expID=126600, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=R, expTime=20.0,
-        numexp=20, binning=2, utMask=None, pointingID=None, mpointingID=1)]
+        [ExposureSet(db_id=126598, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=L, expTime=20.0,
+        numexp=20, binning=2, utMask=None, pointing_id=None, mpointing_id=1),
+        ExposureSet(db_id=126599, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=G, expTime=20.0,
+        numexp=20, binning=2, utMask=None, pointing_id=None, mpointing_id=1),
+        ExposureSet(db_id=126600, raoff=0.0, decoff=0.0, typeFlag=SCIENCE, filt=R, expTime=20.0,
+        numexp=20, binning=2, utMask=None, pointing_id=None, mpointing_id=1)]
 
         These exposure sets will be copied to the Pointings when they're created.
 
@@ -743,7 +744,7 @@ class Mpointing(Base):
     __tablename__ = 'mpointings'
 
     # Primary key
-    mpointingID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     status = Column('status', mpointing_status_list, default='unscheduled')
@@ -765,11 +766,11 @@ class Mpointing(Base):
     stopUTC = Column('stop_time', DateTime)
 
     # Foreign keys
-    userKey = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
-    eventID = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
-    eventTileID = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
-    surveyID = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
-    surveyTileID = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    user_id = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
+    event_id = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
+    event_tile_id = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
+    survey_id = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
+    survey_tile_id = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     user = relationship('User', backref='mpointings', uselist=False)
@@ -780,19 +781,19 @@ class Mpointing(Base):
     observing_blocks = relationship('ObservingBlock', back_populates='mpointing', viewonly=True)
 
     def __repr__(self):
-        template = ("Mpointing(mpointingID={}, status='{}', num_todo={}, num_completed={}," +
+        template = ("Mpointing(db_id={}, status='{}', num_todo={}, num_completed={}," +
                     "num_remaining={}, infinite={}, " +
                     "objectName={}, ra={}, dec={}, rank={}, start_rank={}, " +
                     "minAlt={}, maxSunAlt={}, minTime={}, maxMoon={}, minMoonSep={}, " +
                     "ToO={}, startUTC={}, stopUTC={}, " +
-                    "userKey={}, eventID={}, eventTileID={}, surveyID={}, surveyTileID={})")
+                    "user_id={}, event_id={}, event_tile_id={}, survey_id={}, survey_tile_id={})")
         return template.format(
-            self.mpointingID, self.status, self.num_todo, self.num_completed,
+            self.db_id, self.status, self.num_todo, self.num_completed,
             self.num_remaining, bool(self.infinite),
             self.objectName, self.ra, self.dec, self.rank, self.start_rank,
             self.minAlt, self.maxSunAlt, self.minTime, self.maxMoon, self.minMoonSep,
             bool(self.ToO), self.startUTC, self.stopUTC,
-            self.userKey, self.eventID, self.eventTileID, self.surveyID, self.surveyTileID
+            self.user_id, self.event_id, self.event_tile_id, self.survey_id, self.survey_tile_id
         )
 
     def __init__(self, objectName=None, ra=None, dec=None,
@@ -850,26 +851,26 @@ class Mpointing(Base):
             if len(self.observing_blocks):
                 self.observing_blocks[0].current = 1
 
-        if 'eventID' in kwargs:
-            self.eventID = kwargs['eventID']
-        if 'event' in kwargs:
-            self.event = kwargs['event']
         if 'user' in kwargs:
             self.user = kwargs['user']
-        if 'userKey' in kwargs:
-            self.userKey = kwargs['userKey']
-        if 'surveyID' in kwargs:
-            self.surveyID = kwargs['surveyID']
+        if 'user_id' in kwargs:
+            self.user_id = kwargs['user_id']
+        if 'survey_id' in kwargs:
+            self.survey_id = kwargs['survey_id']
         if 'survey' in kwargs:
             self.survey = kwargs['survey']
         if 'surveyTile' in kwargs:
             self.surveyTile = kwargs['surveyTile']
-        if 'surveyTileID' in kwargs:
-            self.surveyTileID = kwargs['surveyTileID']
+        if 'survey_tile_id' in kwargs:
+            self.survey_tile_id = kwargs['survey_tile_id']
+        if 'event' in kwargs:
+            self.event = kwargs['event']
+        if 'event_id' in kwargs:
+            self.event_id = kwargs['event_id']
         if 'eventTile' in kwargs:
             self.eventTile = kwargs['eventTile']
-        if 'eventTileID' in kwargs:
-            self.eventTileID = kwargs['eventTileID']
+        if 'event_tile_id' in kwargs:
+            self.event_tile_id = kwargs['event_tile_id']
 
     @validates('startUTC', 'stopUTC')
     def munge_times(self, key, field):
@@ -1079,13 +1080,13 @@ class Mpointing(Base):
                      startUTC=startUTC,
                      stopUTC=stopUTC,
                      status='pending',
-                     userKey=self.userKey,
-                     mpointingID=self.mpointingID,
+                     user_id=self.user_id,
+                     mpointing_id=self.db_id,
                      observing_block=next_block,
-                     eventID=self.eventID,
-                     eventTileID=self.eventTileID,
-                     surveyID=self.surveyID,
-                     surveyTileID=self.surveyTileID,
+                     event_id=self.event_id,
+                     event_tile_id=self.event_tile_id,
+                     survey_id=self.survey_id,
+                     survey_tile_id=self.survey_tile_id,
                      )
         # add the exposures
         p.exposure_sets = self.exposure_sets
@@ -1098,7 +1099,7 @@ class ObservingBlock(Base):
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create a ObservingBlock, and set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the blockID)
+    an active database session, and some properties (like the db_id)
     will be None until the ObservingBlock is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -1118,7 +1119,7 @@ class ObservingBlock(Base):
         wait_time : float
             time to wait after this block before allowing the next pointing, in minutes
 
-        mpointingID : int, optional
+        mpointing_id : int, optional
             unique key linking this ObservingBlock to an Mpointing
         current : bool, optional
             True if this ObservingBlock is the one that is currently linked to
@@ -1138,13 +1139,13 @@ class ObservingBlock(Base):
         >>> from obsdb import *
 
         make an ObservingBlock
-        (an Mpointing with mpointingID = 1 is already in the database)
+        (an Mpointing with mpointing_id = 1 is already in the database)
 
-        >>> b = ObservingBlock(blockNum=1, valid_time=60, wait_time=120, mpointingID=1)
+        >>> b = ObservingBlock(blockNum=1, valid_time=60, wait_time=120, mpointing_id=1)
         >>> session = load_session()
         >>> session.add(b)
-        ObservingBlock(blockID=7, blockNum=1, valid_time=60.0, wait_time=120.0, current=False,
-        mpointingID=1)
+        ObservingBlock(db_id=7, blockNum=1, valid_time=60.0, wait_time=120.0, current=False,
+        mpointing_id=1)
 
     """
 
@@ -1152,7 +1153,7 @@ class ObservingBlock(Base):
     __tablename__ = 'observing_blocks'
 
     # Primary key
-    blockID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     blockNum = Column('block_num', Integer)
@@ -1161,17 +1162,17 @@ class ObservingBlock(Base):
     current = Column('current', Integer, default=False)
 
     # Foreign keys
-    mpointingID = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
+    mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
     mpointing = relationship('Mpointing', back_populates='observing_blocks', uselist=False)
     pointings = relationship('Pointing', back_populates='observing_block')
 
     def __repr__(self):
-        template = ("ObservingBlock(blockID={}, blockNum={}, valid_time={}, " +
-                    "wait_time={}, current={}, mpointingID={})")
-        return template.format(self.blockID, self.blockNum, self.valid_time,
-                               self.wait_time, bool(self.current), self.mpointingID)
+        template = ("ObservingBlock(db_id={}, blockNum={}, valid_time={}, " +
+                    "wait_time={}, current={}, mpointing_id={})")
+        return template.format(self.db_id, self.blockNum, self.valid_time,
+                               self.wait_time, bool(self.current), self.mpointing_id)
 
 
 class Event(Base):
@@ -1180,7 +1181,7 @@ class Event(Base):
     Like all SQLAlchemy model classes, these objects link to the
     underlying database. You can create an object, set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the eventID)
+    an active database session, and some properties (like the db_id)
     will be None until the Event is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -1204,8 +1205,8 @@ class Event(Base):
 
     Attributes
     ----------
-        eventID : int
-            primary key for events
+        db_id : int
+            primary database key
         eventTiles : list of `EventTile`
             a list of any `EventTiles` associated with this Event
         mpointings : list of `Mpointing`
@@ -1223,7 +1224,7 @@ class Event(Base):
     __tablename__ = 'events'
 
     # Primary key
-    eventID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     name = Column('name', String)
@@ -1235,8 +1236,8 @@ class Event(Base):
     eventTiles = relationship('EventTile', back_populates='event')
 
     def __repr__(self):
-        return "Event(eventID={}, name={}, source={}, ivo={}, skymap={})".format(
-            self.eventID, self.name, self.source, self.ivo, self.skymap
+        return "Event(db_id={}, name={}, source={}, ivo={}, skymap={})".format(
+            self.db_id, self.name, self.source, self.ivo, self.skymap
         )
 
 
@@ -1246,7 +1247,7 @@ class EventTile(Base):
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an EventTile, and set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the tileID)
+    an active database session, and some properties (like the db_id)
     will be None until the User is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -1265,9 +1266,9 @@ class EventTile(Base):
             J2000 declination in decimal degrees
             if dec is not given and this EventTile is linked to a SurveyTile
             then the dec will be extracted from the SurveyTile
-        eventID : int, optional
+        event_id : int, optional
             the ID number of the Event this tile is associated with
-        surveyTileID : int, optional
+        survey_tile_id : int, optional
             the SurveyTile this tile is associated with, if any
 
     An EventTile also has the following properties which are
@@ -1276,8 +1277,8 @@ class EventTile(Base):
 
     Attributes
     ----------
-        tileID : int
-            primary key for event tiles
+        db_id : int
+            primary database key
         unobserved_probability : float
             the total probability in this tile that hasn't been observed
             should be updated whenever any overlapping tile is observed
@@ -1296,31 +1297,32 @@ class EventTile(Base):
         >>> session = load_session()
         >>> session.add(e)  # add event
         >>> session.commit()  # commit changes (otherwise DB not changed)
-        >>> e.eventID
+        >>> e.db_id
         1
 
-        construct without eventID
+        construct without event_id
 
         >>> event_tile = EventTile(ra=122.34, dec=22.01, probability=0.01)
         >>> event_tile
-        EventTile(tileID=None, ra=122.34, dec=22.01, probability=0.01, eventID=None,
-        surveytileID=None)
+        EventTile(db_id=None, ra=122.34, dec=22.01, probability=0.01, event_id=None,
+        survey_tile_id=None)
 
-        set the eventID
+        set the event_id
 
-        >>> event_tile.eventID = 1
+        >>> event_tile.event_id = 1
         >>> event_tile
-        EventTile(tileID=None, ra=122.34, dec=22.01, probability=0.01, eventID=None,
-        surveytileID=None)
+        EventTile(db_id=None, ra=122.34, dec=22.01, probability=0.01, event_id=None,
+        survey_tile_id=None)
 
         add to the database
 
         >>> session.add(event_tile)
         >>> session.commit()
-        >>> event_tile  # note how tileID is populated now tile is in DB
-        EventTile(tileID=1, ra=122.34, dec=22.01, probability=0.01, eventID=1, surveytileID=None)
+        >>> event_tile  # note how db_id is populated now tile is in DB
+        EventTile(db_id=1, ra=122.34, dec=22.01, probability=0.01, event_id=1, survey_tile_id=None)
         >>> e.eventTiles  # and event knows about all associated tiles
-        [EventTile(tileID=1, ra=122.34, dec=22.01, probability=0.01, eventID=1, surveytileID=None)]
+        [EventTile(db_id=1, ra=122.34, dec=22.01, probability=0.01, event_id=1,
+        survey_tile_id=None)]
         >>> session.close()
 
         make a survey and a survey tile, and add them to the database
@@ -1338,17 +1340,17 @@ class EventTile(Base):
         >>> et2.event = e
         >>> et2.surveyTile = st
         >>> et2
-        EventTile(tileID=None, ra=None, dec=None, probability=0.01, eventID=None,
-        surveytileID=None)
+        EventTile(db_id=None, ra=None, dec=None, probability=0.01, event_id=None,
+        survey_tile_id=None)
 
         add to the database
 
         >>> session.add(event_tile)
         >>> session.commit()
         >>> et2  # note how the ra and dec have been copied from the surveyTile
-        EventTile(tileID=2, ra=22.0, dec=-2.0, probability=0.01, eventID=1, surveytileID=1)
+        EventTile(db_id=2, ra=22.0, dec=-2.0, probability=0.01, event_id=1, survey_tile_id=1)
         >>> st.eventTiles # and the surveyTile knows about the linked eventTiles
-        [EventTile(tileID=2, ra=22.0, dec=-2.0, probability=0.01, eventID=1, surveytileID=1)]
+        [EventTile(db_id=2, ra=22.0, dec=-2.0, probability=0.01, event_id=1, survey_tile_id=1)]
 
     """
 
@@ -1356,7 +1358,7 @@ class EventTile(Base):
     __tablename__ = 'event_tiles'
 
     # Primary key
-    tileID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     ra = Column('ra', Float)
@@ -1365,8 +1367,8 @@ class EventTile(Base):
     unobserved_probability = Column('unobserved_probability', Float)
 
     # Foreign keys
-    eventID = Column('event_id', Integer, ForeignKey('events.id'), nullable=False)
-    surveyTileID = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    event_id = Column('event_id', Integer, ForeignKey('events.id'), nullable=False)
+    survey_tile_id = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     pointings = relationship('Pointing', back_populates='eventTile')
@@ -1375,11 +1377,11 @@ class EventTile(Base):
     surveyTile = relationship('SurveyTile', back_populates='eventTiles', uselist=False)
 
     def __repr__(self):
-        template = ("EventTile(tileID={}, ra={}, dec={}, " +
-                    "probability={}, eventID={}, surveytileID={})")
+        template = ("EventTile(db_id={}, ra={}, dec={}, " +
+                    "probability={}, event_id={}, survey_tile_id={})")
         return template.format(
-            self.tileID, self.ra, self.dec, self.probability, self.eventID,
-            self.surveyTileID)
+            self.db_id, self.ra, self.dec, self.probability, self.event_id,
+            self.survey_tile_id)
 
 
 class Survey(Base):
@@ -1388,7 +1390,7 @@ class Survey(Base):
     Like all SQLAlchemy model classes, these objects link to the
     underlying database. You can create an object, set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the surveyID)
+    an active database session, and some properties (like the db_id)
     will be None until the Survey is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -1406,8 +1408,8 @@ class Survey(Base):
 
     Attributes
     ----------
-        surveyID : int
-            primary key for surveys
+        db_id : int
+            primary database key
         surveyTiles : list of `SurveyTile`
             a list of any `SurveyTiles` associated with this Survey
         mpointings : list of `Mpointing`
@@ -1425,7 +1427,7 @@ class Survey(Base):
     __tablename__ = 'surveys'
 
     # Primary key
-    surveyID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     name = Column('name', String)
@@ -1434,8 +1436,8 @@ class Survey(Base):
     surveyTiles = relationship('SurveyTile', back_populates='survey')
 
     def __repr__(self):
-        return "Survey(surveyID={}, name={})".format(
-            self.surveyID, self.name
+        return "Survey(db_id={}, name={})".format(
+            self.db_id, self.name
         )
 
 
@@ -1445,7 +1447,7 @@ class SurveyTile(Base):
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an SurveyTile, and set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the tileID)
+    an active database session, and some properties (like the db_id)
     will be None until the User is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -1458,7 +1460,7 @@ class SurveyTile(Base):
             J2000 right ascension in decimal degrees
         dec : float
             J2000 declination in decimal degrees
-        surveyID : int, optional
+        survey_id : int, optional
             the ID number of the Survey this tile is associated with
         name : str, optional
             a human-readable identifier for the tile
@@ -1469,8 +1471,8 @@ class SurveyTile(Base):
 
     Attributes
     ----------
-        tileID : int
-            primary key for survey tiles
+        db_id : int
+            primary database key
         eventTiles : list of `EventTile`
             a list of any `EventTiles` associated with this SurveyTiles, if any
         mpointing : `Mpointing`
@@ -1488,31 +1490,31 @@ class SurveyTile(Base):
         >>> session = load_session()
         >>> session.add(s)  # add survey
         >>> session.commit()  # commit changes (otherwise DB not changed)
-        >>> s.surveyID
+        >>> s.db_id
         1
 
-        construct without surveyID
+        construct without survey_id
 
         >>> tile = SurveyTile(ra=100, dec=20)
         >>> tile
-        SurveyTile(tileID=None, ra=100.00, dec=20.00)
+        SurveyTile(db_id=None, ra=100.00, dec=20.00)
 
-        set the surveyID
+        set the survey_id
 
-        >>> event_tile.eventID = 1
+        >>> event_tile.event_id = 1
         >>> event_tile
-        EventTile(tileID=None, ra=122.34, dec=22.01, probability=0.01, eventID=None)
+        EventTile(db_id=None, ra=122.34, dec=22.01, probability=0.01, event_id=None)
 
         add to the database, demonstrating the open_session context manager,
         which will handle committing changes for you:
 
         >>> with open_session as session():
         >>>     insert_items([tile])
-        >>>     tile  # note how tileID is populated now tile is in DB
-        SurveyTile(tileID=1, ra=100.00, dec=20.00, surveyID=1)
+        >>>     tile  # note how db_id is populated now tile is in DB
+        SurveyTile(db_id=1, ra=100.00, dec=20.00, survey_id=1)
         >>> with open_session as session():
         >>>     s.surveyTiles  # and survey knows about all associated tiles
-        [SurveyTile(tileID=1, ra=100.00, dec=20.00, surveyID=1)]
+        [SurveyTile(db_id=1, ra=100.00, dec=20.00, survey_id=1)]
 
     """
 
@@ -1520,7 +1522,7 @@ class SurveyTile(Base):
     __tablename__ = 'survey_tiles'
 
     # Primary key
-    tileID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     name = Column('name', String)
@@ -1528,7 +1530,7 @@ class SurveyTile(Base):
     dec = Column('decl', Float)
 
     # Foreign keys
-    surveyID = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=False)
+    survey_id = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=False)
 
     # Foreign relationships
     survey = relationship('Survey', back_populates='surveyTiles', uselist=False)
@@ -1537,10 +1539,10 @@ class SurveyTile(Base):
     pointings = relationship('Pointing', back_populates='surveyTile')
 
     def __repr__(self):
-        template = ("SurveyTile(tileID={}, ra={}, dec={}, " +
-                    ", name={}, surveyID={})")
+        template = ("SurveyTile(db_id={}, ra={}, dec={}, " +
+                    ", name={}, survey_id={})")
         return template.format(
-            self.tileID, self.ra, self.dec, self.name, self.surveyID)
+            self.db_id, self.ra, self.dec, self.name, self.survey_id)
 
 
 class ImageLog(Base):
@@ -1554,7 +1556,7 @@ class ImageLog(Base):
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an ImageLog, and set its attributes
     without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the logID)
+    an active database session, and some properties (like the db_id)
     will be None until the log is added to the database.
 
     The constructor must use keyword arguments and the arguments below
@@ -1583,11 +1585,11 @@ class ImageLog(Base):
         set_total : int, optional
             total number of exposures in this set, if any
             if not given, it will default to 1
-        expID : int, optional
+        exposure_set_id : int, optional
             the unique key of the exposure set this frame was part of
-        pointingID : int, optional
+        pointing_id : int, optional
             the unique key of the pointing which generated this frame
-        mpointingID : int, optional, optional
+        mpointing_id : int, optional, optional
             unique key of the mpointing which generated the pointing which
             generated this frame
 
@@ -1597,8 +1599,8 @@ class ImageLog(Base):
 
     Attributes
     ----------
-        logID : int
-            primary key for image logs
+        db_id : int
+            primary database key
         exposure_set : `ExposureSet`
             the `ExposureSet` object associated with this `ImageLog`, if any
         pointing : `Pointing`
@@ -1612,7 +1614,7 @@ class ImageLog(Base):
     __tablename__ = 'image_logs'
 
     # Primary key
-    logID = Column('id', Integer, primary_key=True)
+    db_id = Column('id', Integer, primary_key=True)
 
     # Columns
     filename = Column('filename', String)
@@ -1625,9 +1627,9 @@ class ImageLog(Base):
     set_total = Column('set_total', Integer, default=1)
 
     # Foreign keys
-    expID = Column('exposure_set_id', Integer, ForeignKey('exposure_sets.id'), nullable=True)
-    pointingID = Column('pointing_id', Integer, ForeignKey('pointings.id'), nullable=True)
-    mpointingID = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
+    exposure_set_id = Column('exposure_set_id', Integer, ForeignKey('exposure_sets.id'), nullable=True)
+    pointing_id = Column('pointing_id', Integer, ForeignKey('pointings.id'), nullable=True)
+    mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
 
     # Foreign relationships
     exposure_set = relationship('ExposureSet', backref='image_logs', uselist=False)
@@ -1635,13 +1637,13 @@ class ImageLog(Base):
     mpointing = relationship('Mpointing', backref='image_logs', uselist=False)
 
     def __repr__(self):
-        template = ("ImageLog(logID={}, filename={}, runNumber={}, " +
+        template = ("ImageLog(db_id={}, filename={}, runNumber={}, " +
                     "ut={}, utMask={}, startUTC={}, writeUTC={}, " +
-                    "expID={}, pointingID={}, mpointingID={})")
+                    "exposure_set_id={}, pointing_id={}, mpointing_id={})")
         return template.format(
-            self.logID, self.filename, self.runNumber, self.ut, self.utMask,
-            self.startUTC, self.writeUTC, self.expID, self.pointingID,
-            self.mpointingID
+            self.db_id, self.filename, self.runNumber, self.ut, self.utMask,
+            self.startUTC, self.writeUTC, self.exposure_set_id, self.pointing_id,
+            self.mpointing_id
         )
 
     @validates('startUTC', 'writeUTC')

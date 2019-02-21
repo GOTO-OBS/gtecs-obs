@@ -8,7 +8,7 @@ from .models import ExposureSet, Pointing
 __all__ = ['make_random_pointing']
 
 
-def make_random_pointing(userkey, numexps=None, time=None):
+def make_random_pointing(user_id, numexps=None, time=None):
     """Make a random pointing for testing.
 
     It should be observable from La Palma at the time of creation.
@@ -54,7 +54,7 @@ def make_random_pointing(userkey, numexps=None, time=None):
                  startUTC=t1,
                  stopUTC=t2,
                  status='pending',
-                 userKey=userkey,
+                 user_id=user_id,
                  )
 
     if numexps is None:

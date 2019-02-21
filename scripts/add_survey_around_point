@@ -32,19 +32,19 @@ EXP_SETTINGS = dict(expTime=120,
                     utMask=None)
 
 
-def get_userkey(username, description=''):
-    """Get user key of a user, and create it if it doesn't exit."""
+def get_user_id(username, description=''):
+    """Get id of a user, and create it if it doesn't exit."""
     with db.open_session() as session:
         try:
-            user_key = db.get_userkey(session, username)
+            user_id = db.get_user_id(session, username)
         except Exception:
             # Create user if it doesn't exist
             prompt = "Creating {} user - give password: ".format(username)
             passwd = getpass.getpass(prompt=prompt)
             db.add_user(session, username, passwd, description)
             session.commit()
-            user_key = db.get_userkey(session, username)
-    return user_key
+            user_id = db.get_user_id(session, username)
+    return user_id
 
 
 def get_coords(fov, overlap, centre, area):
@@ -98,13 +98,13 @@ def run(fov, overlap, centre, area, name):
 
     # Add to the database
     mpointings = []
-    user_key = get_userkey('goto', 'GOTO Survey')
+    user_id = get_user_id('goto', 'GOTO Survey')
     with db.open_session() as session:
         # create Mpointings
         print('Creating mpointings...')
         start = time.time()
         for ra, dec, tile_num in zip(ras, decs, names):
-            mp = db.Mpointing(userKey=user_key,
+            mp = db.Mpointing(user_id=user_id,
                               objectName='{}_survey_T{}'.format(name, tile_num),
                               ra=float(ra),
                               dec=float(dec),

@@ -141,10 +141,10 @@ def parse_dec(dec_str):
     return dec_deg
 
 
-def get_userkey(session, username):
-    """Get the userkey for the given username, and create it if it doesn't already exist."""
+def get_user_id(session, username):
+    """Get the user_id for the given username, and create it if it doesn't already exist."""
     try:
-        user_key = db.get_userkey(session, username)
+        user_id = db.get_user_id(session, username)
         print('    Attributing pointings to user "{}"'.format(username))
     except Exception:
         # Create user if it doesn't exist
@@ -154,14 +154,13 @@ def get_userkey(session, username):
         passwd = getpass.getpass(prompt=prompt)
         db.add_user(session, username, passwd, description)
         session.commit()
-        user_key = db.get_userkey(session, username)
+        user_id = db.get_user_id(session, username)
 
-    return user_key
+    return user_id
 
 
 def fill_mpointing(mpointing):
     """Fill out an mpointing frame with user input."""
-
     # On or off grid?
     ongrid = None
     while ongrid not in ['y', 'n', 'Y', 'N']:
@@ -226,13 +225,13 @@ def fill_mpointing(mpointing):
         mpointing['objectName'] = db_survey.name + '_' + db_tile.name + '_' + 'EXTRA'
         mpointing['ra'] = db_tile.ra
         mpointing['dec'] = db_tile.dec
-        mpointing['surveyID'] = db_survey.surveyID
-        mpointing['surveyTileID'] = db_tile.tileID
+        mpointing['survey_id'] = db_survey.db_id
+        mpointing['survey_tile_id'] = db_tile.db_id
 
     else:
         # We're off grid
-        mpointing['surveyID'] = None
-        mpointing['surveyTileID'] = None
+        mpointing['survey_id'] = None
+        mpointing['survey_tile_id'] = None
 
         # Object name
         while mpointing['objectName'] is None:
@@ -391,7 +390,7 @@ def fill_exposure_set(exposure_set):
 
 if __name__ == '__main__':
 
-    default_mpointing = {'userKey': None,
+    default_mpointing = {'user_id': None,
                          'objectName': None,
                          'ra': None,
                          'dec': None,
@@ -424,7 +423,7 @@ if __name__ == '__main__':
     with db.open_session() as session:
         print("** Insert pointing into GOTO queue database **")
 
-        # Get userKey
+        # Get user_id
         # username = input('Enter your database username: ')
         # if username is None:
         #     username = 'goto'
@@ -433,7 +432,7 @@ if __name__ == '__main__':
 
         # Fill Mpointing infomation
         mpointing = default_mpointing.copy()
-        mpointing['userKey'] = get_userkey(session, username)
+        mpointing['user_id'] = get_user_id(session, username)
         mpointing = fill_mpointing(mpointing)
 
         # Fill Exposure Set infomation

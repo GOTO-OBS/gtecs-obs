@@ -13,7 +13,7 @@ from .engine import open_session
 from .models import ExposureSet, Mpointing, Pointing, Survey, SurveyTile, User
 
 
-__all__ = ['add_user', 'get_userkey', 'get_username', 'validate_user',
+__all__ = ['add_user', 'get_user_id', 'get_username', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
@@ -45,10 +45,10 @@ def add_user(session, username, password, fullname):
     session.add(new_user)
 
 
-def get_userkey(session, username):
-    """Return the userkey for a given username.
+def get_user_id(session, username):
+    """Return the user_id for a given username.
 
-    The userkey must be supplied as an argument to create a
+    The user_id must be supplied as an argument to create a
     Pointing.
 
     Parameters
@@ -60,7 +60,7 @@ def get_userkey(session, username):
 
     Returns
     --------
-    userkey : int
+    user_id : int
         id of user in database
 
     Raises
@@ -73,17 +73,17 @@ def get_userkey(session, username):
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
-    return user.userKey
+    return user.db_id
 
 
-def get_username(session, userkey):
-    """Return the username for a given userkey.
+def get_username(session, user_id):
+    """Return the username for a given user_id.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session`
-    userkey : int
+    user_id : int
         id of user in database.
 
     Returns
@@ -97,7 +97,7 @@ def get_username(session, userkey):
 
     """
     query = session.query(User)
-    query = query.filter(User.userKey == userkey)
+    query = query.filter(User.db_id == user_id)
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
@@ -335,7 +335,7 @@ def get_pointings(session, pointing_ids=None, status=None):
     """
     query = session.query(Pointing)
     if pointing_ids is not None:
-        query = query.filter(Pointing.pointingID.in_(list(pointing_ids)))
+        query = query.filter(Pointing.db_id.in_(list(pointing_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
@@ -365,7 +365,7 @@ def get_pointing_by_id(session, pointing_id):
 
     """
     query = session.query(Pointing)
-    query = query.filter(Pointing.pointingID == pointing_id)
+    query = query.filter(Pointing.db_id == pointing_id)
     pointing = query.one_or_none()
     if not pointing:
         raise ValueError('No matching Pointing found')
@@ -392,7 +392,7 @@ def get_mpointings(session, mpointing_ids=None, status=None):
     """
     query = session.query(Mpointing)
     if mpointing_ids is not None:
-        query = query.filter(Mpointing.mpointingID.in_(list(mpointing_ids)))
+        query = query.filter(Mpointing.db_id.in_(list(mpointing_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
@@ -422,7 +422,7 @@ def get_mpointing_by_id(session, mpointing_id):
 
     """
     query = session.query(Mpointing)
-    query = query.filter(Mpointing.mpointingID == mpointing_id)
+    query = query.filter(Mpointing.db_id == mpointing_id)
     mpointing = query.one_or_none()
     if not mpointing:
         raise ValueError('No matching Mpointing found')
@@ -450,7 +450,7 @@ def get_exposure_set_by_id(session, expset_id):
 
     """
     query = session.query(ExposureSet)
-    query = query.filter(ExposureSet.expID == expset_id)
+    query = query.filter(ExposureSet.db_id == expset_id)
     exposure_set = query.one_or_none()
     if not exposure_set:
         raise ValueError('No matching ExposureSet found')
@@ -510,7 +510,7 @@ def get_expired_pointing_ids(session, time=None):
     else:
         now = time.iso
 
-    query = session.query(Pointing.pointingID)
+    query = session.query(Pointing.db_id)
     query = query.filter(Pointing.status == 'pending',
                          Pointing.stopUTC < now)
 
@@ -540,7 +540,7 @@ def get_expired_mpointing_ids(session, time=None):
     else:
         now = time.iso
 
-    query = session.query(Mpointing.mpointingID)
+    query = session.query(Mpointing.db_id)
     query = query.filter(Mpointing.status == 'unscheduled',
                          Mpointing.stopUTC < now)
 
@@ -611,7 +611,7 @@ def bulk_update_pointing_status(session, pointing_ids, status):
         status to set pointings to
 
     """
-    mappings = [dict(pointingID=pointing_id, status=status) for pointing_id in pointing_ids]
+    mappings = [dict(db_id=pointing_id, status=status) for pointing_id in pointing_ids]
     session.bulk_update_mappings(Pointing, mappings)
 
 
@@ -638,7 +638,7 @@ def bulk_update_mpointing_status(session, mpointing_ids, status):
         status to set mpointings to
 
     """
-    mappings = [dict(mpointingID=mpointing_id, status=status) for mpointing_id in mpointing_ids]
+    mappings = [dict(db_id=mpointing_id, status=status) for mpointing_id in mpointing_ids]
     session.bulk_update_mappings(Mpointing, mappings)
 
 

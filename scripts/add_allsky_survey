@@ -33,19 +33,19 @@ EXP_SETTINGS = dict(expTime=120,
                     utMask=None)
 
 
-def get_userkey(username, description=''):
-    """Get user key of a user, and create it if it doesn't exit."""
+def get_user_id(username, description=''):
+    """Get id of a user, and create it if it doesn't exit."""
     with db.open_session() as session:
         try:
-            user_key = db.get_userkey(session, username)
+            user_id = db.get_user_id(session, username)
         except Exception:
             # Create user if it doesn't exist
             prompt = "Creating {} user - give password: ".format(username)
             passwd = getpass.getpass(prompt=prompt)
             db.add_user(session, username, passwd, description)
             session.commit()
-            user_key = db.get_userkey(session, username)
-    return user_key
+            user_id = db.get_user_id(session, username)
+    return user_id
 
 
 def run(fov, overlap):
@@ -56,7 +56,7 @@ def run(fov, overlap):
     tile_names = grid.tilenames
 
     # Add to the database
-    user_key = get_userkey('goto', 'GOTO Survey')
+    user_id = get_user_id('goto', 'GOTO Survey')
     with db.open_session() as session:
         # create a Survey
         survey = db.Survey(name=grid.name)
@@ -86,12 +86,12 @@ def run(fov, overlap):
         print('Creating mpointings...')
         start = time.time()
         for tile in tiles:
-            mp = db.Mpointing(userKey=user_key,
+            mp = db.Mpointing(user_id=user_id,
                               objectName=tile.name,
                               **SURVEY_SETTINGS)
             mp.objectName = survey.name + '_' + tile.name
-            mp.surveyID = survey.surveyID
-            mp.surveyTileID = tile.tileID
+            mp.survey = survey
+            mp.survey_tile = tile
             mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
             mpointings.append(mp)
         print('  took {:.2f} secs'.format(time.time() - start))

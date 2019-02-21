@@ -25,7 +25,7 @@ with db.open_session() as session:
     db.add_user(session, 'goto', 'password', "GOTO Test Observer")
 
     # create an event
-    e = db.Event(ivo='ivo://gotoTest', name='gotoVar3', source='made-up')
+    e = db.Event(ivorn='ivo://gotoTest', name='gotoVar3', source='made-up')
 
     # and an event tile
     et = db.EventTile(ra=100, dec=20, probability=0.1)

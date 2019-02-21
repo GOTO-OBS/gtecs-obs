@@ -55,7 +55,7 @@ def add_to_database(pointings, event_time, event_name, survey_name, filename):
         # Create Event
         event = db.Event(name=event_name,
                          source='GW skymap',
-                         ivo=str(event_time),  # no official IVON yet
+                         ivorn=str(event_time),  # no official IVORN yet
                          skymap=filename)
         session.add(event)
 

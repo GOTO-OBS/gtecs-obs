@@ -1195,8 +1195,8 @@ class Event(Base):
 
     Args
     ----
-        ivo : string
-            ivorn for the event
+        ivorn : string
+            IVORN (International Virtual Observatory Resource Name) for the event
         name : string
             a human-readable identifier for the event
         source : string
@@ -1221,7 +1221,7 @@ class Event(Base):
 
     Examples
     --------
-        >>> e = Event(ivo='ivo://pt5mTest', name='pt5mVar3', source='pt5m')
+        >>> e = Event(ivorn='ivo://pt5mTest', name='pt5mVar3', source='pt5m')
 
     """
 
@@ -1234,15 +1234,15 @@ class Event(Base):
     # Columns
     name = Column(String)
     source = Column(String)
-    ivo = Column('ivorn', String, unique=True)  # TODO
+    ivorn = Column(String, unique=True)
     skymap = Column(String)
 
     # Foreign relationships
     event_tiles = relationship('EventTile', back_populates='event')
 
     def __repr__(self):
-        return "Event(db_id={}, name={}, source={}, ivo={}, skymap={})".format(
-            self.db_id, self.name, self.source, self.ivo, self.skymap
+        return "Event(db_id={}, name={}, source={}, ivorn={}, skymap={})".format(
+            self.db_id, self.name, self.source, self.ivorn, self.skymap
         )
 
 
@@ -1298,7 +1298,7 @@ class EventTile(Base):
 
         make a LIGO event to associate our tile with
 
-        >>> e = Event(ivo='ivo://GW150914', name='GW150914', source='LVC')
+        >>> e = Event(ivorn='ivo://GW150914', name='GW150914', source='LVC')
         >>> session = load_session()
         >>> session.add(e)  # add event
         >>> session.commit()  # commit changes (otherwise DB not changed)

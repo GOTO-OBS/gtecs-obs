@@ -60,8 +60,8 @@ def read_tile_file(filename):
 
 def save_to_dbase(session, tile_list, event_time, event_name):
     """Save tiles to the database."""
-    ivo = str(event_time)
-    event = db.Event(ivo=ivo, name=event_name, source='skymap')
+    ivorn = str(event_time)
+    event = db.Event(ivorn=ivorn, name=event_name, source='skymap')
     session.add(event)
 
     for tile in tile_list:

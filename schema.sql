@@ -110,8 +110,8 @@ CREATE TABLE `mpointings` (
   `object` TEXT NOT NULL,
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
   `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
-  `rank` INT NOT NULL,
-  `base_rank` INT NOT NULL,
+  `current_rank` INT NOT NULL,
+  `initial_rank` INT NOT NULL,
   `num_todo` INT NOT NULL,
   `num_completed` INT NOT NULL DEFAULT 0,
   `infinite` BOOLEAN NOT NULL DEFAULT FALSE,
@@ -216,8 +216,8 @@ CREATE TABLE `survey_tiles` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- column
-  `weight` FLOAT NOT NULL COMMENT '0-1',
-  `base_weight` FLOAT NOT NULL COMMENT '0-1',
+  `current_weight` FLOAT NOT NULL COMMENT '0-1',
+  `initial_weight` FLOAT NOT NULL COMMENT '0-1',
   -- indexes
   -- foreign keys
   `survey_id` INT NOT NULL,
@@ -304,9 +304,9 @@ CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_INSERT`
       SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles` WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
       SET NEW.`decl` = (SELECT `decl` FROM `grid_tiles` WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
     END IF;
-    -- Set base_rank from rank
-    IF ((NEW.`base_rank` is NULL) and (NEW.`rank` is not NULL)) THEN
-      SET NEW.`base_rank` = NEW.`rank`;
+    -- Set current_rank from initial_rank
+    IF ((NEW.`current_rank` is NULL) and (NEW.`initial_rank` is not NULL)) THEN
+      SET NEW.`current_rank` = NEW.`initial_rank`;
     END IF;
   END$$
 
@@ -385,11 +385,11 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_UPDATE`
       IF NEW.`status` = 'completed' THEN
         -- Increase the Mpointing's completed count
         UPDATE `mpointings` SET `num_completed` = `num_completed` + 1 WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
-        -- Add 10 to the rank
+        -- Add 10 to the current_rank
         -- NB only if the Mpointing is not infinite
         SELECT `infinite` INTO isinfinite FROM `mpointings` WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
         IF isinfinite = 0 THEN
-          UPDATE `mpointings` SET `rank` = `rank` + 10 WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
+          UPDATE `mpointings` SET `current_rank` = `current_rank` + 10 WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
         END IF;
       END IF;
     END IF;
@@ -401,9 +401,9 @@ DROP TRIGGER IF EXISTS `survey_tiles_BEFORE_INSERT` $$
 CREATE DEFINER = CURRENT_USER TRIGGER `survey_tiles_BEFORE_INSERT`
   BEFORE INSERT ON `survey_tiles` FOR EACH ROW
   BEGIN
-    -- Set base_weight from weight
-    IF ((NEW.`base_weight` is NULL) and (NEW.`weight` is not NULL)) THEN
-      SET NEW.`base_weight` = NEW.`weight`;
+    -- Set current_weight from initial_weight
+    IF ((NEW.`current_weight` is NULL) and (NEW.`initial_weight` is not NULL)) THEN
+      SET NEW.`current_weight` = NEW.`initial_weight`;
     END IF;
   END$$
 

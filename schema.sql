@@ -63,17 +63,15 @@ CREATE TABLE `pointings` (
   `user_id` INT NOT NULL,
   `mpointing_id` INT NULL,
   `time_block_id` INT NULL,
-  `survey_id` INT NULL,
+  `grid_tile_id` INT NULL,
   `survey_tile_id` INT NULL,
   `event_id` INT NULL,
-  `event_tile_id` INT NULL,
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
   FOREIGN KEY (`mpointing_id`) REFERENCES `mpointings` (`id`),
   FOREIGN KEY (`time_block_id`) REFERENCES `time_blocks` (`id`),
-  FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`),
+  FOREIGN KEY (`grid_tile_id`) REFERENCES `event_tiles` (`id`),
   FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`),
-  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`),
-  FOREIGN KEY (`event_tile_id`) REFERENCES `event_tiles` (`id`)
+  FOREIGN KEY (`event_id`) REFERENCES `surveys` (`id`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -113,7 +111,7 @@ CREATE TABLE `mpointings` (
   `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
   `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
   `rank` INT NOT NULL,
-  `start_rank` INT NOT NULL,
+  `base_rank` INT NOT NULL,
   `num_todo` INT NOT NULL,
   `num_completed` INT NOT NULL DEFAULT 0,
   `infinite` BOOLEAN NOT NULL DEFAULT FALSE,
@@ -131,15 +129,13 @@ CREATE TABLE `mpointings` (
   INDEX `stop_time_idx` (`stop_time`),
   -- foreign keys
   `user_id` INT NOT NULL,
-  `survey_id` INT NULL,
+  `grid_tile_id` INT NULL,
   `survey_tile_id` INT NULL,
   `event_id` INT NULL,
-  `event_tile_id` INT NULL,
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
-  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`),
-  FOREIGN KEY (`event_tile_id`) REFERENCES `event_tiles` (`id`),
+  FOREIGN KEY (`grid_tile_id`) REFERENCES `event_tiles` (`id`),
   FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`),
-  FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`)
+  FOREIGN KEY (`event_id`) REFERENCES `surveys` (`id`)
   )
   ENGINE = InnoDB;
 
@@ -162,37 +158,38 @@ CREATE TABLE `time_blocks` (
   )
   ENGINE = InnoDB;
 
--- Events table
-DROP TABLE IF EXISTS `events` ;
-CREATE TABLE `events` (
+-- Grids table
+DROP TABLE IF EXISTS `grids` ;
+CREATE TABLE `grids` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
-  `name` VARCHAR(255) NOT NULL,
-  `source` VARCHAR(255) NOT NULL COMMENT 'LIGO, SWIFT etc.',
-  `ivorn` VARCHAR(255) NOT NULL UNIQUE,
-  `skymap` VARCHAR(255) NULL
+  `name` VARCHAR(255) NOT NULL UNIQUE,
+  `ra_fov` FLOAT NOT NULL COMMENT 'decimal degrees',
+  `dec_fov` FLOAT NOT NULL COMMENT 'decimal degrees',
+  `ra_overlap` FLOAT NOT NULL COMMENT 'fraction (0-1)',
+  `dec_overlap` FLOAT NOT NULL COMMENT 'fraction (0-1)',
+  `algorithm` VARCHAR(255) NOT NULL,
   -- indexes
+  INDEX `name_idx` (`name`)
   -- foreign keys
   )
   ENGINE = InnoDB;
 
--- Event tiles table
-DROP TABLE IF EXISTS `event_tiles` ;
-CREATE TABLE`event_tiles` (
+-- Grid tiles table
+DROP TABLE IF EXISTS `grid_tiles` ;
+CREATE TABLE `grid_tiles` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
-  `ra` FLOAT NOT NULL,
-  `decl` FLOAT NOT NULL,
-  `probability` FLOAT NOT NULL,
-  `unobserved_probability` FLOAT NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
+  `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
   -- indexes
+  INDEX `name_idx` (`name`),
   -- foreign keys
-  `event_id` INT NOT NULL,
-  `survey_tile_id` INT NULL,
-  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`),
-  FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`)
+  `grid_id` INT NOT NULL,
+  FOREIGN KEY (`grid_id`) REFERENCES `grids` (`id`)
   )
   ENGINE = InnoDB;
 
@@ -202,9 +199,14 @@ CREATE TABLE `surveys` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
-  `name` VARCHAR(255) NOT NULL
+  `name` VARCHAR(255) NOT NULL,
   -- indexes
+  INDEX `name_idx` (`name`),
   -- foreign keys
+  `grid_id` INT NOT NULL,
+  `event_id` INT NULL,
+  FOREIGN KEY (`grid_id`) REFERENCES `grids` (`id`),
+  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`)
   )
   ENGINE = InnoDB;
 
@@ -213,11 +215,33 @@ DROP TABLE IF EXISTS `survey_tiles` ;
 CREATE TABLE `survey_tiles` (
   -- primary key
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  -- column
+  `weight` FLOAT NOT NULL COMMENT '0-1',
+  `base_weight` FLOAT NOT NULL COMMENT '0-1',
+  -- indexes
+  -- foreign keys
+  `survey_id` INT NOT NULL,
+  `grid_tile_id` INT NOT NULL,
+  FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`),
+  FOREIGN KEY (`grid_tile_id`) REFERENCES `grid_tiles` (`id`)
+  )
+  ENGINE = InnoDB;
+
+-- Events table
+DROP TABLE IF EXISTS `events` ;
+CREATE TABLE `events` (
+  -- primary key
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   -- columns
   `name` VARCHAR(255) NOT NULL,
-  `ra` FLOAT NOT NULL COMMENT 'decimal degrees',
-  `decl` FLOAT NOT NULL COMMENT 'decimal degrees',
+  `ivorn` VARCHAR(255) NOT NULL UNIQUE,
+  `source` VARCHAR(255) NOT NULL COMMENT 'eg LVC, Swift',
+  `type` VARCHAR(255) NOT NULL COMMENT 'eg GW, GRB',
+  `time` DATETIME NULL COMMENT 'Event time',
+  `skymap` VARCHAR(255) NULL COMMENT 'Local path to skymap file',
   -- indexes
+  INDEX `name_idx` (`name`),
+  INDEX `type_idx` (`type`),
   -- foreign keys
   `survey_id` INT NOT NULL,
   FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`)
@@ -271,34 +295,20 @@ SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
 -- Create triggers
 DELIMITER $$
 
--- Event tiles triggers
--- Before insert
-DROP TRIGGER IF EXISTS `event_tiles_BEFORE_INSERT` $$
-CREATE DEFINER = CURRENT_USER TRIGGER `event_tiles_BEFORE_INSERT`
-  BEFORE INSERT ON `event_tiles` FOR EACH ROW
-  BEGIN
-    -- Select RA and Dec from linked survey tile if not given
-    IF ((NEW.survey_tile_id is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
-      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
-      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
-    END IF;
-    -- Set unobserved_probability from probability
-    IF ((NEW.unobserved_probability is NULL) and (NEW.probability is not NULL)) THEN
-      SET NEW.unobserved_probability = NEW.probability;
-    END IF;
-  END$$
-
-
 -- Mpointings triggers
 -- Before insert
 DROP TRIGGER IF EXISTS `mpointings_BEFORE_INSERT` $$
 CREATE DEFINER = CURRENT_USER TRIGGER `mpointings_BEFORE_INSERT`
   BEFORE INSERT ON `mpointings` FOR EACH ROW
   BEGIN
-    -- Select RA and Dec from linked survey tile if not given
-    IF ((NEW.survey_tile_id is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
-      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
-      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
+    -- Select RA and Dec from linked grid tile if not given
+    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`decl` is NULL)) THEN
+      SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles` WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
+      SET NEW.`decl` = (SELECT `decl` FROM `grid_tiles` WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
+    END IF;
+    -- Set base_rank from rank
+    IF ((NEW.`base_rank` is NULL) and (NEW.`rank` is not NULL)) THEN
+      SET NEW.`base_rank` = NEW.`rank`;
     END IF;
   END$$
 
@@ -321,10 +331,10 @@ DROP TRIGGER IF EXISTS `pointings_BEFORE_INSERT` $$
 CREATE DEFINER = CURRENT_USER TRIGGER `pointings_BEFORE_INSERT`
   BEFORE INSERT ON `pointings` FOR EACH ROW
   BEGIN
-    -- Select RA and Dec from linked survey tile if not given
-    IF ((NEW.survey_tile_id is not NULL) and (NEW.ra is NULL) and (NEW.decl is NULL)) THEN
-      SET NEW.ra = (SELECT ra FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
-      SET NEW.decl = (SELECT decl FROM `survey_tiles` WHERE NEW.survey_tile_id = `survey_tiles`.`id`);
+    -- Select RA and Dec from linked grid tile if not given
+    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`decl` is NULL)) THEN
+      SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles` WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
+      SET NEW.`decl` = (SELECT `decl` FROM `grid_tiles` WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
     END IF;
   END$$
 
@@ -384,6 +394,18 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_UPDATE`
           UPDATE `mpointings` SET `rank` = `rank` + 10 WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
         END IF;
       END IF;
+    END IF;
+  END$$
+
+-- Survey tiles triggers
+-- Before insert
+DROP TRIGGER IF EXISTS `survey_tiles_BEFORE_INSERT` $$
+CREATE DEFINER = CURRENT_USER TRIGGER `survey_tiles_BEFORE_INSERT`
+  BEFORE INSERT ON `survey_tiles` FOR EACH ROW
+  BEGIN
+    -- Set base_weight from weight
+    IF ((NEW.`base_weight` is NULL) and (NEW.`weight` is not NULL)) THEN
+      SET NEW.`base_weight` = NEW.`weight`;
     END IF;
   END$$
 

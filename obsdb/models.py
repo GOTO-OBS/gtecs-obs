@@ -91,9 +91,9 @@ class User(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    username = Column('username', String)
-    password = Column('password', String)
-    full_name = Column('full_name', String)
+    username = Column(String)
+    password = Column(String)
+    full_name = Column(String)
 
     def __repr__(self):
         return "User(db_id={}, username={}, full_name={})".format(
@@ -249,30 +249,30 @@ class Pointing(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    status = Column('status', pointing_status_list, default='pending')
-    object_name = Column('object', String)
-    ra = Column('ra', Float)
-    dec = Column('decl', Float)
-    rank = Column('rank', Integer)
-    min_alt = Column('min_alt', Float)
-    max_sunalt = Column('max_sunalt', Float, default=-15)
-    min_time = Column('min_time', Float)
-    max_moon = Column('max_moon', String(1))
-    min_moonsep = Column('min_moonsep', Float, default=30)
-    too = Column('too', Integer)
-    start_time = Column('start_time', DateTime)
-    stop_time = Column('stop_time', DateTime)
-    started_time = Column('started_time', DateTime, default=None)
-    stopped_time = Column('stopped_time', DateTime, default=None)
+    status = Column(pointing_status_list, default='pending')
+    object_name = Column('object', String)  # object is a built in class in Python
+    ra = Column(Float)
+    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
+    rank = Column(Integer)
+    min_alt = Column(Float)
+    max_sunalt = Column(Float, default=-15)
+    min_time = Column(Float)
+    max_moon = Column(String(1))
+    min_moonsep = Column(Float, default=30)
+    too = Column(Integer)
+    start_time = Column(DateTime)
+    stop_time = Column(DateTime)
+    started_time = Column(DateTime, default=None)
+    stopped_time = Column(DateTime, default=None)
 
     # Foreign keys
-    user_id = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
-    mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
-    time_block_id = Column('time_block_id', Integer, ForeignKey('time_blocks.id'), nullable=True)
-    event_id = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
-    event_tile_id = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
-    survey_id = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
-    survey_tile_id = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=True)
+    time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=True)
+    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
+    event_tile_id = Column(Integer, ForeignKey('event_tiles.id'), nullable=True)
+    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True)
+    survey_tile_id = Column(Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     user = relationship('User', backref='pointings', uselist=False)
@@ -390,18 +390,18 @@ class ExposureSet(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    num_exp = Column('num_exp', Integer)
-    exptime = Column('exptime', Float)
-    filt = Column('filter', String(2))
-    binning = Column('binning', Integer)
-    imgtype = Column('imgtype', Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'))
-    ut_mask = Column('ut_mask', Integer, nullable=True)
-    ra_offset = Column('ra_offset', Float, server_default='0.0')
-    dec_offset = Column('dec_offset', Float, server_default='0.0')
+    num_exp = Column(Integer)
+    exptime = Column(Float)
+    filt = Column('filter', String(2))  # filter is a built in function in Python
+    binning = Column(Integer)
+    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'))
+    ut_mask = Column(Integer, nullable=True)
+    ra_offset = Column(Float, server_default='0.0')
+    dec_offset = Column(Float, server_default='0.0')
 
     # Foreign keys
-    pointing_id = Column('pointing_id', Integer, ForeignKey('pointings.id'), nullable=False)
-    mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
+    pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=False)
+    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
     pointing = relationship('Pointing', backref='exposure_sets', uselist=False)
@@ -748,30 +748,30 @@ class Mpointing(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    status = Column('status', mpointing_status_list, default='unscheduled')
-    object_name = Column('object', String)
-    ra = Column('ra', Float)
-    dec = Column('decl', Float)
-    rank = Column('rank', Integer)
-    start_rank = Column('start_rank', Integer)
-    num_todo = Column('num_todo', Integer)
-    num_completed = Column('num_completed', Integer)
-    infinite = Column('infinite', Integer, default=False)
-    min_alt = Column('min_alt', Float)
-    max_sunalt = Column('max_sunalt', Float)
-    min_time = Column('min_time', Float)
-    max_moon = Column('max_moon', String(1))
-    min_moonsep = Column('min_moonsep', Float)
-    too = Column('too', Integer)
-    start_time = Column('start_time', DateTime)
-    stop_time = Column('stop_time', DateTime)
+    status = Column(mpointing_status_list, default='unscheduled')
+    object_name = Column('object', String)  # object is a built in class in Python
+    ra = Column(Float)
+    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
+    rank = Column(Integer)
+    start_rank = Column(Integer)
+    num_todo = Column(Integer)
+    num_completed = Column(Integer)
+    infinite = Column(Integer, default=False)
+    min_alt = Column(Float)
+    max_sunalt = Column(Float)
+    min_time = Column(Float)
+    max_moon = Column(String(1))
+    min_moonsep = Column(Float)
+    too = Column(Integer)
+    start_time = Column(DateTime)
+    stop_time = Column(DateTime)
 
     # Foreign keys
-    user_id = Column('user_id', Integer, ForeignKey('users.id'), nullable=False)
-    event_id = Column('event_id', Integer, ForeignKey('events.id'), nullable=True)
-    event_tile_id = Column('event_tile_id', Integer, ForeignKey('event_tiles.id'), nullable=True)
-    survey_id = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=True)
-    survey_tile_id = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
+    event_tile_id = Column(Integer, ForeignKey('event_tiles.id'), nullable=True)
+    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True)
+    survey_tile_id = Column(Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     user = relationship('User', backref='mpointings', uselist=False)
@@ -1161,13 +1161,13 @@ class TimeBlock(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    block_num = Column('block_num', Integer)
-    valid_time = Column('valid_time', Integer)
-    wait_time = Column('wait_time', Integer)
-    current = Column('current', Integer, default=False)
+    block_num = Column(Integer)
+    valid_time = Column(Integer)
+    wait_time = Column(Integer)
+    current = Column(Integer, default=False)
 
     # Foreign keys
-    mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=False)
+    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
     mpointing = relationship('Mpointing', back_populates='time_blocks', uselist=False)
@@ -1232,10 +1232,10 @@ class Event(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    name = Column('name', String)
-    source = Column('source', String)
-    ivo = Column('ivorn', String, unique=True)
-    skymap = Column('skymap', String)
+    name = Column(String)
+    source = Column(String)
+    ivo = Column('ivorn', String, unique=True)  # TODO
+    skymap = Column(String)
 
     # Foreign relationships
     event_tiles = relationship('EventTile', back_populates='event')
@@ -1366,14 +1366,14 @@ class EventTile(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    ra = Column('ra', Float)
-    dec = Column('decl', Float)
-    probability = Column('probability', Float)
-    unobserved_probability = Column('unobserved_probability', Float)
+    ra = Column(Float)
+    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
+    probability = Column(Float)
+    unobserved_probability = Column(Float)
 
     # Foreign keys
-    event_id = Column('event_id', Integer, ForeignKey('events.id'), nullable=False)
-    survey_tile_id = Column('survey_tile_id', Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    event_id = Column(Integer, ForeignKey('events.id'), nullable=False)
+    survey_tile_id = Column(Integer, ForeignKey('survey_tiles.id'), nullable=True)
 
     # Foreign relationships
     pointings = relationship('Pointing', back_populates='event_tile')
@@ -1435,7 +1435,7 @@ class Survey(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    name = Column('name', String)
+    name = Column(String)
 
     # Foreign relationships
     survey_tiles = relationship('SurveyTile', back_populates='survey')
@@ -1530,12 +1530,12 @@ class SurveyTile(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    name = Column('name', String)
-    ra = Column('ra', Float)
-    dec = Column('decl', Float)
+    name = Column(String)
+    ra = Column(Float)
+    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
 
     # Foreign keys
-    survey_id = Column('survey_id', Integer, ForeignKey('surveys.id'), nullable=False)
+    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=False)
 
     # Foreign relationships
     survey = relationship('Survey', back_populates='survey_tiles', uselist=False)
@@ -1622,19 +1622,19 @@ class ImageLog(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    filename = Column('filename', String)
-    run_number = Column('run_number', Integer)
-    ut = Column('ut', Integer)
-    ut_mask = Column('ut_mask', Integer)
-    start_time = Column('start_time', DateTime)
-    write_time = Column('write_time', DateTime)
-    set_position = Column('set_position', Integer, default=1)
-    set_total = Column('set_total', Integer, default=1)
+    filename = Column(String)
+    run_number = Column(Integer)
+    ut = Column(Integer)
+    ut_mask = Column(Integer)
+    start_time = Column(DateTime)
+    write_time = Column(DateTime)
+    set_position = Column(Integer, default=1)
+    set_total = Column(Integer, default=1)
 
     # Foreign keys
-    exposure_set_id = Column('exposure_set_id', Integer, ForeignKey('exposure_sets.id'), nullable=True)
-    pointing_id = Column('pointing_id', Integer, ForeignKey('pointings.id'), nullable=True)
-    mpointing_id = Column('mpointing_id', Integer, ForeignKey('mpointings.id'), nullable=True)
+    exposure_set_id = Column(Integer, ForeignKey('exposure_sets.id'), nullable=True)
+    pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=True)
+    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=True)
 
     # Foreign relationships
     exposure_set = relationship('ExposureSet', backref='image_logs', uselist=False)

@@ -241,10 +241,8 @@ CREATE TABLE `events` (
   `skymap` VARCHAR(255) NULL COMMENT 'Local path to skymap file',
   -- indexes
   INDEX `name_idx` (`name`),
-  INDEX `type_idx` (`type`),
+  INDEX `type_idx` (`type`)
   -- foreign keys
-  `survey_id` INT NOT NULL,
-  FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`)
   )
   ENGINE = InnoDB;
 

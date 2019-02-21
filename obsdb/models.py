@@ -11,8 +11,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, validates
 
 
-__all__ = ['User', 'Event', 'EventTile', 'Survey', 'SurveyTile', 'ExposureSet',
-           'Pointing', 'TimeBlock', 'Mpointing', 'ImageLog']
+__all__ = ['User', 'Pointing', 'ExposureSet', 'Mpointing', 'TimeBlock',
+           'Grid', 'GridTile', 'Survey', 'SurveyTile', 'Event', 'ImageLog']
 
 
 Base = declarative_base()
@@ -95,6 +95,10 @@ class User(Base):
     password = Column(String)
     full_name = Column(String)
 
+    # Foreign relationships
+    pointings = relationship('Pointing', back_populates='user', uselist=True)
+    mpointings = relationship('Mpointing', back_populates='user', uselist=True)
+
     def __repr__(self):
         return "User(db_id={}, username={}, full_name={})".format(
             self.db_id, self.username, self.full_name
@@ -122,12 +126,12 @@ class Pointing(Base):
             object name
         ra : float, optional
             J2000 right ascension in decimal degrees
-            if ra is not given and this Pointing is linked to a SurveyTile
-            then the ra will be extracted from the SurveyTile
+            if ra is not given and this Pointing is linked to a GridTile
+            then the ra will be extracted from the GridTile
         dec : float, optional
             J2000 declination in decimal degrees
-            if dec is not given and this Pointing is linked to a SurveyTile
-            then the dec will be extracted from the SurveyTile
+            if dec is not given and this Pointing is linked to a GridTile
+            then the dec will be extracted from the GridTile
         rank : Integer
             rank to use for pointing
         min_alt : float
@@ -151,14 +155,12 @@ class Pointing(Base):
 
         status : string, optional
             status of pointing, default 'pending'
-        event_tile_id : int, optional
-            unique key linking to a `EventTile`
+        grid_tile_id : int, optional
+            unique key linking to a `GridTile`
         survey_tile_id : int, optional
             unique key linking to a `SurveyTile`
         event_id : int, optional
             unique key linking to an `Event`
-        survey_id : int, optional
-            unique key linking to a `Survey`
         mpointing_id : int, optional
             unique key linking to an `Mpointing`
 
@@ -178,14 +180,12 @@ class Pointing(Base):
             some reason) this will give the time it was updated
         exposure_sets : list of `ExposureSet`
             the `ExposureSet` objects associated with this `Pointing`, if any
-        event_tile : `EventTile`
-            the `EventTile` associated with this `Pointing`, if any
+        grid_tile : `GridTile`
+            the `GridTile` associated with this `Pointing`, if any
         survey_tile : `SurveyTile`
             the `SurveyTile` associated with this `Pointing`, if any
         event : `Event`
             the `Event` associated with this `Pointing`, if any
-        survey : `Survey`
-            the `Survey` associated with this `Pointing`, if any
         mpointing : `Mpointing`
             the `Mpointing` associated with this `Pointing`, if any
 
@@ -269,19 +269,18 @@ class Pointing(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=True)
     time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=True)
-    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
-    event_tile_id = Column(Integer, ForeignKey('event_tiles.id'), nullable=True)
-    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True)
+    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True)
     survey_tile_id = Column(Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
-    user = relationship('User', backref='pointings', uselist=False)
-    mpointing = relationship('Mpointing', backref='pointings', uselist=False)
+    user = relationship('User', back_populates='pointings', uselist=False)
+    exposure_sets = relationship('ExposureSet', back_populates='pointing', uselist=True)
+    mpointing = relationship('Mpointing', back_populates='pointings', uselist=False)
     time_block = relationship('TimeBlock', back_populates='pointings', uselist=False)
-    event = relationship('Event', backref='pointings')
-    event_tile = relationship('EventTile', back_populates='pointings', uselist=False)
-    survey = relationship('Survey', backref='pointings')
+    grid_tile = relationship('GridTile', back_populates='pointings', uselist=False)
     survey_tile = relationship('SurveyTile', back_populates='pointings', uselist=False)
+    event = relationship('Event', back_populates='pointings', uselist=False)
 
     def __repr__(self):
         template = ("Pointing(db_id={}, status='{}', " +
@@ -289,13 +288,13 @@ class Pointing(Base):
                     "min_alt={}, max_sunalt={}, min_time={}, max_moon={}, min_moonsep={}, " +
                     "too={}, start_time={}, stop_time={}, started_time={}, stopped_time={}, " +
                     "user_id={}, mpointing_id={}, time_block_id={}, " +
-                    "event_id={}, event_tile_id={}, survey_id={}, survey_tile_id={})")
+                    "grid_tile_id={}, survey_tile_id={}, event_id={})")
         return template.format(
             self.db_id, self.status, self.object_name, self.ra, self.dec, self.rank,
             self.min_alt, self.max_sunalt, self.min_time, self.max_moon, self.min_moonsep,
             bool(self.too), self.start_time, self.stop_time, self.started_time, self.stopped_time,
             self.user_id, self.mpointing_id, self.time_block_id,
-            self.event_id, self.event_tile_id, self.survey_id, self.survey_tile_id
+            self.grid_tile_id, self.survey_tile_id, self.event_id
         )
 
     @validates('start_time', 'stop_time')
@@ -404,8 +403,8 @@ class ExposureSet(Base):
     mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
-    pointing = relationship('Pointing', backref='exposure_sets', uselist=False)
-    mpointing = relationship('Mpointing', backref='exposure_sets', uselist=False)
+    pointing = relationship('Pointing', back_populates='exposure_sets', uselist=False)
+    mpointing = relationship('Mpointing', back_populates='exposure_sets', uselist=False)
 
     def __repr__(self):
         template = ("ExposureSet(db_id={}, ra_offset={}, dec_offset={}, imgtype={}, " +
@@ -439,12 +438,12 @@ class Mpointing(Base):
             object name
         ra : float, optional
             J2000 right ascension in decimal degrees
-            if ra is not given and this Mpointing is linked to a SurveyTile
-            then the ra will be extracted from the SurveyTile
+            if ra is not given and this Mpointing is linked to a GridTile
+            then the ra will be extracted from the GridTile
         dec : float, optional
             J2000 declination in decimal degrees
-            if dec is not given and this Mpointing is linked to a SurveyTile
-            then the dec will be extracted from the SurveyTile
+            if dec is not given and this Mpointing is linked to a GridTile
+            then the dec will be extracted from the GridTile
         start_rank : Integer
             rank to use for first pointing in series
         min_alt : float
@@ -478,14 +477,12 @@ class Mpointing(Base):
             the latest UTC time after which pointings must stop
             if not given the Mpointing will continue creating pointings until
             it is completed
-        event_tile_id : int, optional
-            unique key linking to `EventTile`
+        grid_tile_id : int, optional
+            unique key linking to a `GridTile`
         survey_tile_id : int, optional
-            unique key linking to `SurveyTile`
+            unique key linking to a `SurveyTile`
         event_id : int, optional
-            unique key linking to `Event`
-        survey_id : int, optional
-            unique key linking to `Survey`
+            unique key linking to an `Event`
 
     An Mpointing also has the following properties which are
     populated through database queries, but not needed for
@@ -495,24 +492,26 @@ class Mpointing(Base):
     ----------
         db_id : int
             primary database key
-        rank : int
+        current_rank : int
             rank for next pointing to be scheduled
+        initial_rank : int
+            initial rank set (it will increase as pointings are observed)
         num_completed : int
             number of successfully completed pointings
         num_remaining : int
             number of pointings still to do (same as num_todo - num_completed)
+        pointings : list of `Pointing`
+            the `Pointing` objects associated with this `Mpointing`, if any
         exposure_sets : list of `ExposureSet`
             the `ExposureSet` objects associated with this `Mpointing`, if any
         time_blocks : list of `TimeBlock`
             the `TimeBlock` objects associated with this `Mpointing`, if any
+        grid_tile : `GridTile`
+            the `GridTile` associated with this `Pointing`, if any
         survey_tile : `SurveyTile`
-            the `SurveyTile` associated with this `Mpointing`, if any
-        event_tile : `EventTile`
-            the `EventTile` associated with this `Mpointing`, if any
+            the `SurveyTile` associated with this `Pointing`, if any
         event : `Event`
-            the `Event` associated with this `Mpointing`, if any
-        survey : `Survey`
-            the `Survey` associated with this `Mpointing`, if any
+            the `Event` associated with this `Pointing`, if any
 
     Examples
     --------
@@ -752,8 +751,8 @@ class Mpointing(Base):
     object_name = Column('object', String)  # object is a built in class in Python
     ra = Column(Float)
     dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
-    rank = Column(Integer)
-    start_rank = Column(Integer)
+    current_rank = Column(Integer)
+    initial_rank = Column(Integer)
     num_todo = Column(Integer)
     num_completed = Column(Integer)
     infinite = Column(Integer, default=False)
@@ -768,33 +767,33 @@ class Mpointing(Base):
 
     # Foreign keys
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
-    event_tile_id = Column(Integer, ForeignKey('event_tiles.id'), nullable=True)
-    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True)
+    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True)
     survey_tile_id = Column(Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
-    user = relationship('User', backref='mpointings', uselist=False)
-    event = relationship('Event', backref='mpointings')
-    survey = relationship('Survey', backref='mpointings')
-    event_tile = relationship('EventTile', back_populates='mpointing', uselist=False)
-    survey_tile = relationship('SurveyTile', back_populates='mpointing', uselist=False)
+    user = relationship('User', back_populates='mpointings', uselist=False)
+    pointings = relationship('Pointing', back_populates='mpointing', uselist=True)
+    exposure_sets = relationship('ExposureSet', back_populates='mpointing', uselist=True)
     time_blocks = relationship('TimeBlock', back_populates='mpointing', viewonly=True)
+    grid_tile = relationship('GridTile', back_populates='mpointings', uselist=False)
+    survey_tile = relationship('SurveyTile', back_populates='mpointings', uselist=False)
+    event = relationship('Event', back_populates='mpointings', uselist=False)
 
     def __repr__(self):
         template = ("Mpointing(db_id={}, status='{}', num_todo={}, num_completed={}," +
                     "num_remaining={}, infinite={}, " +
-                    "object_name={}, ra={}, dec={}, rank={}, start_rank={}, " +
+                    "object_name={}, ra={}, dec={}, current_rank={}, initial_rank={}, " +
                     "min_alt={}, max_sunalt={}, min_time={}, max_moon={}, min_moonsep={}, " +
                     "too={}, start_time={}, stop_time={}, " +
-                    "user_id={}, event_id={}, event_tile_id={}, survey_id={}, survey_tile_id={})")
+                    "user_id={}, grid_tile_id={}, survey_tile_id={}, event_id={}})")
         return template.format(
             self.db_id, self.status, self.num_todo, self.num_completed,
             self.num_remaining, bool(self.infinite),
-            self.object_name, self.ra, self.dec, self.rank, self.start_rank,
+            self.object_name, self.ra, self.dec, self.current_rank, self.initial_rank,
             self.min_alt, self.max_sunalt, self.min_time, self.max_moon, self.min_moonsep,
             bool(self.too), self.start_time, self.stop_time,
-            self.user_id, self.event_id, self.event_tile_id, self.survey_id, self.survey_tile_id
+            self.user_id, self.grid_tile_id, self.survey_tile_id, self.event_id
         )
 
     def __init__(self, object_name=None, ra=None, dec=None,
@@ -806,6 +805,8 @@ class Mpointing(Base):
         self.dec = dec
         self.object_name = object_name
         self.start_rank = start_rank
+        self.current_rank = start_rank
+        self.initial_rank = start_rank
         self.max_moon = max_moon
         self.min_moonsep = min_moonsep
         self.min_alt = min_alt
@@ -814,7 +815,6 @@ class Mpointing(Base):
         self.too = too
         self.start_time = start_time if start_time is not None else Time.now()
         self.stop_time = stop_time
-        self.rank = self.start_rank
         self.status = status
         self.infinite = False
         self.num_todo = num_todo
@@ -856,10 +856,10 @@ class Mpointing(Base):
             self.user = kwargs['user']
         if 'user_id' in kwargs:
             self.user_id = kwargs['user_id']
-        if 'survey_id' in kwargs:
-            self.survey_id = kwargs['survey_id']
-        if 'survey' in kwargs:
-            self.survey = kwargs['survey']
+        if 'grid_tile_id' in kwargs:
+            self.grid_tile_id = kwargs['grid_tile_id']
+        if 'grid_tile' in kwargs:
+            self.grid_tile = kwargs['grid_tile']
         if 'survey_tile' in kwargs:
             self.survey_tile = kwargs['survey_tile']
         if 'survey_tile_id' in kwargs:
@@ -868,10 +868,6 @@ class Mpointing(Base):
             self.event = kwargs['event']
         if 'event_id' in kwargs:
             self.event_id = kwargs['event_id']
-        if 'event_tile' in kwargs:
-            self.event_tile = kwargs['event_tile']
-        if 'event_tile_id' in kwargs:
-            self.event_tile_id = kwargs['event_tile_id']
 
     @validates('start_time', 'stop_time')
     def munge_times(self, key, field):
@@ -1071,7 +1067,7 @@ class Mpointing(Base):
         p = Pointing(object_name=self.object_name,
                      ra=self.ra,
                      dec=self.dec,
-                     rank=self.rank,
+                     rank=self.current_rank,
                      min_alt=self.min_alt,
                      max_sunalt=self.max_sunalt,
                      min_time=self.min_time,
@@ -1084,10 +1080,9 @@ class Mpointing(Base):
                      user_id=self.user_id,
                      mpointing_id=self.db_id,
                      time_block=next_block,
-                     event_id=self.event_id,
-                     event_tile_id=self.event_tile_id,
-                     survey_id=self.survey_id,
+                     grid_tile_id=self.grid_tile_id,
                      survey_tile_id=self.survey_tile_id,
+                     event_id=self.event_id,
                      )
         # add the exposures
         p.exposure_sets = self.exposure_sets
@@ -1180,6 +1175,307 @@ class TimeBlock(Base):
                                self.wait_time, bool(self.current), self.mpointing_id)
 
 
+class Grid(Base):
+    """A class to represent a sky grid.
+
+    Like all SQLAlchemy model classes, these objects link to the
+    underlying database. You can create an object, set its attributes
+    without a database session. Accessing some attributes may require
+    an active database session, and some properties (like the db_id)
+    will be None until the Grid is added to the database.
+
+    The constructor must use keyword arguments and the arguments below
+    should be supplied or set before insertion into the database.
+    See Examples for details.
+
+    Args
+    ----
+        name : string
+            a human-readable identifier for the grid
+        ra_fov : float
+            field of view in the RA direction (decimal degrees)
+        dec_fov : float
+            field of view in the Dec direction (decimal degrees)
+        ra_overlap : float
+            overlap in the RA direction (between 0 and 1)
+        dec_overlap : float
+            overlap in the Dec direction (between 0 and 1)
+        algorithm : string
+            the gridding algorithm used to generate the grid
+
+    A Grid also has the following properties which are
+    populated through database queries, but not needed for
+    object creation:
+
+    Attributes
+    ----------
+        db_id : int
+            primary database key
+        grid_tiles : list of `GridTile`
+            a list of any `GridTile`s associated with this Grid
+        surveys : list of `Survey`
+            a list of any `Survey`s associated with this Grid
+
+    Examples
+    --------
+        TODO
+
+    """
+
+    # Set corresponding SQL table name
+    __tablename__ = 'grids'
+
+    # Primary key
+    db_id = Column('id', Integer, primary_key=True)
+
+    # Columns
+    name = Column(String)
+    ra_fov = Column(Float)
+    dec_fov = Column(Float)
+    ra_overlap = Column(Float)
+    dec_overlap = Column(Float)
+    algorithm = Column(String)
+
+    # Foreign relationships
+    grid_tiles = relationship('GridTile', back_populates='grid', uselist=True)
+    surveys = relationship('Survey', back_populates='grid', uselist=True)
+
+    def __repr__(self):
+        template = ("Grid(db_id={}, name={}, ra_fov={}, dec_fov={}, ra_overlap={}, " +
+                    "dec_overlap={}, algorithm={})")
+        return template.format(
+            self.db_id, self.name, self.ra_fov, self.dec_fov, self.ra_overlap, self.dec_overlap,
+            self.algorithm
+        )
+
+
+class GridTile(Base):
+    """A class to represent a tile of a sky grid.
+
+    Like all SQLAlchemy model classes, this object links to the
+    underlying database. You can create an object, and set its attributes
+    without a database session. Accessing some attributes may require
+    an active database session, and some properties (like the db_id)
+    will be None until the User is added to the database.
+
+    The constructor must use keyword arguments and the arguments below
+    should be supplied or set before insertion into the database.
+    See Examples for details.
+
+    Args
+    ----
+        name : str
+            a human-readable identifier for the tile
+        ra : float
+            J2000 right ascension in decimal degrees
+        dec : float
+            J2000 declination in decimal degrees
+        grid_id : int
+            the ID number of the Grid this tile is associated with
+
+    A GridTile also has the following properties which are
+    populated through database queries, but not needed for
+    object creation:
+
+    Attributes
+    ----------
+        db_id : int
+            primary database key
+        grid : `Grid`
+            the `Grid` this GridTile is associated with
+        survey_tiles : list of `SurveyTile`
+            a list of any `SurveyTile`s associated with this GridTile, if any
+        mpointing : `Mpointing`
+            a list of any `Mpointing`s associated with this GridTile, if any
+        pointings : list of `Pointing`
+            a list of any `Pointing`s associated with this GridTile, if any
+
+    Examples
+    --------
+        TODO
+
+    """
+
+    # Set corresponding SQL table name
+    __tablename__ = 'grid_tiles'
+
+    # Primary key
+    db_id = Column('id', Integer, primary_key=True)
+
+    # Columns
+    name = Column(String)
+    ra = Column(Float)
+    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
+
+    # Foreign keys
+    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
+
+    # Foreign relationships
+    grid = relationship('Grid', back_populates='grid_tiles', uselist=False)
+    survey_tiles = relationship('SurveyTile', back_populates='grid_tile', uselist=True)
+    mpointings = relationship('Mpointing', back_populates='grid_tile', uselist=True)
+    pointings = relationship('Pointing', back_populates='grid_tile', uselist=True)
+
+    def __repr__(self):
+        template = "GridTile(db_id={}, name={}, ra={}, dec={}, grid_id={})"
+        return template.format(
+            self.db_id, self.name, self.ra, self.dec, self.grid_id)
+
+
+class Survey(Base):
+    """A class to represent a survey, a group of tiles on a specific grid.
+
+    Like all SQLAlchemy model classes, these objects link to the
+    underlying database. You can create an object, set its attributes
+    without a database session. Accessing some attributes may require
+    an active database session, and some properties (like the db_id)
+    will be None until the Event is added to the database.
+
+    The constructor must use keyword arguments and the arguments below
+    should be supplied or set before insertion into the database.
+    See Examples for details.
+
+    Args
+    ----
+        name : string
+            a human-readable identifier for the survey
+        grid_id : int
+            the ID number of the Grid this tile is associated with
+            a human-readable identifier for the survey
+
+        event_id : int, optional
+            the ID number of the Event this tile is associated with, if any
+
+    A Survey also has the following properties which are
+    populated through database queries, but not needed for
+    object creation:
+
+    Attributes
+    ----------
+        db_id : int
+            primary database key
+        survey_tiles : list of `SurveyTile`
+            a list of any `SurveyTile`s associated with this Survey
+        grid : `Grid`
+            the `Grid` this Survey is associated with
+        event : `Event`
+            the `Event` this Survey is associated with
+
+    Examples
+    --------
+        TODO
+
+    """
+
+    # Set corresponding SQL table name
+    __tablename__ = 'surveys'
+
+    # Primary key
+    db_id = Column('id', Integer, primary_key=True)
+
+    # Columns
+    name = Column(String)
+
+    # Foreign keys
+    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
+    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
+
+    # Foreign relationships
+    survey_tiles = relationship('SurveyTile', back_populates='survey')
+    grid = relationship('Grid', back_populates='surveys', uselist=False)
+    event = relationship('Event', back_populates='surveys', uselist=False)
+
+    def __repr__(self):
+        template = "Survey(db_id={}, name={}, grid_id={}, event_id={}"
+        return template.format(
+            self.db_id, self.name, self.grid_id, self.event_id
+        )
+
+
+class SurveyTile(Base):
+    """A class to represent a tile of a survey, to add a weighting to the base grid tile.
+
+    Like all SQLAlchemy model classes, this object links to the
+    underlying database. You can create an object, and set its attributes
+    without a database session. Accessing some attributes may require
+    an active database session, and some properties (like the db_id)
+    will be None until the User is added to the database.
+
+    The constructor must use keyword arguments and the arguments below
+    should be supplied or set before insertion into the database.
+    See Examples for details.
+
+    Args
+    ----
+        weight : float
+            initial weighting for this tile (between 0 and 1)
+        survey_id : int
+            the ID number of the Survey this tile is associated with
+        grid_tile_id : int
+            the ID number of the GridTile this SurveyTile is associated with
+
+    A SurveyTile also has the following properties which are
+    populated through database queries, but not needed for
+    object creation:
+
+    Attributes
+    ----------
+        db_id : int
+            primary database key
+        current_weight : float
+            the current weighting of this tile
+        initial_weight : float
+            the initial weighting of this tile (it be modified as neighbours are observed)
+        survey : `Survey`
+            the `Survey` this SurveyTile is associated with
+        grid_tile : `GridTile`
+            the `GridTile` this SurveyTile is associated with
+        mpointings : list of `Mpointing`
+            a list of `Mointing`s associated with this tile, if any
+        pointings : list of `Pointing`
+            a list of `Pointing`s associated with this tile, if any
+
+    Examples
+    --------
+        TODO
+
+    """
+
+    # Set corresponding SQL table name
+    __tablename__ = 'survey_tiles'
+
+    # Primary key
+    db_id = Column('id', Integer, primary_key=True)
+
+    # Columns
+    current_weight = Column(Float)
+    initial_weight = Column(Float)
+
+    # Foreign keys
+    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=False)
+    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=False)
+
+    # Foreign relationships
+    survey = relationship('Survey', back_populates='survey_tiles', uselist=False)
+    grid_tile = relationship('GridTile', back_populates='survey_tiles', uselist=False)
+    pointings = relationship('Pointing', back_populates='survey_tile', uselist=True)
+    mpointings = relationship('Mpointing', back_populates='survey_tile', uselist=True)
+
+    def __repr__(self):
+        template = ("SurveyTile(db_id={}, current_weight={}, initial_weight={}, " +
+                    "survey_id={}, grid_tile_id={})")
+        return template.format(
+            self.db_id, self.current_weight, self.initial_weight,
+            self.survey_id, self.grid_tile_id
+        )
+
+    def __init__(self, weight=None, survey_id=None, grid_tile_id=None):
+        self.current_weight = weight
+        self.initial_weight = weight
+        self.survey_id = survey_id
+        self.grid_tile_id = grid_tile_id
+
+
 class Event(Base):
     """A class to represent a transient Event.
 
@@ -1195,12 +1491,17 @@ class Event(Base):
 
     Args
     ----
-        ivorn : string
-            IVORN (International Virtual Observatory Resource Name) for the event
         name : string
             a human-readable identifier for the event
+        ivorn : string
+            unique IVORN (International Virtual Observatory Resource Name) for the event
         source : string
-            the event's origin, e.g. LVC
+            the event's origin, e.g. LVC, Fermi, GAIA
+        event_type : string
+            the type of event, e.g. GW, GRB
+
+        time : string, `astropy.time.Time` or datetime.datetime, optional
+            time the event occured
         skymap : string, optional
             the location of the source skymap file
 
@@ -1212,8 +1513,8 @@ class Event(Base):
     ----------
         db_id : int
             primary database key
-        event_tiles : list of `EventTile`
-            a list of any `EventTiles` associated with this Event
+        surveys : list of `Survey`
+            a list of any `Surveys` associated with this Event
         mpointings : list of `Mpointing`
             a list of any `Mpointing`s associated with this Event
         pointings : list of `Pointing`
@@ -1221,7 +1522,7 @@ class Event(Base):
 
     Examples
     --------
-        >>> e = Event(ivorn='ivo://pt5mTest', name='pt5mVar3', source='pt5m')
+        TODO
 
     """
 
@@ -1233,321 +1534,37 @@ class Event(Base):
 
     # Columns
     name = Column(String)
-    source = Column(String)
     ivorn = Column(String, unique=True)
+    source = Column(String)
+    event_type = Column('type', String)  # type is a built in function in Python
+    time = Column(DateTime)
     skymap = Column(String)
 
     # Foreign relationships
-    event_tiles = relationship('EventTile', back_populates='event')
+    surveys = relationship('Survey', back_populates='event', uselist=True)
+    pointings = relationship('Pointing', back_populates='event', uselist=True)
+    mpointings = relationship('Mpointing', back_populates='event', uselist=True)
 
     def __repr__(self):
-        return "Event(db_id={}, name={}, source={}, ivorn={}, skymap={})".format(
-            self.db_id, self.name, self.source, self.ivorn, self.skymap
+        template = ("Event(db_id={}, name={}, ivorn={}, source={}, event_type={}, " +
+                    "time={}, skymap={})")
+        return template.format(
+            self.db_id, self.name, self.ivorn, self.source, self.event_type, self.time,
+            self.skymap
         )
 
-
-class EventTile(Base):
-    """A class to represent a Tile from an Event (e.g. a LVC skymap).
-
-    Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an EventTile, and set its attributes
-    without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the db_id)
-    will be None until the User is added to the database.
-
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
-        probability : float
-            contained target probability within this tile
-        ra : float, optional
-            J2000 right ascension in decimal degrees
-            if ra is not given and this EventTile is linked to a SurveyTile
-            then the ra will be extracted from the SurveyTile
-        dec : float, optional
-            J2000 declination in decimal degrees
-            if dec is not given and this EventTile is linked to a SurveyTile
-            then the dec will be extracted from the SurveyTile
-        event_id : int, optional
-            the ID number of the Event this tile is associated with
-        survey_tile_id : int, optional
-            the SurveyTile this tile is associated with, if any
-
-    An EventTile also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
-
-    Attributes
-    ----------
-        db_id : int
-            primary database key
-        unobserved_probability : float
-            the total probability in this tile that hasn't been observed
-            should be updated whenever any overlapping tile is observed
-        mpointing : `Mpointing`
-            the `Mpointing` associated with this EventTile if any
-        pointings : list of `Pointing`
-            a list of any `Pointing`s associated with this tile, if any
-
-    Examples
-    --------
-        >>> from obsdb import *
-
-        make a LIGO event to associate our tile with
-
-        >>> e = Event(ivorn='ivo://GW150914', name='GW150914', source='LVC')
-        >>> session = load_session()
-        >>> session.add(e)  # add event
-        >>> session.commit()  # commit changes (otherwise DB not changed)
-        >>> e.db_id
-        1
-
-        construct without event_id
-
-        >>> event_tile = EventTile(ra=122.34, dec=22.01, probability=0.01)
-        >>> event_tile
-        EventTile(db_id=None, ra=122.34, dec=22.01, probability=0.01, event_id=None,
-        survey_tile_id=None)
-
-        set the event_id
-
-        >>> event_tile.event_id = 1
-        >>> event_tile
-        EventTile(db_id=None, ra=122.34, dec=22.01, probability=0.01, event_id=None,
-        survey_tile_id=None)
-
-        add to the database
-
-        >>> session.add(event_tile)
-        >>> session.commit()
-        >>> event_tile  # note how db_id is populated now tile is in DB
-        EventTile(db_id=1, ra=122.34, dec=22.01, probability=0.01, event_id=1, survey_tile_id=None)
-        >>> e.event_tiles  # and event knows about all associated tiles
-        [EventTile(db_id=1, ra=122.34, dec=22.01, probability=0.01, event_id=1,
-        survey_tile_id=None)]
-        >>> session.close()
-
-        make a survey and a survey tile, and add them to the database
-
-        >>> s = Survey(name='GOTO survey')
-        >>> st = SurveyTile(ra=22, dec=-2, name='Tile1')
-        >>> st.survey = s
-        >>> session.add(s, st)
-        >>> session.commit()
-
-        make a new event tile that has no ra and dec,
-        but is linked to the survey tile
-
-        >>> et2 = EventTile(probability=0.01)
-        >>> et2.event = e
-        >>> et2.survey_tile = st
-        >>> et2
-        EventTile(db_id=None, ra=None, dec=None, probability=0.01, event_id=None,
-        survey_tile_id=None)
-
-        add to the database
-
-        >>> session.add(event_tile)
-        >>> session.commit()
-        >>> et2  # note how the ra and dec have been copied from the SurveyTile
-        EventTile(db_id=2, ra=22.0, dec=-2.0, probability=0.01, event_id=1, survey_tile_id=1)
-        >>> st.event_tiles # and the SurveyTile knows about the linked EventTiles
-        [EventTile(db_id=2, ra=22.0, dec=-2.0, probability=0.01, event_id=1, survey_tile_id=1)]
-
-    """
-
-    # Set corresponding SQL table name
-    __tablename__ = 'event_tiles'
-
-    # Primary key
-    db_id = Column('id', Integer, primary_key=True)
-
-    # Columns
-    ra = Column(Float)
-    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
-    probability = Column(Float)
-    unobserved_probability = Column(Float)
-
-    # Foreign keys
-    event_id = Column(Integer, ForeignKey('events.id'), nullable=False)
-    survey_tile_id = Column(Integer, ForeignKey('survey_tiles.id'), nullable=True)
-
-    # Foreign relationships
-    pointings = relationship('Pointing', back_populates='event_tile')
-    mpointing = relationship('Mpointing', back_populates='event_tile')
-    event = relationship('Event', back_populates='event_tiles', uselist=False)
-    survey_tile = relationship('SurveyTile', back_populates='event_tiles', uselist=False)
-
-    def __repr__(self):
-        template = ("EventTile(db_id={}, ra={}, dec={}, " +
-                    "probability={}, event_id={}, survey_tile_id={})")
-        return template.format(
-            self.db_id, self.ra, self.dec, self.probability, self.event_id,
-            self.survey_tile_id)
-
-
-class Survey(Base):
-    """A class to represent an observation survey.
-
-    Like all SQLAlchemy model classes, these objects link to the
-    underlying database. You can create an object, set its attributes
-    without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the db_id)
-    will be None until the Survey is added to the database.
-
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
-        name : string
-            a human-readable identifier for the survey
-
-    A Survey also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
-
-    Attributes
-    ----------
-        db_id : int
-            primary database key
-        survey_tiles : list of `SurveyTile`
-            a list of any `SurveyTiles` associated with this Survey
-        mpointings : list of `Mpointing`
-            a list of any `Mpointing`s associated with this Survey
-        pointings : list of `Pointing`
-            a list of any `Pointing`s associated with this Survey
-
-    Examples
-    --------
-        >>> s = Survey(name='GOTO4-allsky')
-
-    """
-
-    # Set corresponding SQL table name
-    __tablename__ = 'surveys'
-
-    # Primary key
-    db_id = Column('id', Integer, primary_key=True)
-
-    # Columns
-    name = Column(String)
-
-    # Foreign relationships
-    survey_tiles = relationship('SurveyTile', back_populates='survey')
-
-    def __repr__(self):
-        return "Survey(db_id={}, name={})".format(
-            self.db_id, self.name
-        )
-
-
-class SurveyTile(Base):
-    """A class to represent a Survey Tile.
-
-    Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an SurveyTile, and set its attributes
-    without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the db_id)
-    will be None until the User is added to the database.
-
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
-        ra : float
-            J2000 right ascension in decimal degrees
-        dec : float
-            J2000 declination in decimal degrees
-        survey_id : int, optional
-            the ID number of the Survey this tile is associated with
-        name : str, optional
-            a human-readable identifier for the tile
-
-    A SurveyTile also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
-
-    Attributes
-    ----------
-        db_id : int
-            primary database key
-        event_tiles : list of `EventTile`
-            a list of any `EventTiles` associated with this SurveyTiles, if any
-        mpointing : `Mpointing`
-            the `Mpointing` associated with this SurveyTile if any
-        pointings : list of `Pointing`
-            a list of any `Pointing`s associated with this tile, if any
-
-    Examples
-    --------
-        >>> from obsdb import *
-
-        make a survey to associate our tile with
-
-        >>> s = Survey(name='GOTO4-allsky')
-        >>> session = load_session()
-        >>> session.add(s)  # add survey
-        >>> session.commit()  # commit changes (otherwise DB not changed)
-        >>> s.db_id
-        1
-
-        construct without survey_id
-
-        >>> tile = SurveyTile(ra=100, dec=20)
-        >>> tile
-        SurveyTile(db_id=None, ra=100.00, dec=20.00)
-
-        set the survey_id
-
-        >>> event_tile.event_id = 1
-        >>> event_tile
-        EventTile(db_id=None, ra=122.34, dec=22.01, probability=0.01, event_id=None)
-
-        add to the database, demonstrating the open_session context manager,
-        which will handle committing changes for you:
-
-        >>> with open_session as session():
-        >>>     insert_items([tile])
-        >>>     tile  # note how db_id is populated now tile is in DB
-        SurveyTile(db_id=1, ra=100.00, dec=20.00, survey_id=1)
-        >>> with open_session as session():
-        >>>     s.survey_tiles  # and survey knows about all associated tiles
-        [SurveyTile(db_id=1, ra=100.00, dec=20.00, survey_id=1)]
-
-    """
-
-    # Set corresponding SQL table name
-    __tablename__ = 'survey_tiles'
-
-    # Primary key
-    db_id = Column('id', Integer, primary_key=True)
-
-    # Columns
-    name = Column(String)
-    ra = Column(Float)
-    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
-
-    # Foreign keys
-    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=False)
-
-    # Foreign relationships
-    survey = relationship('Survey', back_populates='survey_tiles', uselist=False)
-    event_tiles = relationship('EventTile', back_populates='survey_tile')
-    mpointing = relationship('Mpointing', back_populates='survey_tile')
-    pointings = relationship('Pointing', back_populates='survey_tile')
-
-    def __repr__(self):
-        template = ("SurveyTile(db_id={}, ra={}, dec={}, " +
-                    ", name={}, survey_id={})")
-        return template.format(
-            self.db_id, self.ra, self.dec, self.name, self.survey_id)
+    @validates('time')
+    def munge_times(self, key, field):
+        """Use validators to allow various types of input for UTC."""
+        if isinstance(field, datetime.datetime):
+            value = field.strftime("%Y-%m-%d %H:%M:%S")
+        elif isinstance(field, Time):
+            field.precision = 0  # no D.P on seconds
+            value = field.iso
+        else:
+            # just hope the string works!
+            value = str(field)
+        return value
 
 
 class ImageLog(Base):

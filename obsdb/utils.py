@@ -10,14 +10,14 @@ from astropy.time import Time
 from sqlalchemy import or_
 
 from .engine import open_session
-from .models import ExposureSet, Mpointing, Pointing, Survey, SurveyTile, User
+from .models import ExposureSet, Grid, GridTile, Mpointing, Pointing, User
 
 
 __all__ = ['add_user', 'get_user_id', 'get_username', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
-           'get_exposure_set_by_id', 'get_survey_tile_by_name',
+           'get_exposure_set_by_id', 'get_grid_tile_by_name',
            'get_expired_pointing_ids', 'get_expired_mpointing_ids',
            'insert_items',
            'update_pointing_status', 'bulk_update_pointing_status', 'bulk_update_mpointing_status',
@@ -457,35 +457,35 @@ def get_exposure_set_by_id(session, expset_id):
     return exposure_set
 
 
-def get_survey_tile_by_name(session, survey_name, tile_name):
+def get_grid_tile_by_name(session, grid_name, tile_name):
     """Get a tile in a survey from the name of the survey and tile.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    survey_name : str
-        the name of the survey
+    grid_name : str
+        the name of the grid
     tile_name : str
         the name of the tile
 
     Returns
     -------
-    tile : `SurveyTile`
-        the matching SurveyTile
+    grid_tile : `GridTile`
+        the matching GridTile
 
     Raises
     ------
-    ValueError : if no matching SurveyTile is found in the database
+    ValueError : if no matching GridTile is found in the database
 
     """
-    query = session.query(Survey, SurveyTile)
-    query = query.filter(Survey.name == survey_name,
-                         SurveyTile.name == tile_name)
-    survey, tile = query.one_or_none()
-    if not tile:
-        raise ValueError('No matching SurveyTile found')
-    return tile
+    query = session.query(Grid, GridTile)
+    query = query.filter(Grid.name == grid_name,
+                         GridTile.name == tile_name)
+    grid, grid_tile = query.one_or_none()
+    if not grid_tile:
+        raise ValueError('No matching GridTile found')
+    return grid_tile
 
 
 def get_expired_pointing_ids(session, time=None):

@@ -48,47 +48,77 @@ def get_user_id(username, description=''):
 def run(fov, overlap):
     """Create the mpointings and add them to the database."""
     # Create an all-sky grid with GOTO-tile
-    grid = SkyGrid(fov, overlap)
-    tile_coords = grid.coords
-    tile_names = grid.tilenames
+    skygrid = SkyGrid(fov, overlap)
+    tile_coords = skygrid.coords
+    tile_names = skygrid.tilenames
 
     # Add to the database
     user_id = get_user_id('goto', 'GOTO Survey')
     with db.open_session() as session:
-        # create a Survey
-        survey = db.Survey(name=grid.name)
-        session.add(survey)
 
-        # create SurveyTiles
-        tiles = []
-        print('Creating tiles...')
+        # create a Grid
+        print('Creating grid...')
+        grid = db.Grid(name=skygrid.name,
+                       ra_fov=skygrid.fov['ra'].value,
+                       dec_fov=skygrid.fov['dec'].value,
+                       ra_overlap=skygrid.overlap['ra'],
+                       dec_overlap=skygrid.overlap['dec'],
+                       algorithm=skygrid.algorithm,
+                       )
+        session.add(grid)
+
+        # create GridTiles
+        grid_tiles = []
         start = time.time()
         for coord, name in zip(tile_coords, tile_names):
             ra = coord.ra.value
             dec = coord.dec.value
             if abs(dec) < 0.00001:  # GOTO-tile rounding errors
                 dec = 0
-            tile = db.SurveyTile(ra=float(ra), dec=float(dec), name=str(name))
-            tile.survey = survey
-            tiles.append(tile)
+            grid_tile = db.GridTile(name=str(name),
+                                    ra=float(ra),
+                                    dec=float(dec))
+            grid_tile.grid = grid
+            grid_tiles.append(grid_tile)
         print('  took {:.2f} secs'.format(time.time() - start))
 
-        print('Adding {} tiles to database...'.format(len(tiles)))
+        print('Adding {} grid tiles to database...'.format(len(grid_tiles)))
         start = time.time()
-        db.insert_items(session, tiles)
+        db.insert_items(session, grid_tiles)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+        # create a Survey
+        print('Creating all-sky survey...')
+        survey = db.Survey(name=skygrid.name)
+        survey.grid = grid
+        session.add(survey)
+
+        # create SurveyTiles, one for each GridTile
+        survey_tiles = []
+        start = time.time()
+        for grid_tile in grid_tiles:
+            survey_tile = db.SurveyTile(weight=1)  # Equal weights
+            survey_tile.survey = survey
+            survey_tile.grid_tile = grid_tile
+            survey_tiles.append(survey_tile)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+        print('Adding {} survey tiles to database...'.format(len(survey_tiles)))
+        start = time.time()
+        db.insert_items(session, survey_tiles)
         print('  took {:.2f} secs'.format(time.time() - start))
 
         # create Mpointings
         mpointings = []
         print('Creating mpointings...')
         start = time.time()
-        for tile in tiles:
+        for survey_tile in survey_tiles:
+            name = survey_tile.grid_tile.name
             mp = db.Mpointing(user_id=user_id,
-                              object_name=tile.name,
+                              object_name=survey.name + '_' + name,
                               **SURVEY_SETTINGS)
-            mp.object_name = survey.name + '_' + tile.name
-            mp.survey = survey
-            mp.survey_tile = tile
+            mp.grid_tile = survey_tile.grid_tile
+            mp.survey_tile = survey_tile
             mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
             mpointings.append(mp)
         print('  took {:.2f} secs'.format(time.time() - start))

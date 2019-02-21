@@ -25,31 +25,39 @@ with db.open_session() as session:
     db.add_user(session, 'goto', 'password', "GOTO Test Observer")
 
     # create an event
-    e = db.Event(ivorn='ivo://gotoTest', name='gotoVar3', source='made-up')
+    e = db.Event(name='event', ivorn='ivo://gotoTest', source='made-up', event_type='FAKE')
 
-    # and an event tile
-    et = db.EventTile(ra=100, dec=20, probability=0.1)
-    et.event = e
+    # create a grid
+    g = db.Grid(name='testgrid',
+                ra_fov=10, dec_fov=10,
+                ra_overlap=0.5, dec_overlap=0.5,
+                algorithm='NA')
+
+    # and a few grid tiles
+    gt1 = db.GridTile(name='T0001', ra=100, dec=20)
+    gt1.grid = g
+    gt2 = db.GridTile(name='T0002', ra=100, dec=40)
+    gt2.grid = g
 
     # and a survey
-    s = db.Survey(name='GOTO survey')
+    s = db.Survey(name='GOTO event survey')
+    s.event = e
+    s.grid = g
 
-    # and a survey tile
-    st = db.SurveyTile(ra=22, dec=-2, name='Tile1')
-    st.survey = s
-
-    # and an event tile linked to that survey tile
-    et2 = db.EventTile(probability=0.2)
-    et2.event = e
-    et2.survey_tile = st
+    # and some survey tiles
+    st1 = db.SurveyTile(weight=0.5)
+    st1.survey = s
+    st1.grid_tile = gt1
+    st2 = db.SurveyTile(weight=0.5)
+    st2.survey = s
+    st2.grid_tile = gt2
 
     # add them
-    db.insert_items(session, [e, et, s, st, et2])
+    db.insert_items(session, [e, g, gt1, gt2, s, st1, st2])
     session.commit()
 
-    # check the second event tile updated correctly
-    assert et2.ra == st.ra
-    assert et2.dec == st.dec
+    # check the survey tile weight updated correctly
+    assert st1.initial_weight == st1.current_weight == 0.5
 
 # OK, new Session. Let's make a Pointing
 with db.open_session() as session:

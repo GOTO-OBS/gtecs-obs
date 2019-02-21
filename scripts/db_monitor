@@ -33,10 +33,7 @@ else:
 with db.open_session() as session:
     all_pointings = db.get_pointings(session)
     n_all = len(all_pointings)
-    n_survey = sum([p.survey is not None for p in all_pointings])
-    print("{} points in database - {} targeted and {} survey".format(n_all,
-                                                                     n_all - n_survey,
-                                                                     n_survey))
+    print("{} points in database".format(n_all))
 
     running, _ = db.get_queue(session)
     if running:
@@ -45,7 +42,7 @@ with db.open_session() as session:
         print('\n')
 
     for pointing in all_pointings:
-        if show_all or (pointing.survey is None and pointing.status != 'expired'):
+        if show_all or pointing.status != 'expired':
             string = '{: <6.0f} | {: >20} | {: >3.0f}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
                 pointing.db_id,
                 pointing.object_name,
@@ -70,6 +67,4 @@ with db.open_session() as session:
                 status = pointing.status
             print(status, end='\n')
 
-    print("{} points in database - {} targeted and {} survey".format(n_all,
-                                                                     n_all - n_survey,
-                                                                     n_survey))
+    print("{} points in database".format(n_all))

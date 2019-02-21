@@ -69,9 +69,9 @@ CREATE TABLE `pointings` (
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
   FOREIGN KEY (`mpointing_id`) REFERENCES `mpointings` (`id`),
   FOREIGN KEY (`time_block_id`) REFERENCES `time_blocks` (`id`),
-  FOREIGN KEY (`grid_tile_id`) REFERENCES `event_tiles` (`id`),
+  FOREIGN KEY (`grid_tile_id`) REFERENCES `grid_tiles` (`id`),
   FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`),
-  FOREIGN KEY (`event_id`) REFERENCES `surveys` (`id`)
+  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`)
   )
   ENGINE = InnoDB
   DEFAULT CHARACTER SET = latin1;
@@ -133,9 +133,9 @@ CREATE TABLE `mpointings` (
   `survey_tile_id` INT NULL,
   `event_id` INT NULL,
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
-  FOREIGN KEY (`grid_tile_id`) REFERENCES `event_tiles` (`id`),
+  FOREIGN KEY (`grid_tile_id`) REFERENCES `grid_tiles` (`id`),
   FOREIGN KEY (`survey_tile_id`) REFERENCES `survey_tiles` (`id`),
-  FOREIGN KEY (`event_id`) REFERENCES `surveys` (`id`)
+  FOREIGN KEY (`event_id`) REFERENCES `events` (`id`)
   )
   ENGINE = InnoDB;
 

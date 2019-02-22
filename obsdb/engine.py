@@ -35,12 +35,12 @@ def open_session():
     To create a new user, and add to the database:
 
     >>> with open_session() as session:
-    >>>     newUser = User('sl', '1234', 'Stuey')
-    >>>     session.add(newUser)
+    >>>     new_user = User('sl', '1234', 'Stuey')
+    >>>     session.add(new_user)
 
     """
-    Session = sessionmaker(bind=ENGINE)
-    session = Session()
+    new_session = sessionmaker(bind=ENGINE)
+    session = new_session()
     try:
         yield session
         session.commit()
@@ -67,15 +67,15 @@ def load_session():
     To create a new user, and add to the database:
 
     >>> session = load_session()
-    >>> newUser = User('sl', '1234', 'Stuey')
+    >>> new_user = User('sl', '1234', 'Stuey')
     >>> try:
-    >>>    session.add(newUser)
+    >>>    session.add(new_user)
     >>> except:
     >>>    session.rollback()
     >>> finally:
     >>>    session.close()
 
     """
-    Session = sessionmaker(bind=ENGINE)
-    session = Session()
+    new_session = sessionmaker(bind=ENGINE)
+    session = new_session()
     return session

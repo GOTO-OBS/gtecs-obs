@@ -75,7 +75,7 @@ class User(Base):
         >>> session.add(pointing)
         >>> session.commit()
         >>> bob.pointings
-        [Pointing(db_id=None, status='pending', object_name=randObj, ra=352.133, dec=28.464,
+        [Pointing(db_id=None, status='pending', object_name=random_object, ra=352.133, dec=28.464,
         rank=84, min_alt=30, max_sunalt=-15, min_time=1575.8310236, max_moon=D, min_moonsep=30,
         too=True, start_time=2018-01-16 16:46:12, stop_time=2018-01-18 16:46:12, started_time=None,
         stopped_time=None, user_id=25, mpointing_id=None, time_block_id=None, event_id=None,

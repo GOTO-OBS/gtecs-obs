@@ -25,7 +25,7 @@ with db.open_session() as session:
     db.add_user(session, 'goto', 'password', "GOTO Test Observer")
 
     # create an event
-    e = db.Event(name='event', ivorn='ivo://gotoTest', source='made-up', event_type='FAKE')
+    e = db.Event(name='event', ivorn='ivo://goto', source='made-up', event_type='FAKE')
 
     # create a grid
     g = db.Grid(name='testgrid',
@@ -195,8 +195,7 @@ with db.open_session() as s:
 # now lets pretend we're observing the Mpointing and check the triggers
 s = db.load_session()
 mp = db.get_mpointing_by_id(s, 1)
-keepGoing = True
-while keepGoing:
+while True:
     print('marking job as running')
     mp.pointings[-1].status = 'running'
     s.commit()
@@ -214,7 +213,7 @@ while keepGoing:
     if next_pointing:
         s.add(next_pointing)
     else:
-        keepGoing = False
+        break
     s.commit()
     time.sleep(1)
     summary(mp)

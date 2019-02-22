@@ -25,7 +25,7 @@ __all__ = ['add_user', 'get_user_id', 'get_username', 'validate_user',
            ]
 
 
-def add_user(session, username, password, fullname):
+def add_user(session, username, password, full_name):
     """Add a user to the database.
 
     Parameters
@@ -35,14 +35,20 @@ def add_user(session, username, password, fullname):
     username : string
         short user name
     password : string
-        plain text password. stored in DB using a sha512 hash for security
-    fullname : string
+        plain text password
+        stored in DB using a sha512 hash for security
+    full_name : string
         full name of user
 
+    Returns
+    --------
+    new_user : `User`
+        the new User class
+
     """
-    password_hash = hashlib.sha512(password.encode()).hexdigest()
-    new_user = User(username=username, password=password_hash, full_name=fullname)
+    new_user = User(username=username, password=password, full_name=full_name)
     session.add(new_user)
+    return new_user
 
 
 def get_user_id(session, username):

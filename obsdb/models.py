@@ -2,6 +2,7 @@
 """Python classes mapping on to database tables."""
 
 import datetime
+import hashlib
 
 from astropy import units as u
 from astropy.time import Time
@@ -40,7 +41,8 @@ class User(Base):
     username : string
         a short user name
     password : string
-        password for authentication, stored as a hash in the database.
+        password for authentication
+        the password is stored as a hash in the database, so the unshased string isn't stored
     full_name : string
         the user's full name.
 
@@ -49,6 +51,8 @@ class User(Base):
     db_id : int
         primary database key
         only populated when the instance is added to the database
+    password_hash : str
+        the hashed password as stored in the database
 
     When created the instance can be linked to the following other tables,
     otherwise they are populated when it is added to the database:
@@ -93,12 +97,17 @@ class User(Base):
 
     # Columns
     username = Column(String)
-    password = Column(String)
+    password_hash = Column('password', String)  # Don't allow access to the unhashed password
     full_name = Column(String)
 
     # Foreign relationships
     pointings = relationship('Pointing', back_populates='user', uselist=True)
     mpointings = relationship('Mpointing', back_populates='user', uselist=True)
+
+    def __init__(self, username=None, password=None, full_name=None):
+        self.username = username
+        self.password_hash = hashlib.sha512(password.encode()).hexdigest()
+        self.full_name = full_name
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),

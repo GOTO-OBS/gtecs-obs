@@ -6,7 +6,7 @@ import datetime
 from astropy import units as u
 from astropy.time import Time
 
-from sqlalchemy import (Column, DateTime, Enum, Float, ForeignKey, Integer, String)
+from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, validates
 
@@ -261,7 +261,7 @@ class Pointing(Base):
     min_time = Column(Float)
     max_moon = Column(String(1))
     min_moonsep = Column(Float, default=30)
-    too = Column(Integer)
+    too = Column(Boolean, default=False)
     start_time = Column(DateTime)
     stop_time = Column(DateTime)
     started_time = Column(DateTime, default=None)
@@ -771,13 +771,13 @@ class Mpointing(Base):
     initial_rank = Column(Integer)
     num_todo = Column(Integer)
     num_completed = Column(Integer)
-    infinite = Column(Integer, default=False)
+    infinite = Column(Boolean, default=False)
     min_alt = Column(Float)
     max_sunalt = Column(Float)
     min_time = Column(Float)
     max_moon = Column(String(1))
     min_moonsep = Column(Float)
-    too = Column(Integer)
+    too = Column(Boolean, default=False)
     start_time = Column(DateTime)
     stop_time = Column(DateTime)
 
@@ -816,7 +816,7 @@ class Mpointing(Base):
         self.start_time = start_time if start_time is not None else Time.now()
         self.stop_time = stop_time
         self.status = status
-        self.infinite = False
+        self.infinite = False  # changed below
         self.num_todo = num_todo
         self.num_completed = 0
 
@@ -850,7 +850,7 @@ class Mpointing(Base):
                 block = TimeBlock(block_num=i + 1, valid_time=valid, wait_time=wait)
                 self.time_blocks.append(block)
             if len(self.time_blocks):
-                self.time_blocks[0].current = 1
+                self.time_blocks[0].current = True
 
         if 'user' in kwargs:
             self.user = kwargs['user']
@@ -946,7 +946,7 @@ class Mpointing(Base):
 
         Returns
         -------
-        current : `obsdb.TimeBlock`
+        current_block : `obsdb.TimeBlock`
             The current time block (may be None).
 
         """
@@ -990,7 +990,7 @@ class Mpointing(Base):
 
         Returns
         -------
-        next : `obsdb.TimeBlock`
+        next_block : `obsdb.TimeBlock`
             The next block to do after the current one (may be None).
 
         """
@@ -1186,7 +1186,7 @@ class TimeBlock(Base):
     block_num = Column(Integer)
     valid_time = Column(Integer)
     wait_time = Column(Integer)
-    current = Column(Integer, default=False)
+    current = Column(Boolean, default=False)
 
     # Foreign keys
     mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)

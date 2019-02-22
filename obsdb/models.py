@@ -27,18 +27,16 @@ mpointing_status_list = Enum('unscheduled', 'scheduled', 'completed',
 class User(Base):
     """A class to represent a database User.
 
+    Every Pointing in the database must be associated with a User.
+
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     username : string
         a short user name
     password : string
@@ -46,18 +44,21 @@ class User(Base):
     full_name : string
         the user's full name.
 
-    A User also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
-
     Attributes
     ----------
     db_id : int
         primary database key
-    mpointings : list of `Mpointing`
-        a list of any `Mpointing`s associated with this User
-    pointings : list of `Pointing`
-        a list of any `Pointing`s associated with this User
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    mpointings : list of `Mpointing`, optional
+        the Mpointings associated with this User, if any
+    pointings : list of `Pointing`, optional
+        the Pointings associated with this User, if any
 
     Examples
     --------
@@ -110,18 +111,18 @@ class User(Base):
 class Pointing(Base):
     """A class to represent an Pointing.
 
+    Pointings are the primary table of the Observation Database.
+    When decideing what to observe all the Pointings are processed
+    based on their status and constraints.
+
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     user_id : int
         unique key identifying user to whom this Pointing belongs
     object_name : String
@@ -157,39 +158,38 @@ class Pointing(Base):
 
     status : string, optional
         status of pointing, default 'pending'
-    grid_tile_id : int, optional
-        unique key linking to a `GridTile`
-    survey_tile_id : int, optional
-        unique key linking to a `SurveyTile`
-    event_id : int, optional
-        unique key linking to an `Event`
-    mpointing_id : int, optional
-        unique key linking to an `Mpointing`
-
-    An Pointing also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
 
     Attributes
     ----------
     db_id : int
         primary database key
+        only populated when the instance is added to the database
     started_time : datetime.datetime, or None
         if the pointing has started (been marked running)
         this will give the time it was updated
     stopped_time : datetime.datetime, or None
         if the pointing has finished (either completed or cancelled for
         some reason) this will give the time it was updated
-    exposure_sets : list of `ExposureSet`
-        the `ExposureSet` objects associated with this `Pointing`, if any
-    grid_tile : `GridTile`
-        the `GridTile` associated with this `Pointing`, if any
-    survey_tile : `SurveyTile`
-        the `SurveyTile` associated with this `Pointing`, if any
-    event : `Event`
-        the `Event` associated with this `Pointing`, if any
-    mpointing : `Mpointing`
-        the `Mpointing` associated with this `Pointing`, if any
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    exposure_sets : list of `ExposureSet`, optional
+        the Exposure Sets associated with this Pointing, if any
+    mpointing : `Mpointing`, optional
+        the Mpointing associated with this Pointing, if any
+        can also be added with the mpointing_id parameter
+    grid_tile : `GridTile`, optional
+        the GridTile associated with this Pointing, if any
+        can also be added with the grid_tile_id parameter
+    survey_tile : `SurveyTile`, optional
+        the SurveyTile associated with this Pointing, if any
+        can also be added with the survey_tile_id parameter
+    event : `Event`, optional
+        the Event associated with this Pointing, if any
+        can also be added with the event_id parameter
 
     Examples
     --------
@@ -338,7 +338,11 @@ class Pointing(Base):
 
 
 class ExposureSet(Base):
-    """A class to represent an Exposure Set: a set of repeated identical exposures.
+    """A class to represent an Exposure Set.
+
+    An Exposure Set is a set of repeated identical exposures, with the same
+    exposure time, filter, binning factor etc. Each Pointing should have one or more
+    Exposure Sets.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -346,12 +350,8 @@ class ExposureSet(Base):
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     num_exp : int
         number of exposures within the set
     exptime : float
@@ -375,23 +375,23 @@ class ExposureSet(Base):
         the size of the random offset to apply between each exposure
         if not set, no offset will be made
 
-    mpointing_id : int, optional
-        unique key linking to an `Mpointing`
-    pointing_id : int, optional
-        unique key linking to an `Pointing`
-
-    An ExposureSet also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
-
     Attributes
     ----------
     db_id : int
         primary database key
-    mpointing : `Mpointing`
-        the `Mpointing` associated with this `ExposureSet`, if any
-    pointing : `Pointing`
-        the `Pointing` associated with this `ExposureSet`, if any
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    pointing : `Pointing`, optional
+        the Pointing associated with this Exposure Set, if any
+        can also be added with the pointing_id parameter
+    mpointing : `Mpointing`, optional
+        the Mpointing associated with this Exposure Set, if any
+        can also be added with the mpointing_id parameter
 
     """
 
@@ -436,18 +436,18 @@ class ExposureSet(Base):
 class Mpointing(Base):
     """A class to represent an Mpointing.
 
+    Mpointings are generation engines for Pointings. Most of the parameters
+    are passed directly on to the generated Pointings. Mpointings allow the
+    database to regenerate Pointings at given time intervals.
+
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an Mpointing, and set its attributes
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the Mpointing is added to the database.
+    will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     user_id : int
         unique key identifying user to whom this Mpointing belongs
     object_name : String
@@ -493,21 +493,12 @@ class Mpointing(Base):
         the latest UTC time after which pointings must stop
         if not given the Mpointing will continue creating pointings until
         it is completed
-    grid_tile_id : int, optional
-        unique key linking to a `GridTile`
-    survey_tile_id : int, optional
-        unique key linking to a `SurveyTile`
-    event_id : int, optional
-        unique key linking to an `Event`
-
-    An Mpointing also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
 
     Attributes
     ----------
     db_id : int
         primary database key
+        only populated when the instance is added to the database
     current_rank : int
         rank for next pointing to be scheduled
     initial_rank : int
@@ -518,18 +509,27 @@ class Mpointing(Base):
         number of pointings still to do (same as num_todo - num_completed)
     infinite : bool
         if the Mpointing will continue infnitely (set if num_todo is < 0)
-    pointings : list of `Pointing`
-        the `Pointing` objects associated with this `Mpointing`, if any
-    exposure_sets : list of `ExposureSet`
-        the `ExposureSet` objects associated with this `Mpointing`, if any
-    time_blocks : list of `TimeBlock`
-        the `TimeBlock` objects associated with this `Mpointing`, if any
-    grid_tile : `GridTile`
-        the `GridTile` associated with this `Pointing`, if any
-    survey_tile : `SurveyTile`
-        the `SurveyTile` associated with this `Pointing`, if any
-    event : `Event`
-        the `Event` associated with this `Pointing`, if any
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    pointings : list of `Pointing`, optional
+        the Pointings associated with this Mpointing, if any
+    exposure_sets : list of `ExposureSet`, optional
+        the Exposure Sets associated with this Mpointing, if any
+    time_blocks : list of `TimeBlock`, optional
+        the Time Blocks associated with this Mpointing, if any
+    grid_tile : `GridTile`, optional
+        the GridTile associated with this Mpointing, if any
+        can also be added with the grid_tile_id parameter
+    survey_tile : `SurveyTile`, optional
+        the SurveyTile associated with this Mpointing, if any
+        can also be added with the survey_tile_id parameter
+    event : `Event`, optional
+        the Event associated with this Mpointing, if any
+        can also be added with the event_id parameter
 
     Examples
     --------
@@ -1125,22 +1125,18 @@ class TimeBlock(Base):
     The valid time is the time that the pointing will be valid for, and the wait time will be the
     time after the pointing is observed/invalid to wait until the next valid period.
 
+    NB: you shouldn't ever have to manually create TimeBlocks.
+    They're used internally by Mpointings to keep track of Pointings and all
+    the ones an Mpointing requires are created when the Mpointing is.
+
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Note you shouldn't ever have to manually create TimeBlocks.
-    They're used internally by Mpointings to keep track of Pointings and all
-    the ones an Mpointing requires are created when the Mpointing is.
-
-    Args
-    ----
+    Parameters
+    ----------
     block_num : int
         an integer indicating which block in a sequence this is
     valid_time : float
@@ -1148,20 +1144,28 @@ class TimeBlock(Base):
     wait_time : float
         time to wait after this block before allowing the next pointing, in minutes
 
-    mpointing_id : int, optional
-        unique key linking this TimeBlock to an Mpointing
     current : bool, optional
-        True if this TimeBlock is the one that is currently linked to
+        True if this Time Block is the one that is currently linked to
         a Pointing in the queue
-
-    An TimeBlock also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
 
     Attributes
     ----------
-    pointings : list of `Pointing`
-        a list of any `Pointing`s associated with this block, if any
+    db_id : int
+        primary database key
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    mpointing : `Mpointing`
+        the Mpointing associated with this Time Block
+        required before addition to the database
+        can also be added with the mpointing_id parameter
+
+    pointings : list of `Pointing`, optional
+        the Pointings associated with this Time Block, if any
 
     Examples
     --------
@@ -1209,7 +1213,10 @@ class TimeBlock(Base):
 
 
 class Grid(Base):
-    """A class to represent a sky grid.
+    """A class to represent a Grid on the stellar sphere.
+
+    A Grid is a way of generating Grid Tiles.
+    See `gototile.grid.SkyGrid` for more details.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -1217,12 +1224,8 @@ class Grid(Base):
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     name : string
         a human-readable identifier for the grid
     ra_fov : float
@@ -1236,18 +1239,21 @@ class Grid(Base):
     algorithm : string
         the gridding algorithm used to generate the grid
 
-    A Grid also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
-
     Attributes
     ----------
     db_id : int
         primary database key
-    grid_tiles : list of `GridTile`
-        a list of any `GridTile`s associated with this Grid
-    surveys : list of `Survey`
-        a list of any `Survey`s associated with this Grid
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    grid_tiles : list of `GridTile`, optional
+        the Grid Tiles associated with this Grid, if any
+    surveys : list of `Survey`, optional
+        the Surveys associated with this Grid, if any
 
     Examples
     --------
@@ -1286,7 +1292,10 @@ class Grid(Base):
 
 
 class GridTile(Base):
-    """A class to represent a tile of a sky grid.
+    """A class to represent a Grid Tile.
+
+    Grid Tiles are associated with Grids.
+    See `gototile.grid.SkyGrid` for more details.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -1294,37 +1303,37 @@ class GridTile(Base):
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     name : str
         a human-readable identifier for the tile
     ra : float
         J2000 right ascension in decimal degrees
     dec : float
         J2000 declination in decimal degrees
-    grid_id : int
-        the ID number of the Grid this tile is associated with
-
-    A GridTile also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
 
     Attributes
     ----------
     db_id : int
         primary database key
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
     grid : `Grid`
-        the `Grid` this GridTile is associated with
-    survey_tiles : list of `SurveyTile`
-        a list of any `SurveyTile`s associated with this GridTile, if any
-    mpointing : `Mpointing`
-        a list of any `Mpointing`s associated with this GridTile, if any
-    pointings : list of `Pointing`
-        a list of any `Pointing`s associated with this GridTile, if any
+        the Grid associated with this GridTile
+        required before addition to the database
+        can also be added with the grid_id parameter
+
+    pointings : list of `Pointing`, optional
+        the Pointings associated with this GridTile, if any
+    mpointings : list of `Mpointing`, optional
+        the Mpointing associated with this GridTile, if any
+    survey_tiles : list of `SurveyTile`, optional
+        the Survey Tiles associated with this GridTile, if any
 
     Examples
     --------
@@ -1363,7 +1372,11 @@ class GridTile(Base):
 
 
 class Survey(Base):
-    """A class to represent a survey, a group of tiles on a specific grid.
+    """A class to represent a Survey.
+
+    A Survey is a grouping of tiles from a specific Grid.
+    The purpose of Surveys is to add weighting to the base Grid Tiles.
+    This is done using Survey Tiles.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -1371,35 +1384,32 @@ class Survey(Base):
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     name : string
         a human-readable identifier for the survey
-    grid_id : int
-        the ID number of the Grid this tile is associated with
-        a human-readable identifier for the survey
-
-    event_id : int, optional
-        the ID number of the Event this tile is associated with, if any
-
-    A Survey also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
 
     Attributes
     ----------
     db_id : int
         primary database key
-    survey_tiles : list of `SurveyTile`
-        a list of any `SurveyTile`s associated with this Survey
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
     grid : `Grid`
-        the `Grid` this Survey is associated with
-    event : `Event`
-        the `Event` this Survey is associated with
+        the Grid associated with this Survey
+        required before addition to the database
+        can also be added with the grid_id parameter
+
+    survey_tiles : list of `SurveyTile`, optional
+        the Survey Tiles associated with this Survey, if any
+    event : `Event`, optional
+        the Event associated with this Survey, if any
+        can also be added with the event_id parameter
 
     Examples
     --------
@@ -1435,7 +1445,9 @@ class Survey(Base):
 
 
 class SurveyTile(Base):
-    """A class to represent a tile of a survey, to add a weighting to the base grid tile.
+    """A class to represent a Survey Tile.
+
+    Survey Tiles map onto Grid Tiles, but contain an additional weighting.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -1443,39 +1455,39 @@ class SurveyTile(Base):
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     weight : float
         initial weighting for this tile (between 0 and 1)
-    survey_id : int
-        the ID number of the Survey this tile is associated with
-    grid_tile_id : int
-        the ID number of the GridTile this SurveyTile is associated with
-
-    A SurveyTile also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
 
     Attributes
     ----------
     db_id : int
         primary database key
+        only populated when the instance is added to the database
     current_weight : float
         the current weighting of this tile
     initial_weight : float
         the initial weighting of this tile (it be modified as neighbours are observed)
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
     survey : `Survey`
-        the `Survey` this SurveyTile is associated with
+        the Survey associated with this SurveyTile
+        required before addition to the database
+        can also be added with the survey_id parameter
     grid_tile : `GridTile`
-        the `GridTile` this SurveyTile is associated with
-    mpointings : list of `Mpointing`
-        a list of `Mointing`s associated with this tile, if any
-    pointings : list of `Pointing`
-        a list of `Pointing`s associated with this tile, if any
+        the GridTile associated with this SurveyTile
+        required before addition to the database
+        can also be added with the grid_tile_id parameter
+
+    pointings : list of `Pointing`, optional
+        the Pointings associated with this SurveyTile, if any
+    mpointings : list of `Mpointing`, optional
+        the Mpointing associated with this SurveyTile, if any
 
     Examples
     --------
@@ -1522,18 +1534,16 @@ class SurveyTile(Base):
 class Event(Base):
     """A class to represent a transient Event.
 
+    Events in the database are used to store infomation and link Surveys and Pointings.
+
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     name : string
         a human-readable identifier for the event
     ivorn : string
@@ -1548,20 +1558,23 @@ class Event(Base):
     skymap : string, optional
         the location of the source skymap file
 
-    An Event also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
-
     Attributes
     ----------
     db_id : int
         primary database key
-    surveys : list of `Survey`
-        a list of any `Surveys` associated with this Event
-    mpointings : list of `Mpointing`
-        a list of any `Mpointing`s associated with this Event
-    pointings : list of `Pointing`
-        a list of any `Pointing`s associated with this Event
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    surveys : list of `Survey`, optional
+        the Surveys associated with this Event, if any
+    pointings : list of `Pointing`, optional
+        the Pointings associated with this Event, if any
+    mpointings : list of `Mpointing`, optional
+        the Mpointings associated with this Event, if any
 
     Examples
     --------
@@ -1614,12 +1627,11 @@ class Event(Base):
 
 
 class ImageLog(Base):
-    """A class to store a record of a FITS image file created by the camera daemon.
+    """A class to store a record of an Image.
 
-    The ImageLog is a simple way to link pointings in the database to physical
-    FITS files. An ImageLog should be created by the camera daemon each time
-    an exposure is taken, even if taken manually rather than originating from
-    the database.
+    The ImageLog is a simple way to link Pointings in the database to physical
+    FITS files. An ImageLog should be created each time an exposure is taken,
+    even if taken manually rather than originating from the database.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -1627,12 +1639,8 @@ class ImageLog(Base):
     an active database session, and some properties (like the db_id)
     will be None until the instance is added to the database.
 
-    The constructor must use keyword arguments and the arguments below
-    should be supplied or set before insertion into the database.
-    See Examples for details.
-
-    Args
-    ----
+    Parameters
+    ----------
     filename : string
         the name of the image file
     run_number : int
@@ -1653,28 +1661,27 @@ class ImageLog(Base):
     set_total : int, optional
         total number of exposures in this set, if any
         if not given, it will default to 1
-    exposure_set_id : int, optional
-        the unique key of the exposure set this frame was part of
-    pointing_id : int, optional
-        the unique key of the pointing which generated this frame
-    mpointing_id : int, optional, optional
-        unique key of the mpointing which generated the pointing which
-        generated this frame
-
-    An ImageLog also has the following properties which are
-    populated through database queries, but not needed for
-    object creation:
 
     Attributes
     ----------
     db_id : int
         primary database key
-    exposure_set : `ExposureSet`
-        the `ExposureSet` object associated with this `ImageLog`, if any
-    pointing : `Pointing`
-        the `Pointing` associated with this `ImageLog`, if any
-    mpointing : `Mpointing`
-        the `Mpointing` associated with this `ImageLog`, if any
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    exposure_set : `ExposureSet`, optional
+        the Exposure Set associated with this ImageLog, if any
+        can also be added with the exposure_set_id parameter
+    pointing : `Pointing`, optional
+        the Pointing associated with this ImageLog, if any
+        can also be added with the pointing_id parameter
+    mpointing : `Mpointing`, optional
+        the Mpointing associated with this ImageLog, if any
+        can also be added with the mpointing_id parameter
 
     """
 

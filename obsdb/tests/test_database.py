@@ -14,16 +14,23 @@ import obsdb as db
 
 # add a user
 with db.open_session() as session:
-    try:
-        user_id = db.get_user_id(session, 'goto')
-        if user_id:
-            print('Error: Database is not empty')
-            sys.exit()
-    except ValueError:
-        pass
+    # check if the database is empty
+    users = session.query(db.User).all()
+    if users:
+        print('Error: Database is not empty')
+        sys.exit(1)
 
-    db.add_user(session, 'goto', 'password', "GOTO Test Observer")
+    # create a test user
+    user = db.User(username='goto_test', password='password', full_name='GOTO Test Observer')
+    print(user)
+    session.add(user)
+    session.commit()
+    print(user, end='\n\n')
 
+    # check the password was stored correctly
+    assert db.validate_user(session, 'goto_test', 'password')
+
+with db.open_session() as session:
     # create an event
     e = db.Event(name='event', ivorn='ivo://goto', source='made-up', event_type='FAKE')
 

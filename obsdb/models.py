@@ -100,9 +100,11 @@ class User(Base):
     mpointings = relationship('Mpointing', back_populates='user', uselist=True)
 
     def __repr__(self):
-        return "User(db_id={}, username={}, full_name={})".format(
-            self.db_id, self.username, self.full_name
-        )
+        strings = ['db_id={}'.format(self.db_id),
+                   'username={}'.format(self.username),
+                   'full_name={}'.format(self.full_name),
+                   ]
+        return 'User({})'.format(', '.join(strings))
 
 
 class Pointing(Base):
@@ -283,19 +285,30 @@ class Pointing(Base):
     event = relationship('Event', back_populates='pointings', uselist=False)
 
     def __repr__(self):
-        template = ("Pointing(db_id={}, status='{}', " +
-                    "object_name={}, ra={}, dec={}, rank={}, " +
-                    "min_alt={}, max_sunalt={}, min_time={}, max_moon={}, min_moonsep={}, " +
-                    "too={}, start_time={}, stop_time={}, started_time={}, stopped_time={}, " +
-                    "user_id={}, mpointing_id={}, time_block_id={}, " +
-                    "grid_tile_id={}, survey_tile_id={}, event_id={})")
-        return template.format(
-            self.db_id, self.status, self.object_name, self.ra, self.dec, self.rank,
-            self.min_alt, self.max_sunalt, self.min_time, self.max_moon, self.min_moonsep,
-            bool(self.too), self.start_time, self.stop_time, self.started_time, self.stopped_time,
-            self.user_id, self.mpointing_id, self.time_block_id,
-            self.grid_tile_id, self.survey_tile_id, self.event_id
-        )
+        strings = ['db_id={}'.format(self.db_id),
+                   'status={}'.format(self.status),
+                   'object_name={}'.format(self.object_name),
+                   'ra={}'.format(self.ra),
+                   'dec={}'.format(self.dec),
+                   'rank={}'.format(self.rank),
+                   'min_alt={}'.format(self.min_alt),
+                   'max_sunalt={}'.format(self.max_sunalt),
+                   'min_time={}'.format(self.min_time),
+                   'max_moon={}'.format(self.max_moon),
+                   'min_moonsep={}'.format(self.min_moonsep),
+                   'too={}'.format(self.too),
+                   'start_time={}'.format(self.start_time),
+                   'stop_time={}'.format(self.stop_time),
+                   'started_time={}'.format(self.started_time),
+                   'stopped_time={}'.format(self.stopped_time),
+                   'user_id={}'.format(self.user_id),
+                   'mpointing_id={}'.format(self.mpointing_id),
+                   'time_block_id={}'.format(self.time_block_id),
+                   'grid_tile_id={}'.format(self.grid_tile_id),
+                   'survey_tile_id={}'.format(self.survey_tile_id),
+                   'event_id={}'.format(self.event_id),
+                   ]
+        return 'Pointing({})'.format(', '.join(strings))
 
     @validates('start_time', 'stop_time')
     def munge_times(self, key, field):
@@ -407,14 +420,17 @@ class ExposureSet(Base):
     mpointing = relationship('Mpointing', back_populates='exposure_sets', uselist=False)
 
     def __repr__(self):
-        template = ("ExposureSet(db_id={}, ra_offset={}, dec_offset={}, imgtype={}, " +
-                    "filt={}, exptime={}, num_exp={}, binning={}, ut_mask={}, " +
-                    "pointing_id={}, mpointing_id={})")
-        return template.format(
-            self.db_id, self.ra_offset, self.dec_offset, self.imgtype, self.filt,
-            self.exptime, self.num_exp, self.binning, self.ut_mask,
-            self.pointing_id, self.mpointing_id
-        )
+        strings = ['db_id={}'.format(self.db_id),
+                   'num_exp={}'.format(self.num_exp),
+                   'exptime={}'.format(self.exptime),
+                   'filt={}'.format(self.filt),
+                   'binning={}'.format(self.binning),
+                   'imgtype={}'.format(self.imgtype),
+                   'ut_mask={}'.format(self.ut_mask),
+                   'ra_offset={}'.format(self.ra_offset),
+                   'dec_offset={}'.format(self.dec_offset),
+                   ]
+        return 'ExposureSet({})'.format(', '.join(strings))
 
 
 class Mpointing(Base):
@@ -780,22 +796,6 @@ class Mpointing(Base):
     survey_tile = relationship('SurveyTile', back_populates='mpointings', uselist=False)
     event = relationship('Event', back_populates='mpointings', uselist=False)
 
-    def __repr__(self):
-        template = ("Mpointing(db_id={}, status='{}', num_todo={}, num_completed={}," +
-                    "num_remaining={}, infinite={}, " +
-                    "object_name={}, ra={}, dec={}, current_rank={}, initial_rank={}, " +
-                    "min_alt={}, max_sunalt={}, min_time={}, max_moon={}, min_moonsep={}, " +
-                    "too={}, start_time={}, stop_time={}, " +
-                    "user_id={}, grid_tile_id={}, survey_tile_id={}, event_id={}})")
-        return template.format(
-            self.db_id, self.status, self.num_todo, self.num_completed,
-            self.num_remaining, bool(self.infinite),
-            self.object_name, self.ra, self.dec, self.current_rank, self.initial_rank,
-            self.min_alt, self.max_sunalt, self.min_time, self.max_moon, self.min_moonsep,
-            bool(self.too), self.start_time, self.stop_time,
-            self.user_id, self.grid_tile_id, self.survey_tile_id, self.event_id
-        )
-
     def __init__(self, object_name=None, ra=None, dec=None,
                  start_rank=None, min_alt=None, min_time=None,
                  max_moon=None, min_moonsep=None, max_sunalt=None, too=None, start_time=None,
@@ -868,6 +868,33 @@ class Mpointing(Base):
             self.event = kwargs['event']
         if 'event_id' in kwargs:
             self.event_id = kwargs['event_id']
+
+    def __repr__(self):
+        strings = ['db_id={}'.format(self.db_id),
+                   'status={}'.format(self.status),
+                   'num_todo={}'.format(self.num_todo),
+                   'num_completed={}'.format(self.num_completed),
+                   'num_remaining={}'.format(self.num_remaining),
+                   'infinite={}'.format(self.infinite),
+                   'object_name={}'.format(self.object_name),
+                   'ra={}'.format(self.ra),
+                   'dec={}'.format(self.dec),
+                   'current_rank={}'.format(self.current_rank),
+                   'initial_rank={}'.format(self.initial_rank),
+                   'min_alt={}'.format(self.min_alt),
+                   'max_sunalt={}'.format(self.max_sunalt),
+                   'min_time={}'.format(self.min_time),
+                   'max_moon={}'.format(self.max_moon),
+                   'min_moonsep={}'.format(self.min_moonsep),
+                   'too={}'.format(self.too),
+                   'start_time={}'.format(self.start_time),
+                   'stop_time={}'.format(self.stop_time),
+                   'user_id={}'.format(self.user_id),
+                   'grid_tile_id={}'.format(self.grid_tile_id),
+                   'survey_tile_id={}'.format(self.survey_tile_id),
+                   'event_id={}'.format(self.event_id),
+                   ]
+        return 'Mpointing({})'.format(', '.join(strings))
 
     @validates('start_time', 'stop_time')
     def munge_times(self, key, field):
@@ -1169,10 +1196,14 @@ class TimeBlock(Base):
     pointings = relationship('Pointing', back_populates='time_block')
 
     def __repr__(self):
-        template = ("TimeBlock(db_id={}, block_num={}, valid_time={}, " +
-                    "wait_time={}, current={}, mpointing_id={})")
-        return template.format(self.db_id, self.block_num, self.valid_time,
-                               self.wait_time, bool(self.current), self.mpointing_id)
+        strings = ['db_id={}'.format(self.db_id),
+                   'block_num={}'.format(self.block_num),
+                   'valid_time={}'.format(self.valid_time),
+                   'wait_time={}'.format(self.wait_time),
+                   'current={}'.format(self.current),
+                   'mpointing_id={}'.format(self.mpointing_id),
+                   ]
+        return 'TimeBlock({})'.format(', '.join(strings))
 
 
 class Grid(Base):
@@ -1241,12 +1272,15 @@ class Grid(Base):
     surveys = relationship('Survey', back_populates='grid', uselist=True)
 
     def __repr__(self):
-        template = ("Grid(db_id={}, name={}, ra_fov={}, dec_fov={}, ra_overlap={}, " +
-                    "dec_overlap={}, algorithm={})")
-        return template.format(
-            self.db_id, self.name, self.ra_fov, self.dec_fov, self.ra_overlap, self.dec_overlap,
-            self.algorithm
-        )
+        strings = ['db_id={}'.format(self.db_id),
+                   'name={}'.format(self.name),
+                   'ra_fov={}'.format(self.ra_fov),
+                   'dec_fov={}'.format(self.dec_fov),
+                   'ra_overlap={}'.format(self.ra_overlap),
+                   'dec_overlap={}'.format(self.dec_overlap),
+                   'algorithm={}'.format(self.algorithm),
+                   ]
+        return 'Grid({})'.format(', '.join(strings))
 
 
 class GridTile(Base):
@@ -1317,9 +1351,13 @@ class GridTile(Base):
     pointings = relationship('Pointing', back_populates='grid_tile', uselist=True)
 
     def __repr__(self):
-        template = "GridTile(db_id={}, name={}, ra={}, dec={}, grid_id={})"
-        return template.format(
-            self.db_id, self.name, self.ra, self.dec, self.grid_id)
+        strings = ['db_id={}'.format(self.db_id),
+                   'name={}'.format(self.name),
+                   'ra={}'.format(self.ra),
+                   'dec={}'.format(self.dec),
+                   'grid_id={}'.format(self.grid_id),
+                   ]
+        return 'GridTile({})'.format(', '.join(strings))
 
 
 class Survey(Base):
@@ -1386,10 +1424,12 @@ class Survey(Base):
     event = relationship('Event', back_populates='surveys', uselist=False)
 
     def __repr__(self):
-        template = "Survey(db_id={}, name={}, grid_id={}, event_id={}"
-        return template.format(
-            self.db_id, self.name, self.grid_id, self.event_id
-        )
+        strings = ['db_id={}'.format(self.db_id),
+                   'name={}'.format(self.name),
+                   'grid_id={}'.format(self.grid_id),
+                   'event_id={}'.format(self.event_id),
+                   ]
+        return 'Survey({})'.format(', '.join(strings))
 
 
 class SurveyTile(Base):
@@ -1461,19 +1501,20 @@ class SurveyTile(Base):
     pointings = relationship('Pointing', back_populates='survey_tile', uselist=True)
     mpointings = relationship('Mpointing', back_populates='survey_tile', uselist=True)
 
-    def __repr__(self):
-        template = ("SurveyTile(db_id={}, current_weight={}, initial_weight={}, " +
-                    "survey_id={}, grid_tile_id={})")
-        return template.format(
-            self.db_id, self.current_weight, self.initial_weight,
-            self.survey_id, self.grid_tile_id
-        )
-
     def __init__(self, weight=None, survey_id=None, grid_tile_id=None):
         self.current_weight = weight
         self.initial_weight = weight
         self.survey_id = survey_id
         self.grid_tile_id = grid_tile_id
+
+    def __repr__(self):
+        strings = ['db_id={}'.format(self.db_id),
+                   'current_weight={}'.format(self.current_weight),
+                   'initial_weight={}'.format(self.initial_weight),
+                   'survey_id={}'.format(self.survey_id),
+                   'grid_tile_id={}'.format(self.grid_tile_id),
+                   ]
+        return 'SurveyTile({})'.format(', '.join(strings))
 
 
 class Event(Base):
@@ -1546,12 +1587,15 @@ class Event(Base):
     mpointings = relationship('Mpointing', back_populates='event', uselist=True)
 
     def __repr__(self):
-        template = ("Event(db_id={}, name={}, ivorn={}, source={}, event_type={}, " +
-                    "time={}, skymap={})")
-        return template.format(
-            self.db_id, self.name, self.ivorn, self.source, self.event_type, self.time,
-            self.skymap
-        )
+        strings = ['db_id={}'.format(self.db_id),
+                   'name={}'.format(self.name),
+                   'ivorn={}'.format(self.ivorn),
+                   'source={}'.format(self.source),
+                   'event_type={}'.format(self.event_type),
+                   'time={}'.format(self.time),
+                   'skymap={}'.format(self.skymap),
+                   ]
+        return 'Event({})'.format(', '.join(strings))
 
     @validates('time')
     def munge_times(self, key, field):
@@ -1659,14 +1703,18 @@ class ImageLog(Base):
     mpointing = relationship('Mpointing', backref='image_logs', uselist=False)
 
     def __repr__(self):
-        template = ("ImageLog(db_id={}, filename={}, run_number={}, " +
-                    "ut={}, ut_mask={}, start_time={}, write_time={}, " +
-                    "exposure_set_id={}, pointing_id={}, mpointing_id={})")
-        return template.format(
-            self.db_id, self.filename, self.run_number, self.ut, self.ut_mask,
-            self.start_time, self.write_time, self.exposure_set_id, self.pointing_id,
-            self.mpointing_id
-        )
+        strings = ['db_id={}'.format(self.db_id),
+                   'filename={}'.format(self.filename),
+                   'run_number={}'.format(self.run_number),
+                   'ut={}'.format(self.ut),
+                   'ut_mask={}'.format(self.ut_mask),
+                   'start_time={}'.format(self.start_time),
+                   'write_time={}'.format(self.write_time),
+                   'exposure_set_id={}'.format(self.exposure_set_id),
+                   'pointing_id={}'.format(self.pointing_id),
+                   'mpointing_id={}'.format(self.mpointing_id),
+                   ]
+        return 'ImageLog({})'.format(', '.join(strings))
 
     @validates('start_time', 'write_time')
     def munge_times(self, key, field):

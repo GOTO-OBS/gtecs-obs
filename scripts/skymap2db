@@ -7,6 +7,7 @@
 """
 
 import argparse
+import getpass
 import os
 import time
 
@@ -19,10 +20,6 @@ from gototile.skymap import SkyMap
 import obsdb as db
 
 
-DB_USER = 'goto'
-DB_PW = 'G0T0'
-DB_NAME = 'GOTO GW alerts'
-
 # Constant Pointing values
 MPOINTING_SETTINGS = dict(start_rank=2,
                           min_alt=30,
@@ -33,25 +30,27 @@ MPOINTING_SETTINGS = dict(start_rank=2,
                           too=0,
                           num_todo=5,
                           valid_time=1440,
-                          wait_time=0)
+                          wait_time=0,
+                          )
 
 # Constant ExposureSet values
 EXP_SETTINGS = dict(num_exp=3,
                     exptime=60,
                     filt='L',
                     binning=1,
-                    imgtype='SCIENCE')
+                    imgtype='SCIENCE',
+                    )
 
 
 def add_to_database(db_grid, pointings, event_time, event_name, filename):
     """Add an event and its tiles to the GOTO database."""
     with db.open_session() as session:
-        # Connect to the user, or create it if it doesn't exist
+        # get the User, or make it if it doesn't exist
         try:
-            user_id = db.get_user_id(session, DB_USER)
-        except Exception:
-            db.add_user(session, DB_USER, DB_PW, DB_NAME)
-            user_id = db.get_user_id(session, DB_USER)
+            user = db.get_user(session, username='goto')
+        except ValueError:
+            password = getpass.getpass(prompt="Creating default user - give password: ")
+            user = db.User('goto', password, 'GOTO Survey')
 
         # Create Event
         event = db.Event(name=event_name,
@@ -86,9 +85,10 @@ def add_to_database(db_grid, pointings, event_time, event_name, filename):
             # Create Mpointing and add to the database
             object_name = '{}_{}'.format(event_name, tilename)
 
-            mpointing = db.Mpointing(user_id=user_id,
-                                     object_name=object_name,
-                                     **MPOINTING_SETTINGS)
+            mpointing = db.Mpointing(object_name=object_name,
+                                     **MPOINTING_SETTINGS,
+                                     user=user,
+                                     )
             mpointing.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
 
             mpointing.grid_tile = grid_tile

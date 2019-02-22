@@ -141,24 +141,6 @@ def parse_dec(dec_str):
     return dec_deg
 
 
-def get_user_id(session, username):
-    """Get the user_id for the given username, and create it if it doesn't already exist."""
-    try:
-        user_id = db.get_user_id(session, username)
-        print('    Attributing pointings to user "{}"'.format(username))
-    except Exception:
-        # Create user if it doesn't exist
-        print('    User "{}" not recognised, creating new user...'.format(username))
-        description = input('Enter your full name: ')
-        prompt = 'Give a password for {}: '.format(username)
-        passwd = getpass.getpass(prompt=prompt)
-        db.add_user(session, username, passwd, description)
-        session.commit()
-        user_id = db.get_user_id(session, username)
-
-    return user_id
-
-
 def fill_mpointing(session, mpointing):
     """Fill out an mpointing frame with user input."""
     # On or off grid?
@@ -390,8 +372,7 @@ def fill_exposure_set(exposure_set):
 
 if __name__ == '__main__':
 
-    default_mpointing = {'user_id': None,
-                         'object_name': None,
+    default_mpointing = {'object_name': None,
                          'ra': None,
                          'dec': None,
                          'too': None,
@@ -417,19 +398,17 @@ if __name__ == '__main__':
                             'imgtype': 'SCIENCE',
                             }
 
+    print("** Insert pointing into GOTO queue database **")
     with db.open_session() as session:
-        print("** Insert pointing into GOTO queue database **")
-
-        # Get user_id
-        # username = input('Enter your database username: ')
-        # if username is None:
-        #     username = 'goto'
-        print('Using default username: goto')
-        username = 'goto'
+        # get the User, or make it if it doesn't exist
+        try:
+            user = db.get_user(session, username='goto')
+        except ValueError:
+            password = getpass.getpass(prompt="Creating default user - give password: ")
+            user = db.User('goto', password, 'GOTO Survey')
 
         # Fill Mpointing infomation
         mpointing = default_mpointing.copy()
-        mpointing['user_id'] = get_user_id(session, username)
         mpointing = fill_mpointing(session, mpointing)
 
         # Fill Exposure Set infomation
@@ -452,7 +431,7 @@ if __name__ == '__main__':
 
         mpointing['min_time'] = total_exptime
 
-        mp = db.Mpointing(**mpointing)
+        mp = db.Mpointing(**mpointing, user=user)
         for exposure_set in exposure_sets:
             es = db.ExposureSet(**exposure_set)
             mp.exposure_sets.append(es)

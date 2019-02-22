@@ -76,7 +76,7 @@ with db.open_session() as session:
     print(st2, end='\n\n')
 
     # let's make a Pointing
-    user_id = db.get_user_id(session, 'goto')
+    user = db.get_user(session, 'goto_test')
     p = db.Pointing(object_name='IP Peg',
                     ra=350.785625,
                     dec=18.416472,
@@ -89,7 +89,8 @@ with db.open_session() as session:
                     too=0,
                     start_time=Time.now(),
                     stop_time=Time.now() + 3 * u.day,
-                    user_id=user_id)
+                    user=user,
+                    )
     e = db.ExposureSet(imgtype='SCIENCE',
                        filt='G',
                        exptime=20,
@@ -112,9 +113,10 @@ with db.open_session() as session:
                       max_moon='B',
                       min_moonsep=30,
                       num_todo=5,
-                      user_id=user_id,
                       valid_time=[60, 120],
-                      wait_time=60)
+                      wait_time=60,
+                      user=user,
+                      )
     # and add RGBL exposure set
     L = db.ExposureSet(imgtype='SCIENCE', filt='L', exptime=120, num_exp=3, binning=2)
     R = db.ExposureSet(imgtype='SCIENCE', filt='R', exptime=120, num_exp=3, binning=2)
@@ -131,10 +133,12 @@ with db.open_session() as session:
 
 # new session, add random pointings
 with db.open_session() as session:
-    pointings = [db.make_random_pointing(user_id) for i in range(10)]
+    user = db.get_user(session, 'goto_test')
+
+    pointings = [db.make_random_pointing(user) for i in range(10)]
     db.insert_items(session, pointings)
 
-    more_pointings = [db.make_random_pointing(user_id) for i in range(10)]
+    more_pointings = [db.make_random_pointing(user) for i in range(10)]
     db.insert_items(session, more_pointings)
 
 # now check how many we have

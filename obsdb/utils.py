@@ -13,7 +13,7 @@ from .engine import open_session
 from .models import ExposureSet, Grid, GridTile, Mpointing, Pointing, User
 
 
-__all__ = ['add_user', 'get_user_id', 'get_username', 'validate_user',
+__all__ = ['get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
@@ -25,37 +25,8 @@ __all__ = ['add_user', 'get_user_id', 'get_username', 'validate_user',
            ]
 
 
-def add_user(session, username, password, full_name):
-    """Add a user to the database.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session`
-    username : string
-        short user name
-    password : string
-        plain text password
-        stored in DB using a sha512 hash for security
-    full_name : string
-        full name of user
-
-    Returns
-    --------
-    new_user : `User`
-        the new User class
-
-    """
-    new_user = User(username=username, password=password, full_name=full_name)
-    session.add(new_user)
-    return new_user
-
-
-def get_user_id(session, username):
-    """Return the user_id for a given username.
-
-    The user_id must be supplied as an argument to create a
-    Pointing.
+def get_user(session, username):
+    """Return the `User` for a given username.
 
     Parameters
     ----------
@@ -66,8 +37,8 @@ def get_user_id(session, username):
 
     Returns
     --------
-    user_id : int
-        id of user in database
+    user : `User`
+        the User class for the given username
 
     Raises
     ------
@@ -79,35 +50,7 @@ def get_user_id(session, username):
     user = query.one_or_none()
     if not user:
         raise ValueError('No matching User found')
-    return user.db_id
-
-
-def get_username(session, user_id):
-    """Return the username for a given user_id.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session`
-    user_id : int
-        id of user in database.
-
-    Returns
-    --------
-    username : string
-        short name of user
-
-    Raises
-    ------
-    ValueError : if no matching User is found in the database
-
-    """
-    query = session.query(User)
-    query = query.filter(User.db_id == user_id)
-    user = query.one_or_none()
-    if not user:
-        raise ValueError('No matching User found')
-    return user.username
+    return user
 
 
 def validate_user(session, username, password):
@@ -124,7 +67,7 @@ def validate_user(session, username, password):
 
     Returns
     -------
-    ok : bool
+    passed : bool
         True if user exists and password is correct
 
     Raises
@@ -132,16 +75,11 @@ def validate_user(session, username, password):
     ValueError : if username is not found in DB
 
     """
-    password_hash = hashlib.sha512(password.encode()).hexdigest()
-
-    query = session.query(User)
-    query = query.filter(User.username == username)
-    user = query.one_or_none()
+    user = session.query(User).filter(User.username == username).one_or_none()
     if not user:
         raise ValueError('No matching User found')
 
-    actual_hash = user.password
-    if password_hash == actual_hash:
+    if user.password_hash == hashlib.sha512(password.encode()).hexdigest():
         return True
     else:
         return False

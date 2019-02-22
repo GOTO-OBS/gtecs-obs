@@ -8,7 +8,7 @@ from .models import ExposureSet, Pointing
 __all__ = ['make_random_pointing']
 
 
-def make_random_pointing(user_id, num_expsets=None, time=None):
+def make_random_pointing(user, num_expsets=None, time=None):
     """Make a random pointing for testing.
 
     It should be observable from La Palma at the time of creation.
@@ -17,11 +17,14 @@ def make_random_pointing(user_id, num_expsets=None, time=None):
 
     Parameters
     ----------
-    num_expsets : int
-        if None, a random number of exposure_sets between 1 and 5 will be added
+    user : `User`
+        the User to associate the Pointing with
 
-    time : `~astropy.time.Time`
-        The time to centre the pointings around
+    num_expsets : int, optional
+        the number of Exposure Sets attached to the Pointing
+        if None, a random number of exposure_sets between 1 and 5 will be added
+    time : `~astropy.time.Time`, optional
+        the time to centre the pointings around
         if None, the current time is used
 
     Returns
@@ -54,7 +57,7 @@ def make_random_pointing(user_id, num_expsets=None, time=None):
                  start_time=t1,
                  stop_time=t2,
                  status='pending',
-                 user_id=user_id,
+                 user=user,
                  )
 
     if num_expsets is None:

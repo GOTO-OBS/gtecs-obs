@@ -14,7 +14,7 @@ import obsdb as db
 
 SURVEY_SETTINGS = dict(start_rank=999,
                        min_alt=35,
-                       min_time=120,
+                       min_time=(60 + 30) * 3,
                        max_sunalt=-12,
                        max_moon='B',
                        min_moonsep=30,
@@ -24,7 +24,7 @@ SURVEY_SETTINGS = dict(start_rank=999,
                        wait_time=4320)
 
 EXP_SETTINGS = dict(num_exp=3,
-                    exptime=120,
+                    exptime=60,
                     filt='L',
                     binning=1,
                     imgtype='SCIENCE')

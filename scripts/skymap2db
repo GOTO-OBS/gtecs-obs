@@ -26,7 +26,7 @@ DB_NAME = 'GOTO GW alerts'
 # Constant Pointing values
 MPOINTING_SETTINGS = dict(start_rank=2,
                           min_alt=30,
-                          min_time=360,
+                          min_time=(60 + 30) * 3,
                           max_sunalt=-18,
                           max_moon='B',
                           min_moonsep=30,
@@ -37,7 +37,7 @@ MPOINTING_SETTINGS = dict(start_rank=2,
 
 # Constant ExposureSet values
 EXP_SETTINGS = dict(num_exp=3,
-                    exptime=120,
+                    exptime=60,
                     filt='L',
                     binning=1,
                     imgtype='SCIENCE')

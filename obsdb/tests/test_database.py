@@ -59,8 +59,16 @@ with db.open_session() as session:
     # check the survey tile weight updated correctly
     assert st1.initial_weight == st1.current_weight == 0.5
 
-# OK, new Session. Let's make a Pointing
-with db.open_session() as session:
+    # print them to check __repr__
+    print(e, end='\n\n')
+    print(g, end='\n\n')
+    print(gt1)
+    print(gt2, end='\n\n')
+    print(s, end='\n\n')
+    print(st1)
+    print(st2, end='\n\n')
+
+    # let's make a Pointing
     user_id = db.get_user_id(session, 'goto')
     p = db.Pointing(object_name='IP Peg',
                     ra=350.785625,
@@ -82,6 +90,37 @@ with db.open_session() as session:
                        binning=2)
     p.exposure_sets.append(e)
     session.add(p)
+    session.commit()
+    print(p, end='\n\n')
+
+    # create an Mpointing
+    mp = db.Mpointing(object_name='M31',
+                      ra=10.685,
+                      dec=41.2875,
+                      start_rank=9,
+                      min_alt=30,
+                      max_sunalt=-15,
+                      min_time=3600,
+                      too=0,
+                      max_moon='B',
+                      min_moonsep=30,
+                      num_todo=5,
+                      user_id=user_id,
+                      valid_time=[60, 120],
+                      wait_time=60)
+    # and add RGBL exposure set
+    L = db.ExposureSet(imgtype='SCIENCE', filt='L', exptime=120, num_exp=3, binning=2)
+    R = db.ExposureSet(imgtype='SCIENCE', filt='R', exptime=120, num_exp=3, binning=2)
+    G = db.ExposureSet(imgtype='SCIENCE', filt='G', exptime=120, num_exp=3, binning=2)
+    B = db.ExposureSet(imgtype='SCIENCE', filt='B', exptime=120, num_exp=3, binning=2)
+    mp.exposure_sets = [L, R, G, B]
+    session.add(mp)
+    session.commit()
+    print(mp, end='\n\n')
+    print(L)
+    print(R)
+    print(G)
+    print(B, end='\n\n')
 
 # new session, add random pointings
 with db.open_session() as session:
@@ -117,30 +156,6 @@ print("{} points in database".format(npoints))
 print("{} points in queue".format(nqueue))
 print("{} unmarked expired pointings".format(len(expired)))
 print("{} marked expired pointings\n".format(len(marked)))
-
-# create an Mpointing
-mp = db.Mpointing(object_name='M31',
-                  ra=10.685,
-                  dec=41.2875,
-                  start_rank=9,
-                  min_alt=30,
-                  max_sunalt=-15,
-                  min_time=3600,
-                  too=0,
-                  max_moon='B',
-                  min_moonsep=30,
-                  num_todo=5,
-                  user_id=user_id,
-                  valid_time=[60, 120],
-                  wait_time=60)
-# and add RGBL exposure set
-L = db.ExposureSet(imgtype='SCIENCE', filt='L', exptime=120, num_exp=3, binning=2)
-R = db.ExposureSet(imgtype='SCIENCE', filt='R', exptime=120, num_exp=3, binning=2)
-G = db.ExposureSet(imgtype='SCIENCE', filt='G', exptime=120, num_exp=3, binning=2)
-B = db.ExposureSet(imgtype='SCIENCE', filt='B', exptime=120, num_exp=3, binning=2)
-mp.exposure_sets = [L, R, G, B]
-with db.open_session() as s:
-    s.add(mp)
 
 time.sleep(5)
 

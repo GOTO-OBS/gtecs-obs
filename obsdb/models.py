@@ -1115,12 +1115,12 @@ class Mpointing(Base):
                      start_time=start_time,
                      stop_time=stop_time,
                      status='pending',
-                     user_id=self.user_id,
-                     mpointing_id=self.db_id,
+                     mpointing=self,
+                     user=self.user,
                      time_block=next_block,
-                     grid_tile_id=self.grid_tile_id,
-                     survey_tile_id=self.survey_tile_id,
-                     event_id=self.event_id,
+                     grid_tile=self.grid_tile,
+                     survey_tile=self.survey_tile,
+                     event=self.event,
                      )
         # add the exposures
         p.exposure_sets = self.exposure_sets

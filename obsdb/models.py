@@ -132,8 +132,6 @@ class Pointing(Base):
 
     Parameters
     ----------
-    user_id : int
-        unique key identifying user to whom this Pointing belongs
     object_name : String
         object name
     ra : float, optional
@@ -185,6 +183,11 @@ class Pointing(Base):
 
     Relationships
     -------------
+    user : `User`
+        the User associated with this Pointing
+        required before addition to the database
+        can also be added with the user_id parameter
+
     exposure_sets : list of `ExposureSet`, optional
         the Exposure Sets associated with this Pointing, if any
     mpointing : `Mpointing`, optional
@@ -457,8 +460,6 @@ class Mpointing(Base):
 
     Parameters
     ----------
-    user_id : int
-        unique key identifying user to whom this Mpointing belongs
     object_name : String
         object name
     ra : float, optional
@@ -524,6 +525,11 @@ class Mpointing(Base):
 
     Relationships
     -------------
+    user : `User`
+        the User associated with this Mpointing
+        required before addition to the database
+        can also be added with the user_id parameter
+
     pointings : list of `Pointing`, optional
         the Pointings associated with this Mpointing, if any
     exposure_sets : list of `ExposureSet`, optional

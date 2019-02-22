@@ -28,10 +28,10 @@ class User(Base):
     """A class to represent a database User.
 
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an User, and set its attributes
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the User is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -39,12 +39,12 @@ class User(Base):
 
     Args
     ----
-        username : string
-            a short user name
-        password : string
-            password for authentication. stored as a hash in the database.
-        full_name : string
-            the user's full name.
+    username : string
+        a short user name
+    password : string
+        password for authentication, stored as a hash in the database.
+    full_name : string
+        the user's full name.
 
     A User also has the following properties which are
     populated through database queries, but not needed for
@@ -52,35 +52,35 @@ class User(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        mpointings : list of `Mpointing`
-            a list of any `Mpointing`s associated with this User
-        pointings : list of `Pointing`
-            a list of any `Pointing`s associated with this User
+    db_id : int
+        primary database key
+    mpointings : list of `Mpointing`
+        a list of any `Mpointing`s associated with this User
+    pointings : list of `Pointing`
+        a list of any `Pointing`s associated with this User
 
     Examples
     --------
-        >>> from obsdb import *
-        >>>
-        >>> bob = User(username='bob', password='1234', full_name="Bob Marley")
-        >>> session = load_session()
-        >>> session.add(bob)  # add bob to database
-        >>> session.commit()  # commit changes (otherwise DB not changed)
-        >>> bob
-        User(db_id=25, username=bob, full_name=Bob Marley)
-        >>> bob.pointings
-        []
-        >>> pointing = make_random_pointing(25)  # make a pointing for bob
-        >>> session.add(pointing)
-        >>> session.commit()
-        >>> bob.pointings
-        [Pointing(db_id=None, status='pending', object_name=random_object, ra=352.133, dec=28.464,
-        rank=84, min_alt=30, max_sunalt=-15, min_time=1575.8310236, max_moon=D, min_moonsep=30,
-        too=True, start_time=2018-01-16 16:46:12, stop_time=2018-01-18 16:46:12, started_time=None,
-        stopped_time=None, user_id=25, mpointing_id=None, time_block_id=None, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)]
-        >>> session.close()
+    >>> from obsdb import *
+    >>>
+    >>> bob = User(username='bob', password='1234', full_name="Bob Marley")
+    >>> session = load_session()
+    >>> session.add(bob)  # add bob to database
+    >>> session.commit()  # commit changes (otherwise DB not changed)
+    >>> bob
+    User(db_id=25, username=bob, full_name=Bob Marley)
+    >>> bob.pointings
+    []
+    >>> pointing = make_random_pointing(25)  # make a pointing for bob
+    >>> session.add(pointing)
+    >>> session.commit()
+    >>> bob.pointings
+    [Pointing(db_id=None, status='pending', object_name=random_object, ra=352.133, dec=28.464,
+    rank=84, min_alt=30, max_sunalt=-15, min_time=1575.8310236, max_moon=D, min_moonsep=30,
+    too=True, start_time=2018-01-16 16:46:12, stop_time=2018-01-18 16:46:12, started_time=None,
+    stopped_time=None, user_id=25, mpointing_id=None, time_block_id=None, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)]
+    >>> session.close()
 
     """
 
@@ -111,10 +111,10 @@ class Pointing(Base):
     """A class to represent an Pointing.
 
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an Pointing, and set its attributes
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the Pointing is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -122,49 +122,49 @@ class Pointing(Base):
 
     Args
     ----
-        user_id : int
-            unique key identifying user to whom this Pointing belongs
-        object_name : String
-            object name
-        ra : float, optional
-            J2000 right ascension in decimal degrees
-            if ra is not given and this Pointing is linked to a GridTile
-            then the ra will be extracted from the GridTile
-        dec : float, optional
-            J2000 declination in decimal degrees
-            if dec is not given and this Pointing is linked to a GridTile
-            then the dec will be extracted from the GridTile
-        rank : Integer
-            rank to use for pointing
-        min_alt : float
-            minimum altitude to observer at
-        min_time : float
-            minimum time needed to schedule pointing
-        max_sunalt : float
-            altitude constraint on Sun
-        max_moon : string
-            Moon constraint. one of 'D', 'G', 'B'.
-        min_moonsep : float
-            distance constraint from the Moon, degrees
-        too : int
-            0 or 1 to indicate if this is a target of opportunity or not
-        start_time : string, `astropy.time.Time` or datetime.datetime
-            UTC time from which pointing is considered valid and can be started
-        stop_time : string, `astropy.time.Time` or datetime.datetime, or None
-            the latest UTC time at which pointing may be started
-            can be None, if so the pointing will stay in the queue indefinitely
-            (it can't be marked as expired) and will only leave when observed
+    user_id : int
+        unique key identifying user to whom this Pointing belongs
+    object_name : String
+        object name
+    ra : float, optional
+        J2000 right ascension in decimal degrees
+        if ra is not given and this Pointing is linked to a GridTile
+        then the ra will be extracted from the GridTile
+    dec : float, optional
+        J2000 declination in decimal degrees
+        if dec is not given and this Pointing is linked to a GridTile
+        then the dec will be extracted from the GridTile
+    rank : Integer
+        rank to use for pointing
+    min_alt : float
+        minimum altitude to observer at
+    min_time : float
+        minimum time needed to schedule pointing
+    max_sunalt : float
+        altitude constraint on Sun
+    max_moon : string
+        Moon constraint. one of 'D', 'G', 'B'.
+    min_moonsep : float
+        distance constraint from the Moon, degrees
+    too : bool
+        indicates if this is a Target of Opportunity (ToO)
+    start_time : string, `astropy.time.Time` or datetime.datetime
+        UTC time from which pointing is considered valid and can be started
+    stop_time : string, `astropy.time.Time` or datetime.datetime, or None
+        the latest UTC time at which pointing may be started
+        can be None, if so the pointing will stay in the queue indefinitely
+        (it can't be marked as expired) and will only leave when observed
 
-        status : string, optional
-            status of pointing, default 'pending'
-        grid_tile_id : int, optional
-            unique key linking to a `GridTile`
-        survey_tile_id : int, optional
-            unique key linking to a `SurveyTile`
-        event_id : int, optional
-            unique key linking to an `Event`
-        mpointing_id : int, optional
-            unique key linking to an `Mpointing`
+    status : string, optional
+        status of pointing, default 'pending'
+    grid_tile_id : int, optional
+        unique key linking to a `GridTile`
+    survey_tile_id : int, optional
+        unique key linking to a `SurveyTile`
+    event_id : int, optional
+        unique key linking to an `Event`
+    mpointing_id : int, optional
+        unique key linking to an `Mpointing`
 
     An Pointing also has the following properties which are
     populated through database queries, but not needed for
@@ -172,75 +172,75 @@ class Pointing(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        started_time : datetime.datetime, or None
-            if the pointing has started (been marked running)
-            this will give the time it was updated
-        stopped_time : datetime.datetime, or None
-            if the pointing has finished (either completed or cancelled for
-            some reason) this will give the time it was updated
-        exposure_sets : list of `ExposureSet`
-            the `ExposureSet` objects associated with this `Pointing`, if any
-        grid_tile : `GridTile`
-            the `GridTile` associated with this `Pointing`, if any
-        survey_tile : `SurveyTile`
-            the `SurveyTile` associated with this `Pointing`, if any
-        event : `Event`
-            the `Event` associated with this `Pointing`, if any
-        mpointing : `Mpointing`
-            the `Mpointing` associated with this `Pointing`, if any
+    db_id : int
+        primary database key
+    started_time : datetime.datetime, or None
+        if the pointing has started (been marked running)
+        this will give the time it was updated
+    stopped_time : datetime.datetime, or None
+        if the pointing has finished (either completed or cancelled for
+        some reason) this will give the time it was updated
+    exposure_sets : list of `ExposureSet`
+        the `ExposureSet` objects associated with this `Pointing`, if any
+    grid_tile : `GridTile`
+        the `GridTile` associated with this `Pointing`, if any
+    survey_tile : `SurveyTile`
+        the `SurveyTile` associated with this `Pointing`, if any
+    event : `Event`
+        the `Event` associated with this `Pointing`, if any
+    mpointing : `Mpointing`
+        the `Mpointing` associated with this `Pointing`, if any
 
     Examples
     --------
-        >>> from obsdb import *
-        >>> from astropy import units as u
-        >>> from astropy.time import Time
-        >>> session = load_session()
+    >>> from obsdb import *
+    >>> from astropy import units as u
+    >>> from astropy.time import Time
+    >>> session = load_session()
 
-        Create a pointing:
+    Create a pointing:
 
-        >>> p = Pointing(object_name='IP Peg', ra=350.785625, dec=18.416472, rank=9, min_alt=30,
-        ... max_sunalt=-15, min_time=3600, max_moon='G', min_moonsep=30, too=0,
-        ... start_time=Time.now(), stop_time=Time.now()+3*u.day, user_id=24)
-        >>> p
-        Pointing(db_id=None, status='None', object_name=IP Peg, ra=350.785625, dec=18.416472,
-        rank=9, min_alt=30, max_sunalt=-15, min_time=3600, max_moon=G, min_moonsep=None, too=False,
-        start_time=2018-01-12 17:39:54, stop_time=2018-01-15 17:39:54, started_time=None,
-        stopped_time=None, user_id=24, mpointing_id=None, time_block_id=None, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)
+    >>> p = Pointing(object_name='IP Peg', ra=350.785625, dec=18.416472, rank=9, min_alt=30,
+    ... max_sunalt=-15, min_time=3600, max_moon='G', min_moonsep=30, too=0,
+    ... start_time=Time.now(), stop_time=Time.now()+3*u.day, user_id=24)
+    >>> p
+    Pointing(db_id=None, status='None', object_name=IP Peg, ra=350.785625, dec=18.416472,
+    rank=9, min_alt=30, max_sunalt=-15, min_time=3600, max_moon=G, min_moonsep=None, too=False,
+    start_time=2018-01-12 17:39:54, stop_time=2018-01-15 17:39:54, started_time=None,
+    stopped_time=None, user_id=24, mpointing_id=None, time_block_id=None, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)
 
-        We can insert it into the database and the status and db_id will be set:
+    We can insert it into the database and the status and db_id will be set:
 
-        >>> session.add(p)
-        >>> session.commit()
-        >>> p.status, p.db_id
-        ('pending', 17073)
+    >>> session.add(p)
+    >>> session.commit()
+    >>> p.status, p.db_id
+    ('pending', 17073)
 
-        At the moment, this pointing has no exposure sets. We can either add these to the
-        `exposure_sets` attribute directly:
+    At the moment, this pointing has no exposure sets. We can either add these to the
+    `exposure_sets` attribute directly:
 
-        >>> e1 = ExposureSet(imgtype='SCIENCE', filt='L', exptime=20, num_exp=20, binning=2)
-        >>> p.exposure_sets.append(e1)
+    >>> e1 = ExposureSet(imgtype='SCIENCE', filt='L', exptime=20, num_exp=20, binning=2)
+    >>> p.exposure_sets.append(e1)
 
-        or create `ExposureSet` instances with the `pointing_id` attribute set, and the database
-        will take care of the rest:
+    or create `ExposureSet` instances with the `pointing_id` attribute set, and the database
+    will take care of the rest:
 
-        >>> e2 = ExposureSet(imgtype='SCIENCE', filt='G', exptime=20, num_exp=20, binning=2,
-        ... pointing_id=17073)
-        >>> e3 = ExposureSet(imgtype='SCIENCE', filt='R', exptime=20, num_exp=20, binning=2,
-        ... pointing_id=17073)
-        >>> insert_items(session, [e2, e3])
-        >>> session.commit()
-        >>> p.exposure_sets
-        [ExposureSet(db_id=126601, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=L,
-        exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None),
-        ExposureSet(db_id=126602, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=G,
-        exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None),
-        ExposureSet(db_id=126603, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=R,
-        exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None)]
+    >>> e2 = ExposureSet(imgtype='SCIENCE', filt='G', exptime=20, num_exp=20, binning=2,
+    ... pointing_id=17073)
+    >>> e3 = ExposureSet(imgtype='SCIENCE', filt='R', exptime=20, num_exp=20, binning=2,
+    ... pointing_id=17073)
+    >>> insert_items(session, [e2, e3])
+    >>> session.commit()
+    >>> p.exposure_sets
+    [ExposureSet(db_id=126601, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=L,
+    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None),
+    ExposureSet(db_id=126602, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=G,
+    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None),
+    ExposureSet(db_id=126603, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=R,
+    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None)]
 
-        >>> session.close()
+    >>> session.close()
 
     """
 
@@ -341,10 +341,10 @@ class ExposureSet(Base):
     """A class to represent an Exposure Set: a set of repeated identical exposures.
 
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an ExposureSet, and set its attributes
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the ExposureSet is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -352,33 +352,33 @@ class ExposureSet(Base):
 
     Args
     ----
-        num_exp : int
-            number of exposures within the set
-        exptime : float
-            exposure time in seconds
-        filt : string
-            filter to use
-        binning : int
-            binning to apply
-        imgtype : string
-            indicates the type of exposure set.
-            one of SCIENCE, FOCUS, STD, FLAT, BIAS, DARK
+    num_exp : int
+        number of exposures within the set
+    exptime : float
+        exposure time in seconds
+    filt : string
+        filter to use
+    binning : int
+        binning to apply
+    imgtype : string
+        indicates the type of exposure set.
+        one of SCIENCE, FOCUS, STD, FLAT, BIAS, DARK
 
-        ut_mask : int, optional
-            if set, this is a binary mask which will determine which unit
-            telescopes carry out the exposure. A value of 5 (binary 0101) will
-            be exposed by cameras 1 and 3.
-        ra_offset : float, optional
-            the size of the random offset to apply between each exposure
-            if not set, no offset will be made
-        dec_offset : float, optional
-            the size of the random offset to apply between each exposure
-            if not set, no offset will be made
+    ut_mask : int, optional
+        if set, this is a binary mask which will determine which unit
+        telescopes carry out the exposure. A value of 5 (binary 0101) will
+        be exposed by cameras 1 and 3.
+    ra_offset : float, optional
+        the size of the random offset to apply between each exposure
+        if not set, no offset will be made
+    dec_offset : float, optional
+        the size of the random offset to apply between each exposure
+        if not set, no offset will be made
 
-        mpointing_id : int, optional
-            unique key linking to an `Mpointing`
-        pointing_id : int, optional
-            unique key linking to an `Pointing`
+    mpointing_id : int, optional
+        unique key linking to an `Mpointing`
+    pointing_id : int, optional
+        unique key linking to an `Pointing`
 
     An ExposureSet also has the following properties which are
     populated through database queries, but not needed for
@@ -386,12 +386,12 @@ class ExposureSet(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        mpointing : `Mpointing`
-            the `Mpointing` associated with this `ExposureSet`, if any
-        pointing : `Pointing`
-            the `Pointing` associated with this `ExposureSet`, if any
+    db_id : int
+        primary database key
+    mpointing : `Mpointing`
+        the `Mpointing` associated with this `ExposureSet`, if any
+    pointing : `Pointing`
+        the `Pointing` associated with this `ExposureSet`, if any
 
     """
 
@@ -448,57 +448,57 @@ class Mpointing(Base):
 
     Args
     ----
-        user_id : int
-            unique key identifying user to whom this Mpointing belongs
-        object_name : String
-            object name
-        ra : float, optional
-            J2000 right ascension in decimal degrees
-            if ra is not given and this Mpointing is linked to a GridTile
-            then the ra will be extracted from the GridTile
-        dec : float, optional
-            J2000 declination in decimal degrees
-            if dec is not given and this Mpointing is linked to a GridTile
-            then the dec will be extracted from the GridTile
-        start_rank : Integer
-            rank to use for first pointing in series
-        min_alt : float
-            minimum altitude to observer at
-        min_time : float
-            minimum time needed to schedule pointing
-        max_sunalt : float
-            altitude constraint on Sun
-        max_moon : string
-            Moon constraint. one of 'D', 'G', 'B'.
-        min_moonsep : float
-            distance constraint from the Moon, degrees
-        too : int
-            0 or 1 to indicate if this is a too or not
-        num_todo : int
-            number of (sucsessful) observations required.
-            less than zero means repeat infinitely.
-        valid_time : float or list of float
-            the amount of time the pointing(s) should be valid in the queue.
-            if num_todo is greater than times given the list will be looped.
-        wait_time : float or list of float
-            time to wait between pointings in minutes.
-            if num_todo is greater than times given the list will be looped.
+    user_id : int
+        unique key identifying user to whom this Mpointing belongs
+    object_name : String
+        object name
+    ra : float, optional
+        J2000 right ascension in decimal degrees
+        if ra is not given and this Mpointing is linked to a GridTile
+        then the ra will be extracted from the GridTile
+    dec : float, optional
+        J2000 declination in decimal degrees
+        if dec is not given and this Mpointing is linked to a GridTile
+        then the dec will be extracted from the GridTile
+    start_rank : Integer
+        rank to use for first pointing in series
+    min_alt : float
+        minimum altitude to observer at
+    min_time : float
+        minimum time needed to schedule pointing
+    max_sunalt : float
+        altitude constraint on Sun
+    max_moon : string
+        Moon constraint. one of 'D', 'G', 'B'.
+    min_moonsep : float
+        distance constraint from the Moon, degrees
+    too : bool
+        indicates if this is a Target of Opportunity (ToO)
+    num_todo : int
+        number of (sucsessful) observations required.
+        less than zero means repeat infinitely.
+    valid_time : float or list of float
+        the amount of time the pointing(s) should be valid in the queue.
+        if num_todo is greater than times given the list will be looped.
+    wait_time : float or list of float
+        time to wait between pointings in minutes.
+        if num_todo is greater than times given the list will be looped.
 
-        status : string, optional
-            status of mpointing, default 'unscheduled'
-        start_time : string, `astropy.time.Time` or datetime.datetime, optional
-            UTC time from which Mpointing is considered valid and can be started
-            if not given then set to now, so the Mpointing will start immediately
-        stop_time : string, `astropy.time.Time` or datetime.datetime, optional
-            the latest UTC time after which pointings must stop
-            if not given the Mpointing will continue creating pointings until
-            it is completed
-        grid_tile_id : int, optional
-            unique key linking to a `GridTile`
-        survey_tile_id : int, optional
-            unique key linking to a `SurveyTile`
-        event_id : int, optional
-            unique key linking to an `Event`
+    status : string, optional
+        status of mpointing, default 'unscheduled'
+    start_time : string, `astropy.time.Time` or datetime.datetime, optional
+        UTC time from which Mpointing is considered valid and can be started
+        if not given then set to now, so the Mpointing will start immediately
+    stop_time : string, `astropy.time.Time` or datetime.datetime, optional
+        the latest UTC time after which pointings must stop
+        if not given the Mpointing will continue creating pointings until
+        it is completed
+    grid_tile_id : int, optional
+        unique key linking to a `GridTile`
+    survey_tile_id : int, optional
+        unique key linking to a `SurveyTile`
+    event_id : int, optional
+        unique key linking to an `Event`
 
     An Mpointing also has the following properties which are
     populated through database queries, but not needed for
@@ -506,253 +506,255 @@ class Mpointing(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        current_rank : int
-            rank for next pointing to be scheduled
-        initial_rank : int
-            initial rank set (it will increase as pointings are observed)
-        num_completed : int
-            number of successfully completed pointings
-        num_remaining : int
-            number of pointings still to do (same as num_todo - num_completed)
-        pointings : list of `Pointing`
-            the `Pointing` objects associated with this `Mpointing`, if any
-        exposure_sets : list of `ExposureSet`
-            the `ExposureSet` objects associated with this `Mpointing`, if any
-        time_blocks : list of `TimeBlock`
-            the `TimeBlock` objects associated with this `Mpointing`, if any
-        grid_tile : `GridTile`
-            the `GridTile` associated with this `Pointing`, if any
-        survey_tile : `SurveyTile`
-            the `SurveyTile` associated with this `Pointing`, if any
-        event : `Event`
-            the `Event` associated with this `Pointing`, if any
+    db_id : int
+        primary database key
+    current_rank : int
+        rank for next pointing to be scheduled
+    initial_rank : int
+        initial rank set (it will increase as pointings are observed)
+    num_completed : int
+        number of successfully completed pointings
+    num_remaining : int
+        number of pointings still to do (same as num_todo - num_completed)
+    infinite : bool
+        if the Mpointing will continue infnitely (set if num_todo is < 0)
+    pointings : list of `Pointing`
+        the `Pointing` objects associated with this `Mpointing`, if any
+    exposure_sets : list of `ExposureSet`
+        the `ExposureSet` objects associated with this `Mpointing`, if any
+    time_blocks : list of `TimeBlock`
+        the `TimeBlock` objects associated with this `Mpointing`, if any
+    grid_tile : `GridTile`
+        the `GridTile` associated with this `Pointing`, if any
+    survey_tile : `SurveyTile`
+        the `SurveyTile` associated with this `Pointing`, if any
+    event : `Event`
+        the `Event` associated with this `Pointing`, if any
 
     Examples
     --------
-        >>> from obsdb import *
-        >>> from astropy.time import Time
+    >>> from obsdb import *
+    >>> from astropy.time import Time
 
-        make an Mpointing - starting at midnight, 5 pointings that stay in the queue
-        for 5 minutes and the next one is valid 10 minutes after the previous.
+    make an Mpointing - starting at midnight, 5 pointings that stay in the queue
+    for 5 minutes and the next one is valid 10 minutes after the previous.
 
-        >>> mp = Mpointing(object_name='M31', ra=22, dec=-5, start_rank=9, min_alt=30,
-        ... min_time=3600, max_sunalt=-15, too=0, max_moon='B', min_moonsep=30, num_todo=5,
-        ... user_id=24, valid_time=5, wait_time=10, start_time=Time('2018-01-01 00:00:00'))
-        >>> mp
-        Mpointing(db_id=None, status='unscheduled', num_todo=5, num_completed=0,
-        num_remaining=5, infinite=False, object_name=M31, ra=22, dec=-5, rank=9, start_rank=9,
-        min_alt=30, max_sunalt=-15, min_time=3600, max_moon=B, min_moonsep=30, too=False,
-        start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)
+    >>> mp = Mpointing(object_name='M31', ra=22, dec=-5, start_rank=9, min_alt=30,
+    ... min_time=3600, max_sunalt=-15, too=0, max_moon='B', min_moonsep=30, num_todo=5,
+    ... user_id=24, valid_time=5, wait_time=10, start_time=Time('2018-01-01 00:00:00'))
+    >>> mp
+    Mpointing(db_id=None, status='unscheduled', num_todo=5, num_completed=0,
+    num_remaining=5, infinite=False, object_name=M31, ra=22, dec=-5, rank=9, start_rank=9,
+    min_alt=30, max_sunalt=-15, min_time=3600, max_moon=B, min_moonsep=30, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)
 
-        Note that the db_id is None, because that will be filled out when we add it to the
-        database.
+    Note that the db_id is None, because that will be filled out when we add it to the
+    database.
 
-        Looking at the TimeBlocks you can see that we only need one, and it has been generated
+    Looking at the TimeBlocks you can see that we only need one, and it has been generated
 
-        >>> mp.time_blocks
-        [TimeBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
-        mpointing_id=None)]
+    >>> mp.time_blocks
+    [TimeBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
+    mpointing_id=None)]
 
-        This block will be repeated 5 times, as requested.
+    This block will be repeated 5 times, as requested.
 
-        ~~~~~~~~~~~~~~~~~~~~~
+    ~~~~~~~~~~~~~~~~~~~~~
 
-        For a more complicated example, give a list to wait_time to have the intervals between
-        pointings increase.
+    For a more complicated example, give a list to wait_time to have the intervals between
+    pointings increase.
 
-        >>> mp = Mpointing(object_name='M31', ra=22, dec=-5, start_rank=9, min_alt=30,
-        ... min_time=3600, max_sunalt=-15, too=0, max_moon='B', min_moonsep=30, num_todo=5,
-        ... user_id=24, valid_time=5, wait_time=[10,20,30], start_time=Time('2018-01-01 00:00:00'))
-        >>> mp
-        Mpointing(db_id=None, status='unscheduled', num_todo=5, num_completed=0,
-        num_remaining=5, infinite=False, object_name=M31, ra=22, dec=-5, rank=9, start_rank=9,
-        min_alt=30, max_sunalt=-15, min_time=3600, max_moon=B, min_moonsep=30, too=False,
-        start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)
-        >>> mp.time_blocks
-        [TimeBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
-        mpointing_id=None),
-        TimeBlock(db_id=None, block_num=2, valid_time=5, wait_time=20, current=None,
-        mpointing_id=None),
-        TimeBlock(db_id=None, block_num=3, valid_time=5, wait_time=30, current=None,
-        mpointing_id=None)]
+    >>> mp = Mpointing(object_name='M31', ra=22, dec=-5, start_rank=9, min_alt=30,
+    ... min_time=3600, max_sunalt=-15, too=0, max_moon='B', min_moonsep=30, num_todo=5,
+    ... user_id=24, valid_time=5, wait_time=[10,20,30], start_time=Time('2018-01-01 00:00:00'))
+    >>> mp
+    Mpointing(db_id=None, status='unscheduled', num_todo=5, num_completed=0,
+    num_remaining=5, infinite=False, object_name=M31, ra=22, dec=-5, rank=9, start_rank=9,
+    min_alt=30, max_sunalt=-15, min_time=3600, max_moon=B, min_moonsep=30, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)
+    >>> mp.time_blocks
+    [TimeBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
+    mpointing_id=None),
+    TimeBlock(db_id=None, block_num=2, valid_time=5, wait_time=20, current=None,
+    mpointing_id=None),
+    TimeBlock(db_id=None, block_num=3, valid_time=5, wait_time=30, current=None,
+    mpointing_id=None)]
 
-        Note this time that we only created 3 blocks, but are asking for 5 observations.
-        That's not a problem, as the blocks will simply repeat.
-        In this case the sequence will look like this:
-        [note we set the Mpointing start time to midnight]
-        Pointing 1: start_time=00:00, stop_time=00:05 (valid for 5 minutes)
-        Pointing 2: start_time=00:15, stop_time=00:20 (wait for 10, then valid for 5)
-        Pointing 3: start_time=00:40, stop_time=00:45 (wait for 20, then valid for 5)
-        Pointing 4: start_time=01:15, stop_time=01:20 (wait for 30, then valid for 5)
-        Pointing 5: start_time=01:30, stop_time=01:35 (wait for 10, then valid for 5)
+    Note this time that we only created 3 blocks, but are asking for 5 observations.
+    That's not a problem, as the blocks will simply repeat.
+    In this case the sequence will look like this:
+    [note we set the Mpointing start time to midnight]
+    Pointing 1: start_time=00:00, stop_time=00:05 (valid for 5 minutes)
+    Pointing 2: start_time=00:15, stop_time=00:20 (wait for 10, then valid for 5)
+    Pointing 3: start_time=00:40, stop_time=00:45 (wait for 20, then valid for 5)
+    Pointing 4: start_time=01:15, stop_time=01:20 (wait for 30, then valid for 5)
+    Pointing 5: start_time=01:30, stop_time=01:35 (wait for 10, then valid for 5)
 
-        We can see what would happen by manually running through the pointings and pretending to be
-        the caretaker.
+    We can see what would happen by manually running through the pointings and pretending to be
+    the caretaker.
 
-        First add the Mpointing to the database:
+    First add the Mpointing to the database:
 
-        >>> s = load_session()
-        >>> s.add(mp)
-        >>> s.commit()
+    >>> s = load_session()
+    >>> s.add(mp)
+    >>> s.commit()
 
-        Then create the first pointing and add it to the database.
+    Then create the first pointing and add it to the database.
 
-        >>> p = mp.get_next_pointing()
-        >>> s.add(p)
-        >>> s.commit()
-        >>> mp.pointings
-        [Pointing(db_id=17100, status='pending', object_name=M31, ra=22.0, dec=-5.0, rank=9,
-        min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-        start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:05:00, started_time=None,
-        stopped_time=None, user_id=24, mpointing_id=2, time_block_id=1, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)]
+    >>> p = mp.get_next_pointing()
+    >>> s.add(p)
+    >>> s.commit()
+    >>> mp.pointings
+    [Pointing(db_id=17100, status='pending', object_name=M31, ra=22.0, dec=-5.0, rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:05:00, started_time=None,
+    stopped_time=None, user_id=24, mpointing_id=2, time_block_id=1, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)]
 
-        Note that the db_id, mpointing_id and time_block_id have been filled out,
-        and this Pointing has time_block_id=1.
-        Also that the start time is midnight and the stop time is 5 past, as expected.
-        See what happens if we mark the pointing as completed:
+    Note that the db_id, mpointing_id and time_block_id have been filled out,
+    and this Pointing has time_block_id=1.
+    Also that the start time is midnight and the stop time is 5 past, as expected.
+    See what happens if we mark the pointing as completed:
 
-        >>> mp.pointings[0].status = 'completed'
-        >>> s.commit()
-        >>> mp
-        Mpointing(db_id=2, status='unscheduled', num_todo=5, num_completed=1, num_remaining=4,
-        infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, min_alt=30.0,
-        max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-        start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)
+    >>> mp.pointings[0].status = 'completed'
+    >>> s.commit()
+    >>> mp
+    Mpointing(db_id=2, status='unscheduled', num_todo=5, num_completed=1, num_remaining=4,
+    infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, min_alt=30.0,
+    max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)
 
-        See that the num_completed atribute has gone up, the num_remaining has gone down
-        and the mpointing status has changed to 'unscheduled'.
+    See that the num_completed atribute has gone up, the num_remaining has gone down
+    and the mpointing status has changed to 'unscheduled'.
 
-        Create the next pointing and add it:
+    Create the next pointing and add it:
 
-        >>> p = mp.get_next_pointing()
-        >>> s.add(p)
-        >>> s.commit()
-        >>> p
-        Pointing(db_id=17102, status='pending', object_name=M31, ra=22.0, dec=-5.0, rank=19,
-        min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-        start_time=2018-01-01 00:15:00, stop_time=2018-01-01 00:20:00, started_time=None,
-        stopped_time=None, user_id=24, mpointing_id=2, time_block_id=2, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)
-        >>> mp
-        Mpointing(db_id=2, status='scheduled', num_todo=5, num_completed=1, num_remaining=4,
-        infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, min_alt=30.0,
-        max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-        start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)
+    >>> p = mp.get_next_pointing()
+    >>> s.add(p)
+    >>> s.commit()
+    >>> p
+    Pointing(db_id=17102, status='pending', object_name=M31, ra=22.0, dec=-5.0, rank=19,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:15:00, stop_time=2018-01-01 00:20:00, started_time=None,
+    stopped_time=None, user_id=24, mpointing_id=2, time_block_id=2, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)
+    >>> mp
+    Mpointing(db_id=2, status='scheduled', num_todo=5, num_completed=1, num_remaining=4,
+    infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, min_alt=30.0,
+    max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)
 
-        See that the Mpointing is back to scheduled.
-        Also, note that the new pointing has start time of 00:15 and stop of 00:20. That's as we
-        expected, because it's linked to the second time block not the first
-        (see time_block_id=2).
+    See that the Mpointing is back to scheduled.
+    Also, note that the new pointing has start time of 00:15 and stop of 00:20. That's as we
+    expected, because it's linked to the second time block not the first
+    (see time_block_id=2).
 
-        If you look at the time blocks you can see the next one is now marked as current.
+    If you look at the time blocks you can see the next one is now marked as current.
 
-        >>> mp.time_blocks
-        [TimeBlock(db_id=1, block_num=1, valid_time=5.0, wait_time=10.0, current=0,
-        mpointing_id=2),
-        TimeBlock(db_id=2, block_num=2, valid_time=5.0, wait_time=20.0, current=1,
-        mpointing_id=2),
-        TimeBlock(db_id=3, block_num=3, valid_time=5.0, wait_time=30.0, current=0,
-        mpointing_id=2)]
+    >>> mp.time_blocks
+    [TimeBlock(db_id=1, block_num=1, valid_time=5.0, wait_time=10.0, current=0,
+    mpointing_id=2),
+    TimeBlock(db_id=2, block_num=2, valid_time=5.0, wait_time=20.0, current=1,
+    mpointing_id=2),
+    TimeBlock(db_id=3, block_num=3, valid_time=5.0, wait_time=30.0, current=0,
+    mpointing_id=2)]
 
-        Mark this one as completed, and you'll see the Mpointing is updated.
+    Mark this one as completed, and you'll see the Mpointing is updated.
 
-        >>> p.status = 'completed'
-        >>> s.commit()
-        >>> mp.num_completed
-        2
-        >>> mp.status
-        'unscheduled'
+    >>> p.status = 'completed'
+    >>> s.commit()
+    >>> mp.num_completed
+    2
+    >>> mp.status
+    'unscheduled'
 
-        Let's run through the remaining pointings:
+    Let's run through the remaining pointings:
 
-        >>> p = mp.get_next_pointing() # Pointing 3 of 5
-        >>> s.add(p)
-        >>> s.commit()
-        >>> p.time_block_id
-        3
-        >>> mp.status
-        'scheduled'
+    >>> p = mp.get_next_pointing() # Pointing 3 of 5
+    >>> s.add(p)
+    >>> s.commit()
+    >>> p.time_block_id
+    3
+    >>> mp.status
+    'scheduled'
 
-        >>> p.status = 'completed'
-        >>> s.commit()
-        >>> mp.num_completed
-        3
-        >>> mp.status
-        'unscheduled'
+    >>> p.status = 'completed'
+    >>> s.commit()
+    >>> mp.num_completed
+    3
+    >>> mp.status
+    'unscheduled'
 
-        >>> p = mp.get_next_pointing() # Pointing 4 of 5
-        >>> s.add(p)
-        >>> s.commit()
-        >>> p.time_block_id
-        1
-        >>> mp.status
-        'scheduled'
+    >>> p = mp.get_next_pointing() # Pointing 4 of 5
+    >>> s.add(p)
+    >>> s.commit()
+    >>> p.time_block_id
+    1
+    >>> mp.status
+    'scheduled'
 
-        >>> p.status = 'completed'
-        >>> s.commit()
-        >>> mp.num_completed
-        4
-        >>> mp.status
-        'unscheduled'
+    >>> p.status = 'completed'
+    >>> s.commit()
+    >>> mp.num_completed
+    4
+    >>> mp.status
+    'unscheduled'
 
-        >>> p = mp.get_next_pointing() # Pointing 5 of 5
-        >>> s.add(p)
-        >>> s.commit()
-        >>> p.time_block_id
-        2
-        >>> mp.status
-        'scheduled'
+    >>> p = mp.get_next_pointing() # Pointing 5 of 5
+    >>> s.add(p)
+    >>> s.commit()
+    >>> p.time_block_id
+    2
+    >>> mp.status
+    'scheduled'
 
-        >>> p.status = 'completed'
-        >>> s.commit()
-        >>> mp.num_completed
-        5
-        >>> mp.status
-        'completed'
-        >>> mp
-        Mpointing(db_id=2, status='completed', num_todo=5, num_completed=5, num_remaining=0,
-        infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=59, start_rank=9, min_alt=30.0,
-        max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-        start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-        event_tile_id=None, survey_id=None, survey_tile_id=None)
+    >>> p.status = 'completed'
+    >>> s.commit()
+    >>> mp.num_completed
+    5
+    >>> mp.status
+    'completed'
+    >>> mp
+    Mpointing(db_id=2, status='completed', num_todo=5, num_completed=5, num_remaining=0,
+    infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=59, start_rank=9, min_alt=30.0,
+    max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
+    event_tile_id=None, survey_id=None, survey_tile_id=None)
 
-        And the Mpointing is completed.
+    And the Mpointing is completed.
 
-        ~~~~~~~~~~~~~~~~~~~~~
+    ~~~~~~~~~~~~~~~~~~~~~
 
-        To be useful, an Mpointing should have a list of `ExposureSet`s associated with it. We
-        can either add these to the `exposure_sets` attribute directly:
+    To be useful, an Mpointing should have a list of `ExposureSet`s associated with it. We
+    can either add these to the `exposure_sets` attribute directly:
 
-        >>> e1 = ExposureSet(imgtype='SCIENCE', filt='L', exptime=20, num_exp=20, binning=2)
-        >>> mp.exposure_sets.append(e1)
+    >>> e1 = ExposureSet(imgtype='SCIENCE', filt='L', exptime=20, num_exp=20, binning=2)
+    >>> mp.exposure_sets.append(e1)
 
-        or create `ExposureSet` instances with the `mpointing_id` attribute set, and the database
-        will take care of the rest:
+    or create `ExposureSet` instances with the `mpointing_id` attribute set, and the database
+    will take care of the rest:
 
-        >>> e2 = ExposureSet(imgtype='SCIENCE', filt='G', exptime=20, num_exp=20, binning=2,
-        ... mpointing_id=1)
-        >>> e3 = ExposureSet(imgtype='SCIENCE', filt='R', exptime=20, num_exp=20, binning=2,
-        ... mpointing_id=1)
-        >>> insert_items(session, [e2, e3])
-        >>> session.commit()
-        >>> mp.exposure_sets
-        [ExposureSet(db_id=126598, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=L,
-        exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1),
-        ExposureSet(db_id=126599, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=G,
-        exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1),
-        ExposureSet(db_id=126600, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=R,
-        exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1)]
+    >>> e2 = ExposureSet(imgtype='SCIENCE', filt='G', exptime=20, num_exp=20, binning=2,
+    ... mpointing_id=1)
+    >>> e3 = ExposureSet(imgtype='SCIENCE', filt='R', exptime=20, num_exp=20, binning=2,
+    ... mpointing_id=1)
+    >>> insert_items(session, [e2, e3])
+    >>> session.commit()
+    >>> mp.exposure_sets
+    [ExposureSet(db_id=126598, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=L,
+    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1),
+    ExposureSet(db_id=126599, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=G,
+    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1),
+    ExposureSet(db_id=126600, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=R,
+    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1)]
 
-        These exposure sets will be copied to the Pointings when they're created.
+    These exposure sets will be copied to the Pointings when they're created.
 
-        >>> session.close()
+    >>> session.close()
 
     """
 
@@ -1124,10 +1126,10 @@ class TimeBlock(Base):
     time after the pointing is observed/invalid to wait until the next valid period.
 
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create a TimeBlock, and set its attributes
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the TimeBlock is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -1139,18 +1141,18 @@ class TimeBlock(Base):
 
     Args
     ----
-        block_num : int
-            an integer indicating which block in a sequence this is
-        valid_time : float
-            amount of time a pointing in this block should stay valid in the queue, in minutes.
-        wait_time : float
-            time to wait after this block before allowing the next pointing, in minutes
+    block_num : int
+        an integer indicating which block in a sequence this is
+    valid_time : float
+        amount of time a pointing in this block should stay valid in the queue, in minutes.
+    wait_time : float
+        time to wait after this block before allowing the next pointing, in minutes
 
-        mpointing_id : int, optional
-            unique key linking this TimeBlock to an Mpointing
-        current : bool, optional
-            True if this TimeBlock is the one that is currently linked to
-            a Pointing in the queue
+    mpointing_id : int, optional
+        unique key linking this TimeBlock to an Mpointing
+    current : bool, optional
+        True if this TimeBlock is the one that is currently linked to
+        a Pointing in the queue
 
     An TimeBlock also has the following properties which are
     populated through database queries, but not needed for
@@ -1158,21 +1160,21 @@ class TimeBlock(Base):
 
     Attributes
     ----------
-        pointings : list of `Pointing`
-            a list of any `Pointing`s associated with this block, if any
+    pointings : list of `Pointing`
+        a list of any `Pointing`s associated with this block, if any
 
     Examples
     --------
-        >>> from obsdb import *
+    >>> from obsdb import *
 
-        make an TimeBlock
-        (an Mpointing with mpointing_id = 1 is already in the database)
+    make an TimeBlock
+    (an Mpointing with mpointing_id = 1 is already in the database)
 
-        >>> b = TimeBlock(block_num=1, valid_time=60, wait_time=120, mpointing_id=1)
-        >>> session = load_session()
-        >>> session.add(b)
-        TimeBlock(db_id=7, block_num=1, valid_time=60.0, wait_time=120.0, current=False,
-        mpointing_id=1)
+    >>> b = TimeBlock(block_num=1, valid_time=60, wait_time=120, mpointing_id=1)
+    >>> session = load_session()
+    >>> session.add(b)
+    TimeBlock(db_id=7, block_num=1, valid_time=60.0, wait_time=120.0, current=False,
+    mpointing_id=1)
 
     """
 
@@ -1209,11 +1211,11 @@ class TimeBlock(Base):
 class Grid(Base):
     """A class to represent a sky grid.
 
-    Like all SQLAlchemy model classes, these objects link to the
-    underlying database. You can create an object, set its attributes
+    Like all SQLAlchemy model classes, this object links to the
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the Grid is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -1221,18 +1223,18 @@ class Grid(Base):
 
     Args
     ----
-        name : string
-            a human-readable identifier for the grid
-        ra_fov : float
-            field of view in the RA direction (decimal degrees)
-        dec_fov : float
-            field of view in the Dec direction (decimal degrees)
-        ra_overlap : float
-            overlap in the RA direction (between 0 and 1)
-        dec_overlap : float
-            overlap in the Dec direction (between 0 and 1)
-        algorithm : string
-            the gridding algorithm used to generate the grid
+    name : string
+        a human-readable identifier for the grid
+    ra_fov : float
+        field of view in the RA direction (decimal degrees)
+    dec_fov : float
+        field of view in the Dec direction (decimal degrees)
+    ra_overlap : float
+        overlap in the RA direction (between 0 and 1)
+    dec_overlap : float
+        overlap in the Dec direction (between 0 and 1)
+    algorithm : string
+        the gridding algorithm used to generate the grid
 
     A Grid also has the following properties which are
     populated through database queries, but not needed for
@@ -1240,16 +1242,16 @@ class Grid(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        grid_tiles : list of `GridTile`
-            a list of any `GridTile`s associated with this Grid
-        surveys : list of `Survey`
-            a list of any `Survey`s associated with this Grid
+    db_id : int
+        primary database key
+    grid_tiles : list of `GridTile`
+        a list of any `GridTile`s associated with this Grid
+    surveys : list of `Survey`
+        a list of any `Survey`s associated with this Grid
 
     Examples
     --------
-        TODO
+    TODO
 
     """
 
@@ -1287,10 +1289,10 @@ class GridTile(Base):
     """A class to represent a tile of a sky grid.
 
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an object, and set its attributes
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the User is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -1298,14 +1300,14 @@ class GridTile(Base):
 
     Args
     ----
-        name : str
-            a human-readable identifier for the tile
-        ra : float
-            J2000 right ascension in decimal degrees
-        dec : float
-            J2000 declination in decimal degrees
-        grid_id : int
-            the ID number of the Grid this tile is associated with
+    name : str
+        a human-readable identifier for the tile
+    ra : float
+        J2000 right ascension in decimal degrees
+    dec : float
+        J2000 declination in decimal degrees
+    grid_id : int
+        the ID number of the Grid this tile is associated with
 
     A GridTile also has the following properties which are
     populated through database queries, but not needed for
@@ -1313,20 +1315,20 @@ class GridTile(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        grid : `Grid`
-            the `Grid` this GridTile is associated with
-        survey_tiles : list of `SurveyTile`
-            a list of any `SurveyTile`s associated with this GridTile, if any
-        mpointing : `Mpointing`
-            a list of any `Mpointing`s associated with this GridTile, if any
-        pointings : list of `Pointing`
-            a list of any `Pointing`s associated with this GridTile, if any
+    db_id : int
+        primary database key
+    grid : `Grid`
+        the `Grid` this GridTile is associated with
+    survey_tiles : list of `SurveyTile`
+        a list of any `SurveyTile`s associated with this GridTile, if any
+    mpointing : `Mpointing`
+        a list of any `Mpointing`s associated with this GridTile, if any
+    pointings : list of `Pointing`
+        a list of any `Pointing`s associated with this GridTile, if any
 
     Examples
     --------
-        TODO
+    TODO
 
     """
 
@@ -1363,11 +1365,11 @@ class GridTile(Base):
 class Survey(Base):
     """A class to represent a survey, a group of tiles on a specific grid.
 
-    Like all SQLAlchemy model classes, these objects link to the
-    underlying database. You can create an object, set its attributes
+    Like all SQLAlchemy model classes, this object links to the
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the Event is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -1375,14 +1377,14 @@ class Survey(Base):
 
     Args
     ----
-        name : string
-            a human-readable identifier for the survey
-        grid_id : int
-            the ID number of the Grid this tile is associated with
-            a human-readable identifier for the survey
+    name : string
+        a human-readable identifier for the survey
+    grid_id : int
+        the ID number of the Grid this tile is associated with
+        a human-readable identifier for the survey
 
-        event_id : int, optional
-            the ID number of the Event this tile is associated with, if any
+    event_id : int, optional
+        the ID number of the Event this tile is associated with, if any
 
     A Survey also has the following properties which are
     populated through database queries, but not needed for
@@ -1390,18 +1392,18 @@ class Survey(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        survey_tiles : list of `SurveyTile`
-            a list of any `SurveyTile`s associated with this Survey
-        grid : `Grid`
-            the `Grid` this Survey is associated with
-        event : `Event`
-            the `Event` this Survey is associated with
+    db_id : int
+        primary database key
+    survey_tiles : list of `SurveyTile`
+        a list of any `SurveyTile`s associated with this Survey
+    grid : `Grid`
+        the `Grid` this Survey is associated with
+    event : `Event`
+        the `Event` this Survey is associated with
 
     Examples
     --------
-        TODO
+    TODO
 
     """
 
@@ -1436,10 +1438,10 @@ class SurveyTile(Base):
     """A class to represent a tile of a survey, to add a weighting to the base grid tile.
 
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an object, and set its attributes
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the User is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -1447,12 +1449,12 @@ class SurveyTile(Base):
 
     Args
     ----
-        weight : float
-            initial weighting for this tile (between 0 and 1)
-        survey_id : int
-            the ID number of the Survey this tile is associated with
-        grid_tile_id : int
-            the ID number of the GridTile this SurveyTile is associated with
+    weight : float
+        initial weighting for this tile (between 0 and 1)
+    survey_id : int
+        the ID number of the Survey this tile is associated with
+    grid_tile_id : int
+        the ID number of the GridTile this SurveyTile is associated with
 
     A SurveyTile also has the following properties which are
     populated through database queries, but not needed for
@@ -1460,24 +1462,24 @@ class SurveyTile(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        current_weight : float
-            the current weighting of this tile
-        initial_weight : float
-            the initial weighting of this tile (it be modified as neighbours are observed)
-        survey : `Survey`
-            the `Survey` this SurveyTile is associated with
-        grid_tile : `GridTile`
-            the `GridTile` this SurveyTile is associated with
-        mpointings : list of `Mpointing`
-            a list of `Mointing`s associated with this tile, if any
-        pointings : list of `Pointing`
-            a list of `Pointing`s associated with this tile, if any
+    db_id : int
+        primary database key
+    current_weight : float
+        the current weighting of this tile
+    initial_weight : float
+        the initial weighting of this tile (it be modified as neighbours are observed)
+    survey : `Survey`
+        the `Survey` this SurveyTile is associated with
+    grid_tile : `GridTile`
+        the `GridTile` this SurveyTile is associated with
+    mpointings : list of `Mpointing`
+        a list of `Mointing`s associated with this tile, if any
+    pointings : list of `Pointing`
+        a list of `Pointing`s associated with this tile, if any
 
     Examples
     --------
-        TODO
+    TODO
 
     """
 
@@ -1520,11 +1522,11 @@ class SurveyTile(Base):
 class Event(Base):
     """A class to represent a transient Event.
 
-    Like all SQLAlchemy model classes, these objects link to the
-    underlying database. You can create an object, set its attributes
+    Like all SQLAlchemy model classes, this object links to the
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the Event is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -1532,19 +1534,19 @@ class Event(Base):
 
     Args
     ----
-        name : string
-            a human-readable identifier for the event
-        ivorn : string
-            unique IVORN (International Virtual Observatory Resource Name) for the event
-        source : string
-            the event's origin, e.g. LVC, Fermi, GAIA
-        event_type : string
-            the type of event, e.g. GW, GRB
+    name : string
+        a human-readable identifier for the event
+    ivorn : string
+        unique IVORN (International Virtual Observatory Resource Name) for the event
+    source : string
+        the event's origin, e.g. LVC, Fermi, GAIA
+    event_type : string
+        the type of event, e.g. GW, GRB
 
-        time : string, `astropy.time.Time` or datetime.datetime, optional
-            time the event occured
-        skymap : string, optional
-            the location of the source skymap file
+    time : string, `astropy.time.Time` or datetime.datetime, optional
+        time the event occured
+    skymap : string, optional
+        the location of the source skymap file
 
     An Event also has the following properties which are
     populated through database queries, but not needed for
@@ -1552,18 +1554,18 @@ class Event(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        surveys : list of `Survey`
-            a list of any `Surveys` associated with this Event
-        mpointings : list of `Mpointing`
-            a list of any `Mpointing`s associated with this Event
-        pointings : list of `Pointing`
-            a list of any `Pointing`s associated with this Event
+    db_id : int
+        primary database key
+    surveys : list of `Survey`
+        a list of any `Surveys` associated with this Event
+    mpointings : list of `Mpointing`
+        a list of any `Mpointing`s associated with this Event
+    pointings : list of `Pointing`
+        a list of any `Pointing`s associated with this Event
 
     Examples
     --------
-        TODO
+    TODO
 
     """
 
@@ -1620,10 +1622,10 @@ class ImageLog(Base):
     the database.
 
     Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an ImageLog, and set its attributes
+    underlying database. You can create an instance, and set its attributes
     without a database session. Accessing some attributes may require
     an active database session, and some properties (like the db_id)
-    will be None until the log is added to the database.
+    will be None until the instance is added to the database.
 
     The constructor must use keyword arguments and the arguments below
     should be supplied or set before insertion into the database.
@@ -1631,33 +1633,33 @@ class ImageLog(Base):
 
     Args
     ----
-        filename : string
-            the name of the image file
-        run_number : int
-            the run ID number for this exposure
-        ut : int
-            the unit telescope this frame was captured on
-        ut_mask : int
-            a binary mask for which unit telescopes carried out this exposure.
-            A value of 5 (binary 0101) will have been exposed by cameras 1 and 3.
-        start_time : string, `astropy.time.Time` or datetime.datetime
-            the time that the exposure began
-        write_time : string, `astropy.time.Time` or datetime.datetime
-            the time that the image file was written
+    filename : string
+        the name of the image file
+    run_number : int
+        the run ID number for this exposure
+    ut : int
+        the unit telescope this frame was captured on
+    ut_mask : int
+        a binary mask for which unit telescopes carried out this exposure.
+        A value of 5 (binary 0101) will have been exposed by cameras 1 and 3.
+    start_time : string, `astropy.time.Time` or datetime.datetime
+        the time that the exposure began
+    write_time : string, `astropy.time.Time` or datetime.datetime
+        the time that the image file was written
 
-        set_position : int, optional
-            position of this exposure in a set, if it's in one
-            if not, it will default to 1
-        set_total : int, optional
-            total number of exposures in this set, if any
-            if not given, it will default to 1
-        exposure_set_id : int, optional
-            the unique key of the exposure set this frame was part of
-        pointing_id : int, optional
-            the unique key of the pointing which generated this frame
-        mpointing_id : int, optional, optional
-            unique key of the mpointing which generated the pointing which
-            generated this frame
+    set_position : int, optional
+        position of this exposure in a set, if it's in one
+        if not, it will default to 1
+    set_total : int, optional
+        total number of exposures in this set, if any
+        if not given, it will default to 1
+    exposure_set_id : int, optional
+        the unique key of the exposure set this frame was part of
+    pointing_id : int, optional
+        the unique key of the pointing which generated this frame
+    mpointing_id : int, optional, optional
+        unique key of the mpointing which generated the pointing which
+        generated this frame
 
     An ImageLog also has the following properties which are
     populated through database queries, but not needed for
@@ -1665,14 +1667,14 @@ class ImageLog(Base):
 
     Attributes
     ----------
-        db_id : int
-            primary database key
-        exposure_set : `ExposureSet`
-            the `ExposureSet` object associated with this `ImageLog`, if any
-        pointing : `Pointing`
-            the `Pointing` associated with this `ImageLog`, if any
-        mpointing : `Mpointing`
-            the `Mpointing` associated with this `ImageLog`, if any
+    db_id : int
+        primary database key
+    exposure_set : `ExposureSet`
+        the `ExposureSet` object associated with this `ImageLog`, if any
+    pointing : `Pointing`
+        the `Pointing` associated with this `ImageLog`, if any
+    mpointing : `Mpointing`
+        the `Mpointing` associated with this `ImageLog`, if any
 
     """
 

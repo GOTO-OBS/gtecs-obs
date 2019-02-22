@@ -18,9 +18,9 @@ __all__ = ['get_user', 'validate_user',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
            'get_exposure_set_by_id', 'get_grid_tile_by_name',
-           'get_expired_pointing_ids', 'get_expired_mpointing_ids',
+           'get_expired_pointings', 'get_expired_mpointings',
            'insert_items',
-           'update_pointing_status', 'bulk_update_pointing_status', 'bulk_update_mpointing_status',
+           'update_pointing_status', 'bulk_update_status',
            'mark_completed', 'mark_aborted', 'mark_interrupted', 'mark_running',
            ]
 
@@ -432,7 +432,7 @@ def get_grid_tile_by_name(session, grid_name, tile_name):
     return grid_tile
 
 
-def get_expired_pointing_ids(session, time=None):
+def get_expired_pointings(session, time=None):
     """Find all the pointings still pending whose valid period has expired.
 
     Parameters
@@ -445,8 +445,8 @@ def get_expired_pointing_ids(session, time=None):
 
     Returns
     -------
-    pointing_ids : list
-        a list of all matching pointing IDs
+    pointings : list
+        a list of all matching Pointings
 
     """
     if time is None:
@@ -454,15 +454,13 @@ def get_expired_pointing_ids(session, time=None):
     else:
         now = time.iso
 
-    query = session.query(Pointing.db_id)
-    query = query.filter(Pointing.status == 'pending',
-                         Pointing.stop_time < now)
+    query = session.query(Pointing).filter(Pointing.status == 'pending',
+                                           Pointing.stop_time < now)
 
-    # return values, unpacking tuples
-    return [pointing_id for (pointing_id,) in query.all()]
+    return query.all()
 
 
-def get_expired_mpointing_ids(session, time=None):
+def get_expired_mpointings(session, time=None):
     """Find all the mpointings still unscheduled whose valid period has expired.
 
     Parameters
@@ -475,8 +473,8 @@ def get_expired_mpointing_ids(session, time=None):
 
     Returns
     -------
-    mpointing_ids : list
-        a list of all matching mpointing IDs
+    mpointings : list
+        a list of all matching Mpointings
 
     """
     if time is None:
@@ -484,12 +482,10 @@ def get_expired_mpointing_ids(session, time=None):
     else:
         now = time.iso
 
-    query = session.query(Mpointing.db_id)
-    query = query.filter(Mpointing.status == 'unscheduled',
-                         Mpointing.stop_time < now)
+    query = session.query(Mpointing).filter(Mpointing.status == 'unscheduled',
+                                            Mpointing.stop_time < now)
 
-    # return values, unpacking tuples
-    return [mpointing_id for (mpointing_id,) in query.all()]
+    return query.all()
 
 
 def insert_items(session, items):
@@ -532,58 +528,27 @@ def update_pointing_status(session, pointing_id, status):
     pointing.status = status
 
 
-def bulk_update_pointing_status(session, pointing_ids, status):
-    """Set the status of a large number of pointings.
+def bulk_update_status(session, items, status):
+    """Set the status of a large number of Pointings or Mpointings.
 
-    Setting the status of a pointing, or updating any DB item, does not
-    need this function. One can use:
-
-    >>> with open_session() as session:
-    >>>     pointing = get_pointing_by_id(session, 17074)
-    >>>     pointing.status = 'completed'
-
-    However, for large numbers of pointings this is inefficient. Use this
-    routine instead.
+    For large numbers of items this routine is most efficient.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         the session object
-    pointing_ids : list
-        a list of pointing IDs to update
+    items : list
+        a list of `Pointing`s or `Mpointing`s to update
     status : string
         status to set pointings to
 
     """
-    mappings = [dict(db_id=pointing_id, status=status) for pointing_id in pointing_ids]
-    session.bulk_update_mappings(Pointing, mappings)
+    # Make sure they're all the same type
+    if not all(isinstance(item, type(items[0])) for item in items):
+        raise ValueError('Items must be all the same type (`Pointing` or `Mpointing`)')
 
-
-def bulk_update_mpointing_status(session, mpointing_ids, status):
-    """Set the status of a large number of mpointings.
-
-    Setting the status of an mpointing, or updating any DB item, does not
-    need this function. One can use:
-
-    >>> with open_session() as session:
-    >>>     mpointing = get_mpointing_by_id(session, 17074)
-    >>>     mpointing.status = 'completed'
-
-    However, for large numbers of mpointings this is inefficient. Use this
-    routine instead.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        the session object
-    mpointing_ids : list
-        a list of mpointing IDs to update
-    status : string
-        status to set mpointings to
-
-    """
-    mappings = [dict(db_id=mpointing_id, status=status) for mpointing_id in mpointing_ids]
-    session.bulk_update_mappings(Mpointing, mappings)
+    mappings = [dict(db_id=item.db_id, status=status) for item in items]
+    session.bulk_update_mappings(type(items[0]), mappings)
 
 
 def mark_completed(pointing_id):

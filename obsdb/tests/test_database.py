@@ -141,41 +141,38 @@ with db.open_session() as session:
     more_pointings = [db.make_random_pointing(user) for i in range(10)]
     db.insert_items(session, more_pointings)
 
-# now check how many we have
-with db.open_session() as session:
+    # now check how many we have
     npoints = len(db.get_pointings(session))
     current, pending = db.get_queue(session)
-    expired = db.get_expired_pointing_ids(session)
+    expired = db.get_expired_pointings(session)
     nqueue = len(pending)
-print("{} points in database".format(npoints))
-print("{} points in queue".format(nqueue))
-print("{} expired pointings\n".format(len(expired)))
+    print("{} points in database".format(npoints))
+    print("{} points in queue".format(nqueue))
+    print("{} expired pointings\n".format(len(expired)))
 
-# clean expired pointings
-print('Cleaning expired pointings')
-with db.open_session() as session:
-    db.bulk_update_pointing_status(session, expired, 'expired')
+    # clean expired pointings
+    print('Cleaning expired pointings')
+    db.bulk_update_status(session, expired, 'expired')
 
-# now check how many we have
-with db.open_session() as session:
+    # now check how many we have
     npoints = len(db.get_pointings(session))
     current, pending = db.get_queue(session)
-    expired = db.get_expired_pointing_ids(session)
+    expired = db.get_expired_pointings(session)
     marked = db.get_pointings(session, status='expired')
     nqueue = len(pending)
-print("{} points in database".format(npoints))
-print("{} points in queue".format(nqueue))
-print("{} unmarked expired pointings".format(len(expired)))
-print("{} marked expired pointings\n".format(len(marked)))
+    print("{} points in database".format(npoints))
+    print("{} points in queue".format(nqueue))
+    print("{} unmarked expired pointings".format(len(expired)))
+    print("{} marked expired pointings\n".format(len(marked)))
 
 time.sleep(5)
 
 # now let's go through a caretaker step
 with db.open_session() as s:
     # first remove expired pointings
-    expired = db.get_expired_pointing_ids(s)
+    expired = db.get_expired_pointings(s)
     if len(expired) > 0:
-        db.bulk_update_pointing_status(s, expired, 'expired')
+        db.bulk_update_status(s, expired, 'expired')
     print('Marked {} pointings as expired'.format(len(expired)))
 
     # which Mpointings need pointings submitting?
@@ -190,57 +187,51 @@ with db.open_session() as s:
             pointings_to_add.append(next_pointing)
     db.insert_items(s, pointings_to_add)
 
+    def summary(mp):
+        """Print a summary of the database."""
+        print('{}, num_remaining = {}'.format(mp.status.upper(), mp.num_remaining))
+        print([p.status for p in mp.pointings])
+        print([(b.block_num, b.valid_time, b.wait_time, b.current) for b in mp.time_blocks], '\n')
 
-# check that scheduling worked the way we expected
-def summary(mp):
-    """Print a summary of the database."""
-    print('{}, num_remaining = {}'.format(mp.status.upper(), mp.num_remaining))
-    print([p.status for p in mp.pointings])
-    print([(b.block_num, b.valid_time, b.wait_time, b.current) for b in mp.time_blocks], '\n')
-
-
-with db.open_session() as s:
+    # check that scheduling worked the way we expected
     mp = db.get_mpointing_by_id(s, 1)
     summary(mp)
 
-# now lets pretend we're observing the Mpointing and check the triggers
-s = db.load_session()
-mp = db.get_mpointing_by_id(s, 1)
-while True:
-    print('marking job as running')
-    mp.pointings[-1].status = 'running'
-    s.commit()
-    time.sleep(1)
-    summary(mp)
+    # now lets pretend we're observing the Mpointing and check the triggers
+    while True:
+        print('marking job as running')
+        mp.pointings[-1].status = 'running'
+        s.commit()
+        time.sleep(1)
+        summary(mp)
 
-    print('marking as completed')
-    mp.pointings[-1].status = 'completed'
-    s.commit()
-    time.sleep(1)
-    summary(mp)
+        print('marking as completed')
+        mp.pointings[-1].status = 'completed'
+        s.commit()
+        time.sleep(1)
+        summary(mp)
 
-    # schedule next
-    next_pointing = mp.get_next_pointing()
-    if next_pointing:
-        s.add(next_pointing)
-    else:
-        break
-    s.commit()
-    time.sleep(1)
-    summary(mp)
-s.close()
+        # schedule next
+        next_pointing = mp.get_next_pointing()
+        if next_pointing:
+            s.add(next_pointing)
+        else:
+            break
+        s.commit()
+        time.sleep(1)
+        summary(mp)
 
-with db.open_session() as s:
     # check the list of mps to schedule is empty
     mps_to_schedule = db.get_mpointings(s, status='unscheduled')
     print('There are {} Mpointings to schedule'.format(len(mps_to_schedule)))
 
     npoints = len(db.get_pointings(s))
     current, pending = db.get_queue(s)
-    expired = db.get_expired_pointing_ids(s)
+    expired = db.get_expired_pointings(s)
     marked = db.get_pointings(s, status='expired')
     nqueue = len(pending)
-print("{} points in database".format(npoints))
-print("{} points in queue".format(nqueue))
-print("{} unmarked expired pointings".format(len(expired)))
-print("{} marked expired pointings\n".format(len(marked)))
+
+    print("{} points in database".format(npoints))
+    print("{} points in queue".format(nqueue))
+    print("{} unmarked expired pointings".format(len(expired)))
+    print("{} marked expired pointings\n".format(len(marked)))

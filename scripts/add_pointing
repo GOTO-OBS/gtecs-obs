@@ -447,4 +447,8 @@ if __name__ == '__main__':
 
         if confirm in ['y', 'Y']:
             db.insert_items(session, [mp])
-            print('Inserted into observation database')
+            print('    Inserted into observation database')
+        else:
+            session.rollback()
+            print('    Not inserted')
+        print('Done')

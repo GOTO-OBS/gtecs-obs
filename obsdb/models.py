@@ -66,25 +66,38 @@ class User(Base):
 
     Examples
     --------
-    >>> from obsdb import *
-    >>>
-    >>> bob = User(username='bob', password='1234', full_name="Bob Marley")
+    Create a new User:
+    >>> bob = User(username='bob', password='1234', full_name='Bob Marley')
+
+    Add the User to the session:
     >>> session = load_session()
-    >>> session.add(bob)  # add bob to database
-    >>> session.commit()  # commit changes (otherwise DB not changed)
+    >>> session.add(bob)
+
+    Note the db_id will still be None until the changes are commited:
     >>> bob
-    User(db_id=25, username=bob, full_name=Bob Marley)
+    User(db_id=None, username=bob, full_name=Bob Marley)
+    >>> session.commit()
+    >>> bob
+    User(db_id=1, username=bob, full_name=Bob Marley)
+
+    Make a random pointing assigned to Bob:
+    >>> pointing = make_random_pointing(user=bob)
+
+    Bob has no Pointings until the pointing is committed:
     >>> bob.pointings
     []
-    >>> pointing = make_random_pointing(25)  # make a pointing for bob
     >>> session.add(pointing)
     >>> session.commit()
     >>> bob.pointings
-    [Pointing(db_id=None, status='pending', object_name=random_object, ra=352.133, dec=28.464,
-    rank=84, min_alt=30, max_sunalt=-15, min_time=1575.8310236, max_moon=D, min_moonsep=30,
-    too=True, start_time=2018-01-16 16:46:12, stop_time=2018-01-18 16:46:12, started_time=None,
-    stopped_time=None, user_id=25, mpointing_id=None, time_block_id=None, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)]
+    [Pointing(db_id=1, status=pending, object_name=random_object, ra=28.2859, dec=60.8787, rank=62,
+    ... min_alt=30.0, max_sunalt=-15.0, min_time=184.365, max_moon=G, min_moonsep=30.0, too=False,
+    ... start_time=2019-02-18 16:53:38, stop_time=2019-02-24 16:53:38, started_time=None,
+    ... stopped_time=None, user_id=1, mpointing_id=None, time_block_id=None, grid_tile_id=None,
+    ... survey_tile_id=None, event_id=None)]
+
+    Note the Pointing has Bob's user_id=1.
+
+    Remember to close the session:
     >>> session.close()
 
     """
@@ -210,47 +223,63 @@ class Pointing(Base):
     >>> from astropy.time import Time
     >>> session = load_session()
 
-    Create a pointing:
-
+    Create a new pointing:
     >>> p = Pointing(object_name='IP Peg', ra=350.785625, dec=18.416472, rank=9, min_alt=30,
-    ... max_sunalt=-15, min_time=3600, max_moon='G', min_moonsep=30, too=0,
-    ... start_time=Time.now(), stop_time=Time.now()+3*u.day, user_id=24)
+    ... max_sunalt=-15, min_time=3600, max_moon='G', min_moonsep=30, too=False,
+    ... start_time=Time.now(), stop_time=Time.now()+3*u.day)
     >>> p
-    Pointing(db_id=None, status='None', object_name=IP Peg, ra=350.785625, dec=18.416472,
-    rank=9, min_alt=30, max_sunalt=-15, min_time=3600, max_moon=G, min_moonsep=None, too=False,
-    start_time=2018-01-12 17:39:54, stop_time=2018-01-15 17:39:54, started_time=None,
-    stopped_time=None, user_id=24, mpointing_id=None, time_block_id=None, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)
+    Pointing(db_id=None, status=None, object_name=IP Peg, ra=350.785625, dec=18.416472, rank=9,
+    min_alt=30, max_sunalt=-15, min_time=3600, max_moon=G, min_moonsep=30, too=False,
+    start_time=2019-02-25 10:40:50, stop_time=2019-02-28 10:40:50, started_time=None,
+    stopped_time=None, user_id=None, mpointing_id=None, time_block_id=None, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
 
-    We can insert it into the database and the status and db_id will be set:
-
+    However it can't be insterted into the database until it is assigned to a User:
     >>> session.add(p)
     >>> session.commit()
-    >>> p.status, p.db_id
-    ('pending', 17073)
+    IntegrityError: (1048, "Column 'user_id' cannot be null")
 
-    At the moment, this pointing has no exposure sets. We can either add these to the
-    `exposure_sets` attribute directly:
+    Try again, but this time get a User to assign it to:
+    >>> session.rollback()
+    >>> bob = get_user(session, username='bob')
+    >>> p.user = bob
+    >>> session.add(p)
+    >>> session.commit()
+    >>> p
+    Pointing(db_id=1, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=G, min_moonsep=30.0, too=False,
+    start_time=2019-02-25 10:48:02, stop_time=2019-02-28 10:48:02, started_time=None,
+    stopped_time=None, user_id=1, mpointing_id=None, time_block_id=None, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
 
-    >>> e1 = ExposureSet(imgtype='SCIENCE', filt='L', exptime=20, num_exp=20, binning=2)
+    Note the changes to above are db_id=1, status=pending and user_id=1.
+
+    At the moment this Pointing has no Exposure Sets, so it's fairly useless.
+
+    We can either add these to the Pointing's exposure_sets list attribute directly:
+    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L', binning=1, imgtype='SCIENCE')
     >>> p.exposure_sets.append(e1)
-
-    or create `ExposureSet` instances with the `pointing_id` attribute set, and the database
-    will take care of the rest:
-
-    >>> e2 = ExposureSet(imgtype='SCIENCE', filt='G', exptime=20, num_exp=20, binning=2,
-    ... pointing_id=17073)
-    >>> e3 = ExposureSet(imgtype='SCIENCE', filt='R', exptime=20, num_exp=20, binning=2,
-    ... pointing_id=17073)
-    >>> insert_items(session, [e2, e3])
+    >>> session.add(e1)
     >>> session.commit()
     >>> p.exposure_sets
-    [ExposureSet(db_id=126601, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=L,
-    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None),
-    ExposureSet(db_id=126602, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=G,
-    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None),
-    ExposureSet(db_id=126603, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=R,
-    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=17073, mpointing_id=None)]
+    [ExposureSet(db_id=1, num_exp=3, exptime=30.0, filt=L, binning=1, imgtype=SCIENCE,
+    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None)]
+
+    or create ExposureSets and assign the pointing to them:
+    >>> e2 = ExposureSet(num_exp=3, exptime=30, filt='R', binning=1, imgtype='SCIENCE', pointing=p)
+    >>> e3 = ExposureSet(num_exp=3, exptime=30, filt='G', binning=1, imgtype='SCIENCE', pointing=p)
+    >>> e4 = ExposureSet(num_exp=3, exptime=30, filt='B', binning=1, imgtype='SCIENCE', pointing=p)
+    >>> insert_items(session, [e2, e3, e4])
+    >>> session.commit()
+    >>> p.exposure_sets
+    [ExposureSet(db_id=1, num_exp=3, exptime=30.0, filt=L, binning=1, imgtype=SCIENCE,
+    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None),
+    ExposureSet(db_id=2, num_exp=3, exptime=30.0, filt=R, binning=1, imgtype=SCIENCE,
+    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None),
+    ExposureSet(db_id=3, num_exp=3, exptime=30.0, filt=G, binning=1, imgtype=SCIENCE,
+    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None),
+    ExposureSet(db_id=4, num_exp=3, exptime=30.0, filt=B, binning=1, imgtype=SCIENCE,
+    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None)]
 
     >>> session.close()
 
@@ -552,224 +581,143 @@ class Mpointing(Base):
     --------
     >>> from obsdb import *
     >>> from astropy.time import Time
+    >>> bob = get_user(session, username='bob')
 
-    make an Mpointing - starting at midnight, 5 pointings that stay in the queue
-    for 5 minutes and the next one is valid 10 minutes after the previous.
-
-    >>> mp = Mpointing(object_name='M31', ra=22, dec=-5, start_rank=9, min_alt=30,
-    ... min_time=3600, max_sunalt=-15, too=0, max_moon='B', min_moonsep=30, num_todo=5,
-    ... user_id=24, valid_time=5, wait_time=10, start_time=Time('2018-01-01 00:00:00'))
+    Make an Mpointing.
+    Note we set the start_time to midnight, num_todo to 5 and valid_time & wait_time to 10 mins.
+    >>> mp = Mpointing(object_name='IP Peg', ra=350.785625, dec=18.416472, start_rank=9,
+    ... min_alt=30, min_time=3600, max_sunalt=-15, max_moon='B', min_moonsep=30, too=False,
+    ... start_time=Time('2018-01-01 00:00:00'), num_todo=5, valid_time=10, wait_time=10,
+    ... user=bob)
+    >>> session.add(mp)
+    >>> session.commit()
     >>> mp
-    Mpointing(db_id=None, status='unscheduled', num_todo=5, num_completed=0,
-    num_remaining=5, infinite=False, object_name=M31, ra=22, dec=-5, rank=9, start_rank=9,
-    min_alt=30, max_sunalt=-15, min_time=3600, max_moon=B, min_moonsep=30, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)
+    Mpointing(db_id=1, status=unscheduled, num_todo=5, num_completed=0, num_remaining=5,
+    infinite=False, object_name=IP Peg, ra=350.785, dec=18.4165, current_rank=9, initial_rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
 
-    Note that the db_id is None, because that will be filled out when we add it to the
-    database.
-
-    Looking at the TimeBlocks you can see that we only need one, and it has been generated
-
+    Take a look at the Time Blocks, you can see that we only need one:
     >>> mp.time_blocks
-    [TimeBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
-    mpointing_id=None)]
-
-    This block will be repeated 5 times, as requested.
-
-    ~~~~~~~~~~~~~~~~~~~~~
+    [TimeBlock(db_id=1, block_num=1, valid_time=10.0, wait_time=10.0, current=True, mpointing_id=1)]
 
     For a more complicated example, give a list to wait_time to have the intervals between
-    pointings increase.
-
-    >>> mp = Mpointing(object_name='M31', ra=22, dec=-5, start_rank=9, min_alt=30,
-    ... min_time=3600, max_sunalt=-15, too=0, max_moon='B', min_moonsep=30, num_todo=5,
-    ... user_id=24, valid_time=5, wait_time=[10,20,30], start_time=Time('2018-01-01 00:00:00'))
+    pointings increase: from 10 minutes, to 20 then 30:
+    >>> mp = Mpointing(object_name='IP Peg', ra=350.785625, dec=18.416472, start_rank=9,
+    ... min_alt=30, min_time=3600, max_sunalt=-15, max_moon='B', min_moonsep=30, too=False,
+    ... start_time=Time('2018-01-01 00:00:00'), num_todo=5, valid_time=10, wait_time=[10,20,30],
+    ... user=bob)
+    >>> session.add(mp)
+    >>> session.commit()
     >>> mp
-    Mpointing(db_id=None, status='unscheduled', num_todo=5, num_completed=0,
-    num_remaining=5, infinite=False, object_name=M31, ra=22, dec=-5, rank=9, start_rank=9,
-    min_alt=30, max_sunalt=-15, min_time=3600, max_moon=B, min_moonsep=30, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)
-    >>> mp.time_blocks
-    [TimeBlock(db_id=None, block_num=1, valid_time=5, wait_time=10, current=1,
-    mpointing_id=None),
-    TimeBlock(db_id=None, block_num=2, valid_time=5, wait_time=20, current=None,
-    mpointing_id=None),
-    TimeBlock(db_id=None, block_num=3, valid_time=5, wait_time=30, current=None,
-    mpointing_id=None)]
+    Mpointing(db_id=2, status=unscheduled, num_todo=5, num_completed=0, num_remaining=5,
+    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, initial_rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
 
-    Note this time that we only created 3 blocks, but are asking for 5 observations.
-    That's not a problem, as the blocks will simply repeat.
+    Note this Mpointing looks exactly the same as the previous (aside from db_id=2).
+    The difference is in the Time Blocks:
+    >>> mp.time_blocks
+    [TimeBlock(db_id=2, block_num=1, valid_time=10.0, wait_time=10.0, current=True, mpointing_id=2),
+    TimeBlock(db_id=3, block_num=2, valid_time=10.0, wait_time=20.0, current=False, mpointing_id=2),
+    TimeBlock(db_id=4, block_num=3, valid_time=10.0, wait_time=30.0, current=False, mpointing_id=2)]
+
+    Since num_todo=5, a total of 5 Pointings will be generated for the Mpointing.
+    Each will use a Time Block, looping through the list.
     In this case the sequence will look like this:
-    [note we set the Mpointing start time to midnight]
-    Pointing 1: start_time=00:00, stop_time=00:05 (valid for 5 minutes)
-    Pointing 2: start_time=00:15, stop_time=00:20 (wait for 10, then valid for 5)
-    Pointing 3: start_time=00:40, stop_time=00:45 (wait for 20, then valid for 5)
-    Pointing 4: start_time=01:15, stop_time=01:20 (wait for 30, then valid for 5)
-    Pointing 5: start_time=01:30, stop_time=01:35 (wait for 10, then valid for 5)
+    Pointing 1: start_time=00:00, stop_time=00:10 (valid for 10 minutes, then wait for 10)
+    Pointing 2: start_time=00:20, stop_time=00:30 (valid for 10 minutes, then wait for 20)
+    Pointing 3: start_time=00:50, stop_time=01:00 (valid for 10 minutes, then wait for 30)
+    Pointing 4: start_time=01:30, stop_time=01:40 (valid for 10 minutes, then wait for 10)*
+    Pointing 5: start_time=01:50, stop_time=02:00 (valid for 10 minutes, then wait for 20)
+    *Since there were 5 to do but only 3 blocks we looped back to the start.
 
-    We can see what would happen by manually running through the pointings and pretending to be
-    the caretaker.
-
-    First add the Mpointing to the database:
-
-    >>> s = load_session()
-    >>> s.add(mp)
-    >>> s.commit()
-
-    Then create the first pointing and add it to the database.
-
-    >>> p = mp.get_next_pointing()
-    >>> s.add(p)
-    >>> s.commit()
-    >>> mp.pointings
-    [Pointing(db_id=17100, status='pending', object_name=M31, ra=22.0, dec=-5.0, rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:05:00, started_time=None,
-    stopped_time=None, user_id=24, mpointing_id=2, time_block_id=1, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)]
-
-    Note that the db_id, mpointing_id and time_block_id have been filled out,
-    and this Pointing has time_block_id=1.
-    Also that the start time is midnight and the stop time is 5 past, as expected.
-    See what happens if we mark the pointing as completed:
-
-    >>> mp.pointings[0].status = 'completed'
-    >>> s.commit()
-    >>> mp
-    Mpointing(db_id=2, status='unscheduled', num_todo=5, num_completed=1, num_remaining=4,
-    infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, min_alt=30.0,
-    max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)
-
-    See that the num_completed atribute has gone up, the num_remaining has gone down
-    and the mpointing status has changed to 'unscheduled'.
-
-    Create the next pointing and add it:
-
-    >>> p = mp.get_next_pointing()
-    >>> s.add(p)
-    >>> s.commit()
-    >>> p
-    Pointing(db_id=17102, status='pending', object_name=M31, ra=22.0, dec=-5.0, rank=19,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:15:00, stop_time=2018-01-01 00:20:00, started_time=None,
-    stopped_time=None, user_id=24, mpointing_id=2, time_block_id=2, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)
-    >>> mp
-    Mpointing(db_id=2, status='scheduled', num_todo=5, num_completed=1, num_remaining=4,
-    infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=19, start_rank=9, min_alt=30.0,
-    max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)
-
-    See that the Mpointing is back to scheduled.
-    Also, note that the new pointing has start time of 00:15 and stop of 00:20. That's as we
-    expected, because it's linked to the second time block not the first
-    (see time_block_id=2).
-
-    If you look at the time blocks you can see the next one is now marked as current.
-
-    >>> mp.time_blocks
-    [TimeBlock(db_id=1, block_num=1, valid_time=5.0, wait_time=10.0, current=0,
-    mpointing_id=2),
-    TimeBlock(db_id=2, block_num=2, valid_time=5.0, wait_time=20.0, current=1,
-    mpointing_id=2),
-    TimeBlock(db_id=3, block_num=3, valid_time=5.0, wait_time=30.0, current=0,
-    mpointing_id=2)]
-
-    Mark this one as completed, and you'll see the Mpointing is updated.
-
-    >>> p.status = 'completed'
-    >>> s.commit()
-    >>> mp.num_completed
-    2
-    >>> mp.status
-    'unscheduled'
-
-    Let's run through the remaining pointings:
-
-    >>> p = mp.get_next_pointing() # Pointing 3 of 5
-    >>> s.add(p)
-    >>> s.commit()
-    >>> p.time_block_id
-    3
-    >>> mp.status
-    'scheduled'
-
-    >>> p.status = 'completed'
-    >>> s.commit()
-    >>> mp.num_completed
-    3
-    >>> mp.status
-    'unscheduled'
-
-    >>> p = mp.get_next_pointing() # Pointing 4 of 5
-    >>> s.add(p)
-    >>> s.commit()
-    >>> p.time_block_id
-    1
-    >>> mp.status
-    'scheduled'
-
-    >>> p.status = 'completed'
-    >>> s.commit()
-    >>> mp.num_completed
-    4
-    >>> mp.status
-    'unscheduled'
-
-    >>> p = mp.get_next_pointing() # Pointing 5 of 5
-    >>> s.add(p)
-    >>> s.commit()
-    >>> p.time_block_id
-    2
-    >>> mp.status
-    'scheduled'
-
-    >>> p.status = 'completed'
-    >>> s.commit()
-    >>> mp.num_completed
-    5
-    >>> mp.status
-    'completed'
-    >>> mp
-    Mpointing(db_id=2, status='completed', num_todo=5, num_completed=5, num_remaining=0,
-    infinite=False, object_name=M31, ra=22.0, dec=-5.0, rank=59, start_rank=9, min_alt=30.0,
-    max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=24, event_id=None,
-    event_tile_id=None, survey_id=None, survey_tile_id=None)
-
-    And the Mpointing is completed.
-
-    ~~~~~~~~~~~~~~~~~~~~~
-
-    To be useful, an Mpointing should have a list of `ExposureSet`s associated with it. We
-    can either add these to the `exposure_sets` attribute directly:
-
-    >>> e1 = ExposureSet(imgtype='SCIENCE', filt='L', exptime=20, num_exp=20, binning=2)
+    Like a Pointing, an Mpointing is only useful if it has at least one Exposure Set:
+    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L', binning=1, imgtype='SCIENCE')
     >>> mp.exposure_sets.append(e1)
-
-    or create `ExposureSet` instances with the `mpointing_id` attribute set, and the database
-    will take care of the rest:
-
-    >>> e2 = ExposureSet(imgtype='SCIENCE', filt='G', exptime=20, num_exp=20, binning=2,
-    ... mpointing_id=1)
-    >>> e3 = ExposureSet(imgtype='SCIENCE', filt='R', exptime=20, num_exp=20, binning=2,
-    ... mpointing_id=1)
-    >>> insert_items(session, [e2, e3])
+    >>> session.add(e1)
     >>> session.commit()
     >>> mp.exposure_sets
-    [ExposureSet(db_id=126598, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=L,
-    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1),
-    ExposureSet(db_id=126599, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=G,
-    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1),
-    ExposureSet(db_id=126600, ra_offset=0.0, dec_offset=0.0, imgtype=SCIENCE, filt=R,
-    exptime=20.0, num_exp=20, binning=2, ut_mask=None, pointing_id=None, mpointing_id=1)]
+    [ExposureSet(db_id=1, num_exp=3, exptime=30.0, filt=L, binning=1, imgtype=SCIENCE,
+    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=None, mpointing_id=1)]
 
-    These exposure sets will be copied to the Pointings when they're created.
+    These will be passed onto its Pointings when they are created.
+    This is done using the get_next_function() method:
+    >>> p = mp.get_next_pointing()
+    >>> p
+    Pointing(db_id=None, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00, started_time=None,
+    stopped_time=None, user_id=None, mpointing_id=None, time_block_id=None, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
+
+    Once it's added to the database you will see the times and IDs set:
+    >>> session.add(p)
+    >>> session.commit()
+    >>> p
+    Pointing(db_id=1, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00, started_time=None,
+    stopped_time=None, user_id=1, mpointing_id=1, time_block_id=1, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
+
+    Check the Exposure Sets:
+    >>> p.exposure_sets
+    [ExposureSet(db_id=1, num_exp=3, exptime=30.0, filt=L, binning=1, imgtype=SCIENCE,
+    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=1)]
+
+    As it has a pending Pointing associated with it the Mpointing status is now 'scheduled':
+    >>> mp
+    Mpointing(db_id=1, status=scheduled, num_todo=5, num_completed=0, num_remaining=5,
+    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, initial_rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
+
+    We can simulate an observation by marking the Pointing as running and then completed:
+    >>> p.status = 'running'
+    >>> s.commit()
+    >>> p
+    Pointing(db_id=1, status=running, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00,
+    started_time=2019-02-25 11:45:51, stopped_time=None, user_id=1, mpointing_id=1,
+    time_block_id=1, grid_tile_id=None, survey_tile_id=None, event_id=None)
+    >>> mp
+    Mpointing(db_id=1, status=scheduled, num_todo=5, num_completed=0, num_remaining=5,
+    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, initial_rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
+    >>> p.status = 'completed'
+    >>> s.commit()
+    >>> p
+    Pointing(db_id=1, status=completed, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00,
+    started_time=2019-02-25 11:50:52, stopped_time=2019-02-25 11:52:09, user_id=1, mpointing_id=1,
+    time_block_id=1, grid_tile_id=None, survey_tile_id=None, event_id=None)
+    >>> mp
+    Mpointing(db_id=1, status=unscheduled, num_todo=5, num_completed=1, num_remaining=4,
+    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=19, initial_rank=9,
+    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
+    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
+    survey_tile_id=None, event_id=None)
+    >>> session.close()
+
+    Things to note: after marking the Pointing as running the Pointing's started_time was filled,
+    but nothing else changed. After marking it as completed the stopped_time was filled, but the
+    Mpointing was also reset to unscheduled and the num_completed went up by one (and num_remaining
+    went down by 1).
+
+    You can repeat this process using mp.get_next_pointing(), adding it, marking it as running and
+    then completed. Once it reaches num_completed=5 (num_remaining=0) it will stop, and
+    mp.get_next_pointing() will return None.
+
+    Note if the pointing was marked aborted not completed then the next one would still be
+    generated, but the num_completed in the Mpointing wouldn't increase.
 
     >>> session.close()
 
@@ -1184,19 +1132,6 @@ class TimeBlock(Base):
     pointings : list of `Pointing`, optional
         the Pointings associated with this Time Block, if any
 
-    Examples
-    --------
-    >>> from obsdb import *
-
-    make an TimeBlock
-    (an Mpointing with mpointing_id = 1 is already in the database)
-
-    >>> b = TimeBlock(block_num=1, valid_time=60, wait_time=120, mpointing_id=1)
-    >>> session = load_session()
-    >>> session.add(b)
-    TimeBlock(db_id=7, block_num=1, valid_time=60.0, wait_time=120.0, current=False,
-    mpointing_id=1)
-
     """
 
     # Set corresponding SQL table name
@@ -1271,10 +1206,6 @@ class Grid(Base):
         the Grid Tiles associated with this Grid, if any
     surveys : list of `Survey`, optional
         the Surveys associated with this Grid, if any
-
-    Examples
-    --------
-    TODO
 
     """
 
@@ -1352,10 +1283,6 @@ class GridTile(Base):
     survey_tiles : list of `SurveyTile`, optional
         the Survey Tiles associated with this GridTile, if any
 
-    Examples
-    --------
-    TODO
-
     """
 
     # Set corresponding SQL table name
@@ -1427,10 +1354,6 @@ class Survey(Base):
     event : `Event`, optional
         the Event associated with this Survey, if any
         can also be added with the event_id parameter
-
-    Examples
-    --------
-    TODO
 
     """
 
@@ -1505,10 +1428,6 @@ class SurveyTile(Base):
         the Pointings associated with this SurveyTile, if any
     mpointings : list of `Mpointing`, optional
         the Mpointing associated with this SurveyTile, if any
-
-    Examples
-    --------
-    TODO
 
     """
 
@@ -1592,10 +1511,6 @@ class Event(Base):
         the Pointings associated with this Event, if any
     mpointings : list of `Mpointing`, optional
         the Mpointings associated with this Event, if any
-
-    Examples
-    --------
-    TODO
 
     """
 

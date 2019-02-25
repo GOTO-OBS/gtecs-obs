@@ -28,7 +28,7 @@ with db.open_session() as session:
     print(user, end='\n\n')
 
     # check the password was stored correctly
-    assert db.validate_user(session, 'goto_test', 'password')
+    assert db.validate_user(session, username='goto_test', password='password')
 
 with db.open_session() as session:
     # create an event
@@ -76,7 +76,7 @@ with db.open_session() as session:
     print(st2, end='\n\n')
 
     # let's make a Pointing
-    user = db.get_user(session, 'goto_test')
+    user = db.get_user(session, username='goto_test')
     p = db.Pointing(object_name='IP Peg',
                     ra=350.785625,
                     dec=18.416472,
@@ -133,7 +133,7 @@ with db.open_session() as session:
 
 # new session, add random pointings
 with db.open_session() as session:
-    user = db.get_user(session, 'goto_test')
+    user = db.get_user(session, username='goto_test')
 
     pointings = [db.make_random_pointing(user) for i in range(10)]
     db.insert_items(session, pointings)

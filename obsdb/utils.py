@@ -45,9 +45,7 @@ def get_user(session, username):
     ValueError : if no matching User is found in the database
 
     """
-    query = session.query(User)
-    query = query.filter(User.username == username)
-    user = query.one_or_none()
+    user = session.query(User).filter(User.username == username).one_or_none()
     if not user:
         raise ValueError('No matching User found')
     return user
@@ -75,14 +73,8 @@ def validate_user(session, username, password):
     ValueError : if username is not found in DB
 
     """
-    user = session.query(User).filter(User.username == username).one_or_none()
-    if not user:
-        raise ValueError('No matching User found')
-
-    if user.password_hash == hashlib.sha512(password.encode()).hexdigest():
-        return True
-    else:
-        return False
+    user = get_user(session, username)
+    return user.password_hash == hashlib.sha512(password.encode()).hexdigest()
 
 
 def get_filtered_queue(session, time=None, rank_limit=None, location=None,
@@ -202,9 +194,7 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     pending_pointings = queue.all()
 
     # find the current pointing too, with a seperate query
-    query = session.query(Pointing)
-    query = query.filter(Pointing.status == 'running')
-    current_pointing = query.one_or_none()
+    current_pointing = session.query(Pointing).filter(Pointing.status == 'running').one_or_none()
 
     return current_pointing, pending_pointings
 
@@ -229,29 +219,6 @@ def get_queue(session, time=None):
         Pointing being observed now
     pending_pointings : `Pointing`
         all current pending Pointings
-
-    Examples
-    --------
-    An example using `open_session`. The items retrieved won't function outside the
-    scope of the with block, since they rely on a session to access the underlying
-    database.
-
-    >>> with open_session() as session:
-    >>>     current_job, pending_jobs = get_queue(session)
-    >>>     njobs = len(pending_jobs)
-    >>>     exposure_list = current_job.exposure_sets
-    >>>     sorted_ranks = sorted([job.rank for job in pending_jobs])
-    >>> current_job
-    DetachedInstanceError: Instance <Pointing at 0x10a00ac50> is not bound to a Session;
-    attribute refresh operation cannot proceed
-
-    An example using `load_session`. This will return a session object. With this method
-    you don't have to worry so about about scope, but you do have to be careful about
-    trapping errors and commiting any changes you make to the database. See the help for
-    `load_session` for more details.
-
-    >>> session = load_session()
-    >>> current_job, pending_jobs = get_queue(session)
 
     """
     # call get_filtered_queue with no filtering
@@ -308,9 +275,7 @@ def get_pointing_by_id(session, pointing_id):
     ValueError : if no matching Pointing is found in the database
 
     """
-    query = session.query(Pointing)
-    query = query.filter(Pointing.db_id == pointing_id)
-    pointing = query.one_or_none()
+    pointing = session.query(Pointing).filter(Pointing.db_id == pointing_id).one_or_none()
     if not pointing:
         raise ValueError('No matching Pointing found')
     return pointing
@@ -365,39 +330,35 @@ def get_mpointing_by_id(session, mpointing_id):
     ValueError : if no matching Mpointing is found in the database
 
     """
-    query = session.query(Mpointing)
-    query = query.filter(Mpointing.db_id == mpointing_id)
-    mpointing = query.one_or_none()
+    mpointing = session.query(Mpointing).filter(Mpointing.db_id == mpointing_id).one_or_none()
     if not mpointing:
         raise ValueError('No matching Mpointing found')
     return mpointing
 
 
 def get_exposure_set_by_id(session, expset_id):
-    """Get a single ExposureSet, filtered by ID.
+    """Get a single Exposure Set, filtered by ID.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
     expset_id : int
-        the id number of the ExposureSet
+        the id number of the Exposure Set
 
     Returns
     -------
     exposure_set : `ExposureSet`
-        the matching ExposureSet
+        the matching Exposure Set
 
     Raises
     ------
-    ValueError : if no matching ExposureSet is found in the database
+    ValueError : if no matching Exposure Set is found in the database
 
     """
-    query = session.query(ExposureSet)
-    query = query.filter(ExposureSet.db_id == expset_id)
-    exposure_set = query.one_or_none()
+    exposure_set = session.query(ExposureSet).filter(ExposureSet.db_id == expset_id).one_or_none()
     if not exposure_set:
-        raise ValueError('No matching ExposureSet found')
+        raise ValueError('No matching Exposure Set found')
     return exposure_set
 
 
@@ -416,17 +377,19 @@ def get_grid_tile_by_name(session, grid_name, tile_name):
     Returns
     -------
     grid_tile : `GridTile`
-        the matching GridTile
+        the matching Grid Tile
 
     Raises
     ------
-    ValueError : if no matching GridTile is found in the database
+    ValueError : if no matching Grid or Grid Tile is found in the database
 
     """
-    query = session.query(Grid, GridTile)
-    query = query.filter(Grid.name == grid_name,
-                         GridTile.name == tile_name)
-    grid, grid_tile = query.one_or_none()
+    grid = session.query(Grid).filter(Grid.name == grid_name).one_or_none()
+    if not grid:
+        raise ValueError('No matching GridTile found')
+    grid_tile = session.query(GridTile).filter(GridTile.name == tile_name,
+                                               GridTile.grid_id == grid.db_id,
+                                               ).one_or_none()
     if not grid_tile:
         raise ValueError('No matching GridTile found')
     return grid_tile
@@ -454,10 +417,9 @@ def get_expired_pointings(session, time=None):
     else:
         now = time.iso
 
-    query = session.query(Pointing).filter(Pointing.status == 'pending',
-                                           Pointing.stop_time < now)
-
-    return query.all()
+    pointings = session.query(Pointing).filter(Pointing.status == 'pending',
+                                               Pointing.stop_time < now).all()
+    return pointings
 
 
 def get_expired_mpointings(session, time=None):
@@ -482,10 +444,9 @@ def get_expired_mpointings(session, time=None):
     else:
         now = time.iso
 
-    query = session.query(Mpointing).filter(Mpointing.status == 'unscheduled',
-                                            Mpointing.stop_time < now)
-
-    return query.all()
+    mpointings = session.query(Mpointing).filter(Mpointing.status == 'unscheduled',
+                                                 Mpointing.stop_time < now).all()
+    return mpointings
 
 
 def insert_items(session, items):

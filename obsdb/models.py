@@ -441,6 +441,8 @@ class ExposureSet(Base):
                    'ut_mask={}'.format(self.ut_mask),
                    'ra_offset={}'.format(self.ra_offset),
                    'dec_offset={}'.format(self.dec_offset),
+                   'pointing_id={}'.format(self.pointing_id),
+                   'mpointing_id={}'.format(self.mpointing_id),
                    ]
         return 'ExposureSet({})'.format(', '.join(strings))
 

@@ -10,46 +10,23 @@ from astropy.time import Time
 from sqlalchemy import or_
 
 from .engine import open_session
-from .models import ExposureSet, Mpointing, Pointing, Survey, SurveyTile, User
+from .models import ExposureSet, Grid, GridTile, Mpointing, Pointing, User
 
 
-__all__ = ['add_user', 'get_userkey', 'get_username', 'validate_user',
+__all__ = ['get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
-           'get_exposure_set_by_id', 'get_survey_tile_by_name',
-           'get_expired_pointing_ids', 'get_expired_mpointing_ids',
+           'get_exposure_set_by_id', 'get_grid_tile_by_name',
+           'get_expired_pointings', 'get_expired_mpointings',
            'insert_items',
-           'update_pointing_status', 'bulk_update_pointing_status', 'bulk_update_mpointing_status',
+           'update_pointing_status', 'bulk_update_status',
            'mark_completed', 'mark_aborted', 'mark_interrupted', 'mark_running',
            ]
 
 
-def add_user(session, username, password, fullname):
-    """Add a user to the database.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session`
-    username : string
-        short user name
-    password : string
-        plain text password. stored in DB using a sha512 hash for security
-    fullname : string
-        full name of user
-
-    """
-    password_hash = hashlib.sha512(password.encode()).hexdigest()
-    new_user = User(userName=username, password=password_hash, fullName=fullname)
-    session.add(new_user)
-
-
-def get_userkey(session, username):
-    """Return the userkey for a given username.
-
-    The userkey must be supplied as an argument to create a
-    Pointing.
+def get_user(session, username):
+    """Return the `User` for a given username.
 
     Parameters
     ----------
@@ -60,48 +37,18 @@ def get_userkey(session, username):
 
     Returns
     --------
-    userkey : int
-        id of user in database
+    user : `User`
+        the User class for the given username
 
     Raises
     ------
     ValueError : if no matching User is found in the database
 
     """
-    query = session.query(User)
-    query = query.filter(User.userName == username)
-    user = query.one_or_none()
+    user = session.query(User).filter(User.username == username).one_or_none()
     if not user:
         raise ValueError('No matching User found')
-    return user.userKey
-
-
-def get_username(session, userkey):
-    """Return the username for a given userkey.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session`
-    userkey : int
-        id of user in database.
-
-    Returns
-    --------
-    username : string
-        short name of user
-
-    Raises
-    ------
-    ValueError : if no matching User is found in the database
-
-    """
-    query = session.query(User)
-    query = query.filter(User.userKey == userkey)
-    user = query.one_or_none()
-    if not user:
-        raise ValueError('No matching User found')
-    return user.userName
+    return user
 
 
 def validate_user(session, username, password):
@@ -118,7 +65,7 @@ def validate_user(session, username, password):
 
     Returns
     -------
-    ok : bool
+    passed : bool
         True if user exists and password is correct
 
     Raises
@@ -126,19 +73,8 @@ def validate_user(session, username, password):
     ValueError : if username is not found in DB
 
     """
-    password_hash = hashlib.sha512(password.encode()).hexdigest()
-
-    query = session.query(User)
-    query = query.filter(User.userName == username)
-    user = query.one_or_none()
-    if not user:
-        raise ValueError('No matching User found')
-
-    actual_hash = user.password
-    if password_hash == actual_hash:
-        return True
-    else:
-        return False
+    user = get_user(session, username)
+    return user.password_hash == hashlib.sha512(password.encode()).hexdigest()
 
 
 def get_filtered_queue(session, time=None, rank_limit=None, location=None,
@@ -220,9 +156,9 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     now = time.iso
 
     # are we after the start time?
-    queue = queue.filter(Pointing.startUTC < now)
+    queue = queue.filter(Pointing.start_time < now)
     # are we before the stop time (if any)?
-    queue = queue.filter(or_(Pointing.stopUTC > now, Pointing.stopUTC == None))  # noqa: E711
+    queue = queue.filter(or_(Pointing.stop_time > now, Pointing.stop_time == None))  # noqa: E711
 
     # now limit by RA and Dec
     if location is not None:
@@ -239,8 +175,8 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
 
         # is latitude ever greater than limit?
         lat = location.lat.deg
-        queue = queue.filter(Pointing.decl > lat - 90 + altitude_limit,
-                             Pointing.decl < lat + 90 - altitude_limit)
+        queue = queue.filter(Pointing.dec > lat - 90 + altitude_limit,
+                             Pointing.dec < lat + 90 - altitude_limit)
 
     queue = queue.order_by('rank')
 
@@ -258,9 +194,7 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     pending_pointings = queue.all()
 
     # find the current pointing too, with a seperate query
-    query = session.query(Pointing)
-    query = query.filter(Pointing.status == 'running')
-    current_pointing = query.one_or_none()
+    current_pointing = session.query(Pointing).filter(Pointing.status == 'running').one_or_none()
 
     return current_pointing, pending_pointings
 
@@ -285,29 +219,6 @@ def get_queue(session, time=None):
         Pointing being observed now
     pending_pointings : `Pointing`
         all current pending Pointings
-
-    Examples
-    --------
-    An example using `open_session`. The items retrieved won't function outside the
-    scope of the with block, since they rely on a session to access the underlying
-    database.
-
-    >>> with open_session() as session:
-    >>>     current_job, pending_jobs = get_queue(session)
-    >>>     njobs = len(pending_jobs)
-    >>>     exposure_list = current_job.exposure_sets
-    >>>     sorted_ranks = sorted([job.rank for job in pending_jobs])
-    >>> current_job
-    DetachedInstanceError: Instance <Pointing at 0x10a00ac50> is not bound to a Session;
-    attribute refresh operation cannot proceed
-
-    An example using `load_session`. This will return a session object. With this method
-    you don't have to worry so about about scope, but you do have to be careful about
-    trapping errors and commiting any changes you make to the database. See the help for
-    `load_session` for more details.
-
-    >>> session = load_session()
-    >>> current_job, pending_jobs = get_queue(session)
 
     """
     # call get_filtered_queue with no filtering
@@ -335,7 +246,7 @@ def get_pointings(session, pointing_ids=None, status=None):
     """
     query = session.query(Pointing)
     if pointing_ids is not None:
-        query = query.filter(Pointing.pointingID.in_(list(pointing_ids)))
+        query = query.filter(Pointing.db_id.in_(list(pointing_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
@@ -364,9 +275,7 @@ def get_pointing_by_id(session, pointing_id):
     ValueError : if no matching Pointing is found in the database
 
     """
-    query = session.query(Pointing)
-    query = query.filter(Pointing.pointingID == pointing_id)
-    pointing = query.one_or_none()
+    pointing = session.query(Pointing).filter(Pointing.db_id == pointing_id).one_or_none()
     if not pointing:
         raise ValueError('No matching Pointing found')
     return pointing
@@ -392,7 +301,7 @@ def get_mpointings(session, mpointing_ids=None, status=None):
     """
     query = session.query(Mpointing)
     if mpointing_ids is not None:
-        query = query.filter(Mpointing.mpointingID.in_(list(mpointing_ids)))
+        query = query.filter(Mpointing.db_id.in_(list(mpointing_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
@@ -421,74 +330,72 @@ def get_mpointing_by_id(session, mpointing_id):
     ValueError : if no matching Mpointing is found in the database
 
     """
-    query = session.query(Mpointing)
-    query = query.filter(Mpointing.mpointingID == mpointing_id)
-    mpointing = query.one_or_none()
+    mpointing = session.query(Mpointing).filter(Mpointing.db_id == mpointing_id).one_or_none()
     if not mpointing:
         raise ValueError('No matching Mpointing found')
     return mpointing
 
 
 def get_exposure_set_by_id(session, expset_id):
-    """Get a single ExposureSet, filtered by ID.
+    """Get a single Exposure Set, filtered by ID.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
     expset_id : int
-        the id number of the ExposureSet
+        the id number of the Exposure Set
 
     Returns
     -------
     exposure_set : `ExposureSet`
-        the matching ExposureSet
+        the matching Exposure Set
 
     Raises
     ------
-    ValueError : if no matching ExposureSet is found in the database
+    ValueError : if no matching Exposure Set is found in the database
 
     """
-    query = session.query(ExposureSet)
-    query = query.filter(ExposureSet.expID == expset_id)
-    exposure_set = query.one_or_none()
+    exposure_set = session.query(ExposureSet).filter(ExposureSet.db_id == expset_id).one_or_none()
     if not exposure_set:
-        raise ValueError('No matching ExposureSet found')
+        raise ValueError('No matching Exposure Set found')
     return exposure_set
 
 
-def get_survey_tile_by_name(session, survey_name, tile_name):
-    """Get a tile in a survey from the name of the survey and tile.
+def get_grid_tile_by_name(session, grid_name, tile_name):
+    """Get a tile in a grid from the name of the grid and tile.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    survey_name : str
-        the name of the survey
+    grid_name : str
+        the name of the grid
     tile_name : str
         the name of the tile
 
     Returns
     -------
-    tile : `SurveyTile`
-        the matching SurveyTile
+    grid_tile : `GridTile`
+        the matching Grid Tile
 
     Raises
     ------
-    ValueError : if no matching SurveyTile is found in the database
+    ValueError : if no matching Grid or Grid Tile is found in the database
 
     """
-    query = session.query(Survey, SurveyTile)
-    query = query.filter(Survey.name == survey_name,
-                         SurveyTile.name == tile_name)
-    survey, tile = query.one_or_none()
-    if not tile:
-        raise ValueError('No matching SurveyTile found')
-    return tile
+    grid = session.query(Grid).filter(Grid.name == grid_name).one_or_none()
+    if not grid:
+        raise ValueError('No matching GridTile found')
+    grid_tile = session.query(GridTile).filter(GridTile.name == tile_name,
+                                               GridTile.grid_id == grid.db_id,
+                                               ).one_or_none()
+    if not grid_tile:
+        raise ValueError('No matching GridTile found')
+    return grid_tile
 
 
-def get_expired_pointing_ids(session, time=None):
+def get_expired_pointings(session, time=None):
     """Find all the pointings still pending whose valid period has expired.
 
     Parameters
@@ -501,8 +408,8 @@ def get_expired_pointing_ids(session, time=None):
 
     Returns
     -------
-    pointing_ids : list
-        a list of all matching pointing IDs
+    pointings : list
+        a list of all matching Pointings
 
     """
     if time is None:
@@ -510,15 +417,12 @@ def get_expired_pointing_ids(session, time=None):
     else:
         now = time.iso
 
-    query = session.query(Pointing.pointingID)
-    query = query.filter(Pointing.status == 'pending',
-                         Pointing.stopUTC < now)
-
-    # return values, unpacking tuples
-    return [pointing_id for (pointing_id,) in query.all()]
+    pointings = session.query(Pointing).filter(Pointing.status == 'pending',
+                                               Pointing.stop_time < now).all()
+    return pointings
 
 
-def get_expired_mpointing_ids(session, time=None):
+def get_expired_mpointings(session, time=None):
     """Find all the mpointings still unscheduled whose valid period has expired.
 
     Parameters
@@ -531,8 +435,8 @@ def get_expired_mpointing_ids(session, time=None):
 
     Returns
     -------
-    mpointing_ids : list
-        a list of all matching mpointing IDs
+    mpointings : list
+        a list of all matching Mpointings
 
     """
     if time is None:
@@ -540,12 +444,9 @@ def get_expired_mpointing_ids(session, time=None):
     else:
         now = time.iso
 
-    query = session.query(Mpointing.mpointingID)
-    query = query.filter(Mpointing.status == 'unscheduled',
-                         Mpointing.stopUTC < now)
-
-    # return values, unpacking tuples
-    return [mpointing_id for (mpointing_id,) in query.all()]
+    mpointings = session.query(Mpointing).filter(Mpointing.status == 'unscheduled',
+                                                 Mpointing.stop_time < now).all()
+    return mpointings
 
 
 def insert_items(session, items):
@@ -588,58 +489,27 @@ def update_pointing_status(session, pointing_id, status):
     pointing.status = status
 
 
-def bulk_update_pointing_status(session, pointing_ids, status):
-    """Set the status of a large number of pointings.
+def bulk_update_status(session, items, status):
+    """Set the status of a large number of Pointings or Mpointings.
 
-    Setting the status of a pointing, or updating any DB item, does not
-    need this function. One can use:
-
-    >>> with open_session() as session:
-    >>>     pointing = get_pointing_by_id(session, 17074)
-    >>>     pointing.status = 'completed'
-
-    However, for large numbers of pointings this is inefficient. Use this
-    routine instead.
+    For large numbers of items this routine is most efficient.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         the session object
-    pointing_ids : list
-        a list of pointing IDs to update
+    items : list
+        a list of `Pointing`s or `Mpointing`s to update
     status : string
         status to set pointings to
 
     """
-    mappings = [dict(pointingID=pointing_id, status=status) for pointing_id in pointing_ids]
-    session.bulk_update_mappings(Pointing, mappings)
+    # Make sure they're all the same type
+    if not all(isinstance(item, type(items[0])) for item in items):
+        raise ValueError('Items must be all the same type (`Pointing` or `Mpointing`)')
 
-
-def bulk_update_mpointing_status(session, mpointing_ids, status):
-    """Set the status of a large number of mpointings.
-
-    Setting the status of an mpointing, or updating any DB item, does not
-    need this function. One can use:
-
-    >>> with open_session() as session:
-    >>>     mpointing = get_mpointing_by_id(session, 17074)
-    >>>     mpointing.status = 'completed'
-
-    However, for large numbers of mpointings this is inefficient. Use this
-    routine instead.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        the session object
-    mpointing_ids : list
-        a list of mpointing IDs to update
-    status : string
-        status to set mpointings to
-
-    """
-    mappings = [dict(mpointingID=mpointing_id, status=status) for mpointing_id in mpointing_ids]
-    session.bulk_update_mappings(Mpointing, mappings)
+    mappings = [dict(db_id=item.db_id, status=status) for item in items]
+    session.bulk_update_mappings(type(items[0]), mappings)
 
 
 def mark_completed(pointing_id):

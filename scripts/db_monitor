@@ -33,26 +33,23 @@ else:
 with db.open_session() as session:
     all_pointings = db.get_pointings(session)
     n_all = len(all_pointings)
-    n_survey = sum([p.survey is not None for p in all_pointings])
-    print("{} points in database - {} targeted and {} survey".format(n_all,
-                                                                     n_all - n_survey,
-                                                                     n_survey))
+    print("{} points in database".format(n_all))
 
     running, _ = db.get_queue(session)
     if running:
-        print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running.pointingID))
+        print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running.db_id))
     else:
         print('\n')
 
     for pointing in all_pointings:
-        if show_all or (pointing.survey is None and pointing.status != 'expired'):
+        if show_all or pointing.status != 'expired':
             string = '{: <6.0f} | {: >20} | {: >3.0f}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
-                pointing.pointingID,
-                pointing.objectName,
+                pointing.db_id,
+                pointing.object_name,
                 pointing.rank,
-                '!' if pointing.ToO else ' ',
-                pointing.ra, pointing.decl,
-                pointing.startUTC)
+                '!' if pointing.too else ' ',
+                pointing.ra, pointing.dec,
+                pointing.start_time)
 
             print(string, end=' ')
 
@@ -61,15 +58,13 @@ with db.open_session() as session:
             elif pointing.status == 'completed':
                 status = gtxt('completed')
             elif pointing.status == 'pending':
-                if t > Time(pointing.startUTC):
+                if t > Time(pointing.start_time):
                     status = btxt('pending')
                 else:
-                    wait = Time(pointing.startUTC) - t
+                    wait = Time(pointing.start_time) - t
                     status = 'upcoming ({:.1f}h)'.format(wait.to('hour').value)
             else:
                 status = pointing.status
             print(status, end='\n')
 
-    print("{} points in database - {} targeted and {} survey".format(n_all,
-                                                                     n_all - n_survey,
-                                                                     n_survey))
+    print("{} points in database".format(n_all))

@@ -11,40 +11,22 @@ import obsdb as db
 
 
 MP_SETTINGS = dict(start_rank=998,
-                   minAlt=35,
-                   minTime=(120 + 30) * 3,
-                   maxSunAlt=-12,
-                   maxMoon='B',
-                   minMoonSep=30,
-                   ToO=0,
+                   min_alt=35,
+                   min_time=(60 + 30) * 3,
+                   max_sunalt=-12,
+                   max_moon='B',
+                   min_moonsep=30,
+                   too=0,
                    num_todo=-1,
                    valid_time=-1,
                    wait_time=4320,  # 3 days
                    )
 
-EXP_SETTINGS = dict(expTime=120,
-                    raoff=0.,
-                    decoff=0.,
-                    # numexp=3,
-                    typeFlag='SCIENCE',
-                    # filt='L',
+EXP_SETTINGS = dict(num_exp=None,
+                    exptime=60,
+                    filt=None,
                     binning=1,
-                    utMask=None)
-
-
-def get_userkey(username, description=''):
-    """Get user key of a user, and create it if it doesn't exit."""
-    with db.open_session() as session:
-        try:
-            user_key = db.get_userkey(session, username)
-        except Exception:
-            # Create user if it doesn't exist
-            prompt = "Creating {} user - give password: ".format(username)
-            passwd = getpass.getpass(prompt=prompt)
-            db.add_user(session, username, passwd, description)
-            session.commit()
-            user_key = db.get_userkey(session, username)
-    return user_key
+                    imgtype='SCIENCE')
 
 
 def get_coords(fov, overlap, centre, area):
@@ -98,23 +80,30 @@ def run(fov, overlap, centre, area, name):
 
     # Add to the database
     mpointings = []
-    user_key = get_userkey('goto', 'GOTO Survey')
     with db.open_session() as session:
+        # get the User, or make it if it doesn't exist
+        try:
+            user = db.get_user(session, username='goto')
+        except ValueError:
+            password = getpass.getpass(prompt="Creating default user - give password: ")
+            user = db.User('goto', password, 'GOTO Survey')
+
         # create Mpointings
         print('Creating mpointings...')
         start = time.time()
         for ra, dec, tile_num in zip(ras, decs, names):
-            mp = db.Mpointing(userKey=user_key,
-                              objectName='{}_survey_T{}'.format(name, tile_num),
+            mp = db.Mpointing(object_name='{}_survey_T{}'.format(name, tile_num),
                               ra=float(ra),
-                              decl=float(dec),
-                              **MP_SETTINGS)
+                              dec=float(dec),
+                              **MP_SETTINGS,
+                              user=user,
+                              )
             for filt in ['L', 'R', 'G', 'B']:
                 if filt == 'L':
-                    numexp = 3
+                    num_exp = 3
                 else:
-                    numexp = 1
-                mp.exposure_sets.append(db.ExposureSet(numexp=numexp,
+                    num_exp = 1
+                mp.exposure_sets.append(db.ExposureSet(num_exp=num_exp,
                                                        filt=filt,
                                                        **EXP_SETTINGS))
             mpointings.append(mp)

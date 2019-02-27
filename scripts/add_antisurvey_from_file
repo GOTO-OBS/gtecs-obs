@@ -5,48 +5,28 @@ import argparse
 import getpass
 import time
 
-import astropy.units as u
-
-from gototile.grid import SkyGrid
+from astropy.coordinates import SkyCoord
 
 import obsdb as db
 
 
 MP_SETTINGS = dict(start_rank=800,
-                   minAlt=35,
-                   minTime=(60 + 5) * 3,
-                   maxSunAlt=-12,
-                   maxMoon='B',
-                   minMoonSep=50,
-                   ToO=0,
+                   min_alt=35,
+                   min_time=(60 + 5) * 3,
+                   max_sunalt=-12,
+                   max_moon='B',
+                   min_moonsep=50,
+                   too=0,
                    num_todo=3,
                    valid_time=-1,
                    wait_time=10080,  # 1 week
                    )
 
-EXP_SETTINGS = dict(expTime=60,
-                    raoff=0.,
-                    decoff=0.,
-                    numexp=3,
-                    typeFlag='SCIENCE',
+EXP_SETTINGS = dict(num_exp=3,
+                    exptime=60,
                     filt='L',
                     binning=1,
-                    utMask=None)
-
-
-def get_userkey(username, description=''):
-    """Get user key of a user, and create it if it doesn't exit."""
-    with db.open_session() as session:
-        try:
-            user_key = db.get_userkey(session, username)
-        except Exception:
-            # Create user if it doesn't exist
-            prompt = "Creating {} user - give password: ".format(username)
-            passwd = getpass.getpass(prompt=prompt)
-            db.add_user(session, username, passwd, description)
-            session.commit()
-            user_key = db.get_userkey(session, username)
-    return user_key
+                    imgtype='SCIENCE')
 
 
 def get_coords_from_file(filename):
@@ -77,18 +57,21 @@ def get_coords_from_file(filename):
 
 def run(filename):
     """Create the mpointings and add them to the database."""
-    ra_fov = 5.5
-    dec_fov = 2.6
-    ra_overlap = 0.1
-    dec_overlap = 0.1
+    # Find the current Grid in the database
+    with db.open_session() as session:
+        db_grids = session.query(db.Grid).all()
+        if not db_grids:
+            raise ValueError('No defined grids found!')
+        else:
+            # Might have multiple grids defined, just take the latest...
+            db_grid = db_grids[-1]
 
-    fov = {'ra': ra_fov * u.deg, 'dec': dec_fov * u.deg}
-    overlap = {'ra': ra_overlap, 'dec': dec_overlap}
+        # Get the tile names and coords
+        tile_ras = [grid_tile.ra for grid_tile in db_grid.grid_tiles]
+        tile_decs = [grid_tile.dec for grid_tile in db_grid.grid_tiles]
+        tile_coords = SkyCoord(tile_ras, tile_decs, unit='deg')
 
-    # Create an all-sky grid with GOTO-tile
-    grid = SkyGrid(fov, overlap)
-    tile_coords = grid.coords
-    tile_names = grid.tilenames
+        tile_names = [grid_tile.name for grid_tile in db_grid.grid_tiles]
 
     # Get the tiles that are in the survey file
     _, _, _, survey_names = get_coords_from_file(filename)
@@ -106,17 +89,24 @@ def run(filename):
 
     # Add to the database
     mpointings = []
-    user_key = get_userkey('goto', 'GOTO Survey')
     with db.open_session() as session:
+        # get the User, or make it if it doesn't exist
+        try:
+            user = db.get_user(session, username='goto')
+        except ValueError:
+            password = getpass.getpass(prompt="Creating default user - give password: ")
+            user = db.User('goto', password, 'GOTO Survey')
+
         # create Mpointings
         print('Creating mpointings...')
         start = time.time()
         for ra, dec, name in zip(ras, decs, names):
-            mp = db.Mpointing(userKey=user_key,
-                              objectName=name,
+            mp = db.Mpointing(object_name=name,
                               ra=float(ra),
-                              decl=float(dec),
-                              **MP_SETTINGS)
+                              dec=float(dec),
+                              **MP_SETTINGS,
+                              user=user,
+                              )
 
             mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
             mpointings.append(mp)

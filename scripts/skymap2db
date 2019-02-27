@@ -7,10 +7,12 @@
 """
 
 import argparse
+import getpass
 import os
 import time
 
 import astropy.units as u
+from astropy.time import Time
 
 from gototile.grid import SkyGrid
 from gototile.skymap import SkyMap
@@ -18,93 +20,99 @@ from gototile.skymap import SkyMap
 import obsdb as db
 
 
-DB_USER = 'goto'
-DB_PW = 'G0T0'
-DB_NAME = 'GOTO GW alerts'
-
 # Constant Pointing values
 MPOINTING_SETTINGS = dict(start_rank=2,
-                          minAlt=30,
-                          minTime=360,
-                          maxSunAlt=-18,
-                          maxMoon='B',
-                          minMoonSep=30,
-                          ToO=0,
+                          min_alt=30,
+                          min_time=(60 + 30) * 3,
+                          max_sunalt=-18,
+                          max_moon='B',
+                          min_moonsep=30,
+                          too=0,
                           num_todo=5,
                           valid_time=1440,
-                          wait_time=0)
+                          wait_time=0,
+                          )
 
 # Constant ExposureSet values
-EXP_SETTINGS = dict(expTime=120,
-                    raoff=0.,
-                    decoff=0.,
-                    numexp=3,
-                    typeFlag='SCIENCE',
+EXP_SETTINGS = dict(num_exp=3,
+                    exptime=60,
                     filt='L',
                     binning=1,
-                    utMask=None)
+                    imgtype='SCIENCE',
+                    )
 
 
-def add_to_database(pointings, event_time, event_name, survey_name, filename):
+def add_to_database(db_grid, pointings, event_time, event_name, filename):
     """Add an event and its tiles to the GOTO database."""
     with db.open_session() as session:
-        # Connect to the user, or create it if it doesn't exist
+        # get the User, or make it if it doesn't exist
         try:
-            userkey = db.get_userkey(session, DB_USER)
-        except Exception:
-            db.add_user(session, DB_USER, DB_PW, DB_NAME)
-            userkey = db.get_userkey(session, DB_USER)
+            user = db.get_user(session, username='goto')
+        except ValueError:
+            password = getpass.getpass(prompt="Creating default user - give password: ")
+            user = db.User('goto', password, 'GOTO Survey')
 
         # Create Event
         event = db.Event(name=event_name,
-                         source='GW skymap',
-                         ivo=str(event_time),  # no official IVON yet
+                         ivorn=str(event_time),  # no official IVORN yet
+                         source='LVC',
+                         event_type='GW',
+                         time=Time.now(),
                          skymap=filename)
         session.add(event)
 
-        # Go through the pointings
+        # Create Survey
+        survey = db.Survey(name=event_name)
+        survey.grid = db_grid
+        survey.event = event
+        session.add(survey)
+
+        # Go through the pointings to create survey tiles
         for pointing in pointings:
             # Get pointing infomation
-            tile_name = str(pointing['tilename'])
+            tilename = str(pointing['tilename'])
             prob = float(pointing['prob'])
 
-            # Find the matched Survey tile
-            survey_tile = db.get_survey_tile_by_name(session, survey_name,
-                                                     tile_name)
+            # Find the matched Grid tile
+            grid_tile = db.get_grid_tile_by_name(session, db_grid.name, tilename)
 
-            # Create an EventTile and add to the database
-            tile = db.EventTile(probability=prob)
-            tile.event = event
-            tile.surveyTile = survey_tile
-
-            session.add(tile)
+            # Create an SurveyTile and add to the database
+            survey_tile = db.SurveyTile(weight=prob)
+            survey_tile.survey = survey
+            survey_tile.grid_tile = grid_tile
+            session.add(survey_tile)
 
             # Create Mpointing and add to the database
-            object_name = '{} {}'.format(event_name, tile_name)
+            object_name = '{}_{}'.format(event_name, tilename)
 
-            mpointing = db.Mpointing(userKey=userkey,
-                                     objectName=object_name,
-                                     **MPOINTING_SETTINGS)
-            mpointing.surveyTile = survey_tile
-            mpointing.event = event
-            mpointing.eventTile = tile
+            mpointing = db.Mpointing(object_name=object_name,
+                                     **MPOINTING_SETTINGS,
+                                     user=user,
+                                     )
             mpointing.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
+
+            mpointing.grid_tile = grid_tile
+            mpointing.survey_tile = survey_tile
+            mpointing.event = event
 
             session.add(mpointing)
 
 
-def run(filename, hp_lim=0.001, n_lim=200):
+def run(filename, hp_lim=0.001, n_lim=20):
     """Create the mpointings and add them to the database."""
-    ra_fov = 5.5
-    dec_fov = 2.6
-    ra_overlap = 0.1
-    dec_overlap = 0.1
+    with db.open_session() as session:
+        # Find the current Grid in the database
+        db_grids = session.query(db.Grid).all()
+        if not db_grids:
+            raise ValueError('No defined grids found!')
+        else:
+            # Might have multiple grids defined, just take the latest...
+            db_grid = db_grids[-1]
 
-    fov = {'ra': ra_fov * u.deg, 'dec': dec_fov * u.deg}
-    overlap = {'ra': ra_overlap, 'dec': dec_overlap}
-
-    # Create an all-sky grid with GOTO-tile
-    grid = SkyGrid(fov, overlap)
+        # Create a SkyGrid from the database Grid
+        fov = {'ra': db_grid.ra_fov * u.deg, 'dec': db_grid.dec_fov * u.deg}
+        overlap = {'ra': db_grid.ra_overlap, 'dec': db_grid.dec_overlap}
+        grid = SkyGrid(fov, overlap, kind=db_grid.algorithm)
 
     # open skymap and get event details
     print('Loading skymap...')
@@ -141,7 +149,7 @@ def run(filename, hp_lim=0.001, n_lim=200):
     # add pointings to the database
     print('Adding {} tiles to the database...'.format(len(selected_pointings)))
     start = time.time()
-    add_to_database(selected_pointings, event_time, event_name, grid.name, filename)
+    add_to_database(db_grid, selected_pointings, event_time, event_name, filename)
     print('  took {:.2f} secs'.format(time.time() - start))
 
 
@@ -155,7 +163,7 @@ if __name__ == '__main__':
 
     parser.add_argument('filename', help="skymap file")
     parser.add_argument('--priority', help="minimum priority", type=float, default=0.001)
-    parser.add_argument('--number', help="minimum number", type=int, default=200)
+    parser.add_argument('--number', help="minimum number", type=int, default=20)
 
     args = parser.parse_args()
 

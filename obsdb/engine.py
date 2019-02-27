@@ -32,15 +32,19 @@ def open_session():
 
     Examples
     --------
-    To create a new user, and add to the database:
+    To create a new user:
 
     >>> with open_session() as session:
-    >>>     newUser = User('sl', '1234', 'Stuey')
-    >>>     session.add(newUser)
+    >>>     bob = User(username='bob', password='1234', full_name='Bob Marley')
+    >>>     session.add(bob)
+    >>> bob
+    User(db_id=1, username=bob, full_name=Bob Marley)
+
+    Note it was committed automatically when leaving the context.
 
     """
-    Session = sessionmaker(bind=ENGINE)
-    session = Session()
+    new_session = sessionmaker(bind=ENGINE)
+    session = new_session()
     try:
         yield session
         session.commit()
@@ -64,18 +68,20 @@ def load_session():
 
     Examples
     --------
-    To create a new user, and add to the database:
+    To create a new user:
 
     >>> session = load_session()
-    >>> newUser = User('sl', '1234', 'Stuey')
+    >>> bob = User(username='bob', password='1234', full_name='Bob Marley')
     >>> try:
-    >>>    session.add(newUser)
+    >>>    session.add(new_user)
     >>> except:
     >>>    session.rollback()
     >>> finally:
     >>>    session.close()
+    >>> bob
+    User(db_id=1, username=bob, full_name=Bob Marley)
 
     """
-    Session = sessionmaker(bind=ENGINE)
-    session = Session()
+    new_session = sessionmaker(bind=ENGINE)
+    session = new_session()
     return session

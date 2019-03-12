@@ -206,10 +206,16 @@ def fill_mpointing(session, mpointing):
                                                                       db_grid_tile.ra,
                                                                       db_grid_tile.dec,
                                                                       ))
-        mpointing['object_name'] = db_grid.name + '_' + db_grid_tile.name + '_' + 'EXTRA'
         mpointing['ra'] = db_grid_tile.ra
         mpointing['dec'] = db_grid_tile.dec
         mpointing['grid_tile'] = db_grid_tile
+
+        # Object name
+        default_name = db_grid.name + '_' + db_grid_tile.name + '_' + 'EXTRA'
+        name = input('Enter Target name (blank for "{}"): '.format(default_name))
+        if not name:
+            name = default_name
+        mpointing['object_name'] = name
 
     else:
         # We're off grid

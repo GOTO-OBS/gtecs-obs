@@ -260,8 +260,13 @@ def fill_mpointing(session, mpointing):
         too = input('Is the target a ToO (can interupt)? [y/n]: ')
     if too in ['y', 'Y']:
         mpointing['too'] = 1
-        print('    Setting ToO rank automatically to: high')
-        mpointing['start_rank'] = 6
+        rank_zero = 'None'
+        while rank_zero not in ['y', 'n', 'Y', 'N']:
+            rank_zero = input('Enter as Rank 0 (higher than GW targets - use with care)? [y/n]: ')
+        if rank_zero in ['y', 'Y']:
+            mpointing['start_rank'] = 0
+        else:
+            mpointing['start_rank'] = 6
     else:
         mpointing['too'] = 0
         rank_str = 'None'

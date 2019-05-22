@@ -1044,14 +1044,19 @@ class Mpointing(Base):
                 # need to re-insert the current block with a new pointing
                 start_time = latest_pointing.start_time
 
-        if next_block.valid_time < 0:
-            # non-expiring pointings
+        if next_block.valid_time < 0 and not self.stop_time:
+            # If valid time is infinite (and there's no Mpointing stop_time)
+            # then the pointings should never expire.
             stop_time = None
         else:
-            stop_time = Time(start_time) + next_block.valid_time * u.minute
-            if self.stop_time and stop_time > self.stop_time:
-                # force pointings to stop by an Mpointing's stop_time, if given
+            if next_block.valid_time < 0:
+                # The Mpointing stop time takes priority over infinite valid time
                 stop_time = self.stop_time
+            else:
+                stop_time = Time(start_time) + next_block.valid_time * u.minute
+                if self.stop_time and stop_time > self.stop_time:
+                    # force pointings to stop by an Mpointing's stop_time, if given
+                    stop_time = self.stop_time
 
             if start_time >= stop_time:
                 # can happen if the Mpointing has a stop_time

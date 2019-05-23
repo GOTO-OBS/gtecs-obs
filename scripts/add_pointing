@@ -266,7 +266,7 @@ def fill_mpointing(session, mpointing):
         if rank_zero in ['y', 'Y']:
             mpointing['start_rank'] = 0
         else:
-            mpointing['start_rank'] = 6
+            mpointing['start_rank'] = 506
     else:
         mpointing['too'] = 0
         rank_str = 'None'
@@ -274,11 +274,11 @@ def fill_mpointing(session, mpointing):
             rank_str = input('Enter rank [low/medium/high]: ')
 
         if rank_str.lower() in ['low', 'l']:
-            mpointing['start_rank'] = 8
+            mpointing['start_rank'] = 508
         elif rank_str.lower() in ['medium', 'm']:
-            mpointing['start_rank'] = 7
+            mpointing['start_rank'] = 507
         elif rank_str.lower() in ['high', 'h']:
-            mpointing['start_rank'] = 6
+            mpointing['start_rank'] = 506
 
     # Valid time & wait time
     daily = None

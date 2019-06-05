@@ -13,7 +13,7 @@ import obsdb as db
 
 
 SURVEY_SETTINGS = dict(start_rank=999,
-                       min_alt=35,
+                       min_alt=30,
                        min_time=(60 + 30) * 3,
                        max_sunalt=-12,
                        max_moon='B',

@@ -67,7 +67,7 @@ def run(name, target_ra, target_dec):
                    ]
 
         mp_data = {'object_name': name,
-                   'too': 1,
+                   'too': 0,
                    'start_rank': 0,
                    'num_todo': 1,
                    'valid_time': -1,

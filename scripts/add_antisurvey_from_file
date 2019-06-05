@@ -11,7 +11,7 @@ import obsdb as db
 
 
 MP_SETTINGS = dict(start_rank=800,
-                   min_alt=35,
+                   min_alt=30,
                    min_time=(60 + 5) * 3,
                    max_sunalt=-12,
                    max_moon='B',

@@ -1042,9 +1042,11 @@ class Mpointing(Base):
                                   current_block.valid_time * u.min +
                                   current_block.wait_time * u.min)
                 else:
-                    # non-expiring pointing, no stop_time
+                    # non-expiring pointing, no valid_time
                     # (unless the mpointing had one, but we don't want to wait until after that)
-                    start_time = Time.now() + current_block.wait_time * u.minute
+                    # Start the wait time after the previous one stopped
+                    start_time = (Time(latest_pointing.stopped_time) +
+                                  current_block.wait_time * u.minute)
             else:
                 # the current block wasn't completed, and there's still time left
                 # (e.g. aborted, interrupted)

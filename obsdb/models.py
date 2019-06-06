@@ -1033,10 +1033,17 @@ class Mpointing(Base):
             #  - if the last block's pointing was completed
             #  - if the last block's pointing's valid time has expired
             if latest_pointing.status in ['completed', 'expired']:
-                if latest_pointing.stop_time:
-                    start_time = Time(latest_pointing.stop_time) + current_block.wait_time * u.min
+                if current_block.valid_time > 0:
+                    # Want to wait after the valid period of the latest pointing, which started at
+                    # it's start time.
+                    # We can't just use the stop_time, because it might have been set by the
+                    # Mpointing's stop_time instead (see below)
+                    start_time = (Time(latest_pointing.start_time) +
+                                  current_block.valid_time * u.min +
+                                  current_block.wait_time * u.min)
                 else:
-                    # non-expiring pointings have no stop_time
+                    # non-expiring pointing, no stop_time
+                    # (unless the mpointing had one, but we don't want to wait until after that)
                     start_time = Time.now() + current_block.wait_time * u.minute
             else:
                 # the current block wasn't completed, and there's still time left

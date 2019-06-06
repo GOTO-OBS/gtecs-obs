@@ -447,6 +447,10 @@ if __name__ == '__main__':
             es = db.ExposureSet(**exposure_set)
             mp.exposure_sets.append(es)
 
+        # Create the first Pointing (i.e. preempt the caretaker)
+        p = mp.get_next_pointing()
+        mp.pointings.append(p)
+
         print('~~ Final check ~~')
         print(mp)
         for es in mp.exposure_sets:

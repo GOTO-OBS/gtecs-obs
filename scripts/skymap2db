@@ -95,6 +95,10 @@ def add_to_database(db_grid, pointings, event_time, event_name, filename):
             mpointing.survey_tile = survey_tile
             mpointing.event = event
 
+            # Create the first Pointing (i.e. preempt the caretaker)
+            pointing = mpointing.get_next_pointing()
+            mpointing.pointings.append(pointing)
+
             session.add(mpointing)
 
 

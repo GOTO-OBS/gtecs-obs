@@ -80,6 +80,11 @@ def run(filename):
                               )
 
             mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
+
+            # Create the first Pointing (i.e. preempt the caretaker)
+            p = mp.get_next_pointing()
+            mp.pointings.append(p)
+
             mpointings.append(mp)
         print('  took {:.2f} secs'.format(time.time() - start))
 

@@ -10,7 +10,7 @@ from astropy.time import Time
 from sqlalchemy import or_
 
 from .engine import open_session
-from .models import ExposureSet, Grid, GridTile, Mpointing, Pointing, User
+from .models import Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, User
 
 
 __all__ = ['get_user', 'validate_user',
@@ -19,6 +19,7 @@ __all__ = ['get_user', 'validate_user',
            'get_mpointings', 'get_mpointing_by_id',
            'get_exposure_set_by_id',
            'get_current_grid', 'get_grid_tile_by_name',
+           'get_events', 'delete_event_pointings',
            'get_expired_pointings', 'get_expired_mpointings',
            'insert_items',
            'update_pointing_status', 'bulk_update_status',
@@ -404,6 +405,49 @@ def get_grid_tile_by_name(session, grid_name, tile_name):
     if not grid_tile:
         raise ValueError('No matching GridTile found')
     return grid_tile
+
+
+def get_events(session, event_type=None, source=None):
+    """Get all events, filtered by type or source.
+
+    Parameters
+    ----------
+    session : `sqlalchemy.Session.session`
+        a session object - see `load_session` or `open_session` for details
+    event_type: str or list of str, optional
+        the type of event, e.g. GW, GRB
+    source : str or list of str,, optional
+        the event's origin, e.g. LVC, Fermi, GAIA
+
+    Returns
+    -------
+    events : list
+        a list of all matching Events
+
+    """
+    query = session.query(Event)
+    if event_type is not None:
+        if isinstance(event_type, str):
+            event_type = [event_type]
+        query = query.filter(Event.event_type.in_(event_type))
+    if source is not None:
+        if isinstance(source, str):
+            source = [source]
+        query = query.filter(Event.source.in_(source))
+    events = query.all()
+    return events
+
+
+def delete_event_pointings(session, event):
+    """Set all the Mpointings and Pointings assosiated with the given Event to deleted.
+
+    Note this doesn't physically delete the rows from the database tables,
+    it just sets the statuses to 'deleted'.
+    """
+    for mpointing in event.mpointings:
+        mpointing.status = 'deleted'
+        if mpointing.pointings[-1].status == 'pending':
+            mpointing.pointings[-1].status = 'deleted'
 
 
 def get_expired_pointings(session, time=None):

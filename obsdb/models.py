@@ -329,27 +329,33 @@ class Pointing(Base):
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
-    user = relationship('User', back_populates='pointings')
-    exposure_sets = relationship('ExposureSet', back_populates='pointing')
-    mpointing = relationship('Mpointing', back_populates='pointings')
-    time_block = relationship('TimeBlock', back_populates='pointings')
-    grid_tile = relationship('GridTile', back_populates='pointings')
-    survey_tile = relationship('SurveyTile', back_populates='pointings')
-    event = relationship('Event', back_populates='pointings')
+    user = relationship('User', lazy='joined', back_populates='pointings')
+    exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='pointing')
+    mpointing = relationship('Mpointing', lazy='joined', back_populates='pointings')
+    time_block = relationship('TimeBlock', lazy='joined', back_populates='pointings')
+    grid_tile = relationship('GridTile', lazy='joined', back_populates='pointings')
+    survey_tile = relationship('SurveyTile', lazy='joined', back_populates='pointings')
+    event = relationship('Event', lazy='joined', back_populates='pointings')
 
     # Secondary relationships
-    grid = relationship('Grid', secondary='grid_tiles',
+    grid = relationship('Grid',
+                        lazy='joined',
+                        secondary='grid_tiles',
                         primaryjoin='Pointing.grid_tile_id == GridTile.db_id',
                         secondaryjoin='Grid.db_id == GridTile.grid_id',
                         back_populates='pointings',
                         viewonly=True,
-                        uselist=False)
-    survey = relationship('Survey', secondary='survey_tiles',
+                        uselist=False,
+                        )
+    survey = relationship('Survey',
+                          lazy='joined',
+                          secondary='survey_tiles',
                           primaryjoin='Pointing.survey_tile_id == SurveyTile.db_id',
                           secondaryjoin='Survey.db_id == SurveyTile.survey_id',
                           back_populates='pointings',
                           viewonly=True,
-                          uselist=False)
+                          uselist=False,
+                          )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -793,27 +799,33 @@ class Mpointing(Base):
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
-    user = relationship('User', back_populates='mpointings')
-    pointings = relationship('Pointing', back_populates='mpointing')
-    exposure_sets = relationship('ExposureSet', back_populates='mpointing')
-    time_blocks = relationship('TimeBlock', back_populates='mpointing')
-    grid_tile = relationship('GridTile', back_populates='mpointings')
-    survey_tile = relationship('SurveyTile', back_populates='mpointings')
-    event = relationship('Event', back_populates='mpointings')
+    user = relationship('User', lazy='joined', back_populates='mpointings')
+    pointings = relationship('Pointing', lazy='joined', back_populates='mpointing')
+    exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='mpointing')
+    time_blocks = relationship('TimeBlock', lazy='joined', back_populates='mpointing')
+    grid_tile = relationship('GridTile', lazy='joined', back_populates='mpointings')
+    survey_tile = relationship('SurveyTile', lazy='joined', back_populates='mpointings')
+    event = relationship('Event', lazy='joined', back_populates='mpointings')
 
     # Secondary relationships
-    grid = relationship('Grid', secondary='grid_tiles',
+    grid = relationship('Grid',
+                        lazy='joined',
+                        secondary='grid_tiles',
                         primaryjoin='Mpointing.grid_tile_id == GridTile.db_id',
                         secondaryjoin='Grid.db_id == GridTile.grid_id',
                         back_populates='mpointings',
                         viewonly=True,
-                        uselist=False)
-    survey = relationship('Survey', secondary='survey_tiles',
+                        uselist=False,
+                        )
+    survey = relationship('Survey',
+                          lazy='joined',
+                          secondary='survey_tiles',
                           primaryjoin='Mpointing.survey_tile_id == SurveyTile.db_id',
                           secondaryjoin='Survey.db_id == SurveyTile.survey_id',
                           back_populates='mpointings',
                           viewonly=True,
-                          uselist=False)
+                          uselist=False,
+                          )
 
     def __init__(self, object_name=None, ra=None, dec=None,
                  start_rank=None, min_alt=None, min_time=None,
@@ -1306,18 +1318,22 @@ class Grid(Base):
     surveys = relationship('Survey', back_populates='grid')
 
     # Secondary relationships
-    pointings = relationship('Pointing', secondary='grid_tiles',
+    pointings = relationship('Pointing',
+                             secondary='grid_tiles',
                              primaryjoin='Grid.db_id == GridTile.grid_id',
                              secondaryjoin='Pointing.grid_tile_id == GridTile.db_id',
                              back_populates='grid',
                              viewonly=True,
-                             uselist=True)
-    mpointings = relationship('Mpointing', secondary='grid_tiles',
+                             uselist=True,
+                             )
+    mpointings = relationship('Mpointing',
+                              secondary='grid_tiles',
                               primaryjoin='Grid.db_id == GridTile.grid_id',
                               secondaryjoin='Mpointing.grid_tile_id == GridTile.db_id',
                               back_populates='grid',
                               viewonly=True,
-                              uselist=True)
+                              uselist=True,
+                              )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1477,18 +1493,22 @@ class Survey(Base):
     event = relationship('Event', back_populates='surveys')
 
     # Secondary relationships
-    pointings = relationship('Pointing', secondary='survey_tiles',
+    pointings = relationship('Pointing',
+                             secondary='survey_tiles',
                              primaryjoin='Survey.db_id == SurveyTile.survey_id',
                              secondaryjoin='Pointing.survey_tile_id == SurveyTile.db_id',
                              back_populates='survey',
                              viewonly=True,
-                             uselist=True)
-    mpointings = relationship('Mpointing', secondary='survey_tiles',
+                             uselist=True,
+                             )
+    mpointings = relationship('Mpointing',
+                              secondary='survey_tiles',
                               primaryjoin='Survey.db_id == SurveyTile.survey_id',
                               secondaryjoin='Mpointing.survey_tile_id == SurveyTile.db_id',
                               back_populates='survey',
                               viewonly=True,
-                              uselist=True)
+                              uselist=True,
+                              )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),

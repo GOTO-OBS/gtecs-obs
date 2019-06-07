@@ -17,7 +17,8 @@ __all__ = ['get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
-           'get_exposure_set_by_id', 'get_grid_tile_by_name',
+           'get_exposure_set_by_id',
+           'get_current_grid', 'get_grid_tile_by_name',
            'get_expired_pointings', 'get_expired_mpointings',
            'insert_items',
            'update_pointing_status', 'bulk_update_status',
@@ -360,6 +361,16 @@ def get_exposure_set_by_id(session, expset_id):
     if not exposure_set:
         raise ValueError('No matching Exposure Set found')
     return exposure_set
+
+
+def get_current_grid(session):
+    """Get the current (last-defined) Grid from the grids table."""
+    # Get the final entry in the grids table, assuming that's the latest and therefore current one
+    # Note there's no query.last(), so need to order by id decending then take the first.
+    grid = session.query(Grid).order_by(Grid.db_id.desc()).first()
+    if not grid:
+        raise ValueError('No defined grids found')
+    return grid
 
 
 def get_grid_tile_by_name(session, grid_name, tile_name):

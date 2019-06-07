@@ -59,12 +59,8 @@ def run(filename):
     """Create the mpointings and add them to the database."""
     # Find the current Grid in the database
     with db.open_session() as session:
-        db_grids = session.query(db.Grid).all()
-        if not db_grids:
-            raise ValueError('No defined grids found!')
-        else:
-            # Might have multiple grids defined, just take the latest...
-            db_grid = db_grids[-1]
+        # Get the current grid
+        db_grid = db.get_current_grid(session)
 
         # Get the tile names and coords
         tile_ras = [grid_tile.ra for grid_tile in db_grid.grid_tiles]

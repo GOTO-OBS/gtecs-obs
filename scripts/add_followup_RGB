@@ -18,13 +18,8 @@ import obsdb as db
 def run(name, target_ra, target_dec):
     """Add an Mpointing with 60s exposures in R, G and B filters."""
     with db.open_session() as session:
-        # Find the current Grid in the database
-        db_grids = session.query(db.Grid).all()
-        if not db_grids:
-            raise ValueError('No defined grids found!')
-        else:
-            # Might have multiple grids defined, just take the latest...
-            db_grid = db_grids[-1]
+        # Get the current grid
+        db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
         fov = {'ra': db_grid.ra_fov * u.deg, 'dec': db_grid.dec_fov * u.deg}

@@ -147,37 +147,45 @@ class Pointing(Base):
     ----------
     object_name : String
         object name
-    ra : float, optional
+    ra : float
         J2000 right ascension in decimal degrees
         if ra is not given and this Pointing is linked to a GridTile
         then the ra will be extracted from the GridTile
-    dec : float, optional
+    dec : float
         J2000 declination in decimal degrees
         if dec is not given and this Pointing is linked to a GridTile
         then the dec will be extracted from the GridTile
     rank : Integer
         rank to use for pointing
-    min_alt : float
-        minimum altitude to observer at
     min_time : float
         minimum time needed to schedule pointing
-    max_sunalt : float
-        altitude constraint on Sun
-    max_moon : string
-        Moon constraint. one of 'D', 'G', 'B'.
-    min_moonsep : float
-        distance constraint from the Moon, degrees
-    too : bool
+
+    status : string, optional
+        status of the pointing
+        default = 'pending'
+    too : bool, optional
         indicates if this is a Target of Opportunity (ToO)
-    start_time : string, `astropy.time.Time` or datetime.datetime
+        default = False
+    min_alt : float, optional
+        minimum altitude to observe at
+        default = 30
+    max_sunalt : float, optional
+        altitude constraint on Sun
+        default = -15
+    max_moon : string, optional
+        Moon constraint. one of 'D', 'G', 'B'
+        default = 'B'
+    min_moonsep : float, optional
+        distance constraint from the Moon, degrees
+        default = 30
+    start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which pointing is considered valid and can be started
-    stop_time : string, `astropy.time.Time` or datetime.datetime, or None
+        default = Time.now()
+    stop_time : string, `astropy.time.Time` or datetime.datetime, or None, optional
         the latest UTC time at which pointing may be started
         can be None, if so the pointing will stay in the queue indefinitely
         (it can't be marked as expired) and will only leave when observed
-
-    status : string, optional
-        status of pointing, default 'pending'
+        default = None
 
     Attributes
     ----------
@@ -309,14 +317,14 @@ class Pointing(Base):
     ra = Column(Float)
     dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
     rank = Column(Integer)
-    min_alt = Column(Float)
+    min_alt = Column(Float, default=30)
     max_sunalt = Column(Float, default=-15)
     min_time = Column(Float)
-    max_moon = Column(String(1))
+    max_moon = Column(String(1), default='B')
     min_moonsep = Column(Float, default=30)
     too = Column(Boolean, default=False)
-    start_time = Column(DateTime)
-    stop_time = Column(DateTime)
+    start_time = Column(DateTime, default=datetime.datetime.now())
+    stop_time = Column(DateTime, default=None)
     started_time = Column(DateTime, default=None)
     stopped_time = Column(DateTime, default=None)
 
@@ -431,22 +439,27 @@ class ExposureSet(Base):
         exposure time in seconds
     filt : string
         filter to use
-    binning : int
-        binning to apply
-    imgtype : string
+
+    binning : int, optional
+        binning factor to apply
+        default = 1 (no binning)
+    imgtype : string, optional
         indicates the type of exposure set.
         one of SCIENCE, FOCUS, STD, FLAT, BIAS, DARK
-
+        default = 'SCIENCE'
     ut_mask : int, optional
         if set, this is a binary mask which will determine which unit
         telescopes carry out the exposure. A value of 5 (binary 0101) will
         be exposed by cameras 1 and 3.
+        default = None
     ra_offset : float, optional
         the size of the random offset to apply between each exposure
         if not set, no offset will be made
+        default = 0
     dec_offset : float, optional
         the size of the random offset to apply between each exposure
         if not set, no offset will be made
+        default = 0
 
     Attributes
     ----------
@@ -478,11 +491,11 @@ class ExposureSet(Base):
     num_exp = Column(Integer)
     exptime = Column(Float)
     filt = Column('filter', String(2))  # filter is a built in function in Python
-    binning = Column(Integer)
-    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'))
-    ut_mask = Column(Integer, nullable=True)
-    ra_offset = Column(Float, server_default='0.0')
-    dec_offset = Column(Float, server_default='0.0')
+    binning = Column(Integer, default=1)
+    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'), default='SCIENCE')
+    ut_mask = Column(Integer, default=None)
+    ra_offset = Column(Float, default=0)
+    dec_offset = Column(Float, default=0)
 
     # Foreign keys
     pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=False)
@@ -535,37 +548,49 @@ class Mpointing(Base):
         then the dec will be extracted from the GridTile
     start_rank : Integer
         rank to use for first pointing in series
-    min_alt : float
-        minimum altitude to observer at
+    num_todo : int
+        number of (successful) observations required.
+        less than zero means repeat infinitely.
     min_time : float
         minimum time needed to schedule pointing
-    max_sunalt : float
-        altitude constraint on Sun
-    max_moon : string
-        Moon constraint. one of 'D', 'G', 'B'.
-    min_moonsep : float
-        distance constraint from the Moon, degrees
-    too : bool
-        indicates if this is a Target of Opportunity (ToO)
-    num_todo : int
-        number of (sucsessful) observations required.
-        less than zero means repeat infinitely.
-    valid_time : float or list of float
-        the amount of time the pointing(s) should be valid in the queue.
-        if num_todo is greater than times given the list will be looped.
-    wait_time : float or list of float
-        time to wait between pointings in minutes.
-        if num_todo is greater than times given the list will be looped.
 
     status : string, optional
-        status of mpointing, default 'unscheduled'
+        status of the mpointing
+        default = 'unscheduled'
+    too : bool, optional
+        indicates if this is a Target of Opportunity (ToO)
+        default = False
+    min_alt : float, optional
+        minimum altitude to observe at, degrees
+        default = 30
+    max_sunalt : float, optional
+        altitude constraint on Sun, degrees
+        default = -15
+    max_moon : string, optional
+        Moon constraint
+        one of 'D', 'G', 'B'
+        default = 'B'
+    min_moonsep : float, optional
+        distance constraint from the Moon, degrees
+        default = 30
+    wait_time : float or list of float, optional
+        time to wait between pointings in minutes.
+        if num_todo is greater than times given the list will be looped.
+        default = 0 (no delay)
+    valid_time : float or list of float, optional
+        the amount of time the pointing(s) should be valid in the queue.
+        if num_todo is greater than times given the list will be looped.
+        less than zero means valid indefinitely
+        default = -1 (indefinitely valid)
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which Mpointing is considered valid and can be started
         if not given then set to now, so the Mpointing will start immediately
+        default = Time.now()
     stop_time : string, `astropy.time.Time` or datetime.datetime, optional
         the latest UTC time after which pointings must stop
         if not given the Mpointing will continue creating pointings until
         it is completed
+        default = None
 
     Attributes
     ----------
@@ -783,14 +808,14 @@ class Mpointing(Base):
     num_todo = Column(Integer)
     num_completed = Column(Integer)
     infinite = Column(Boolean, default=False)
-    min_alt = Column(Float)
-    max_sunalt = Column(Float)
+    min_alt = Column(Float, default=30)
+    max_sunalt = Column(Float, default=-15)
     min_time = Column(Float)
-    max_moon = Column(String(1))
-    min_moonsep = Column(Float)
+    max_moon = Column(String(1), default='B')
+    min_moonsep = Column(Float, default=30)
     too = Column(Boolean, default=False)
-    start_time = Column(DateTime)
-    stop_time = Column(DateTime)
+    start_time = Column(DateTime, default=datetime.datetime.now())
+    stop_time = Column(DateTime, default=None)
 
     # Foreign keys
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -830,7 +855,7 @@ class Mpointing(Base):
     def __init__(self, object_name=None, ra=None, dec=None,
                  start_rank=None, min_alt=None, min_time=None,
                  max_moon=None, min_moonsep=None, max_sunalt=None, too=None, start_time=None,
-                 stop_time=None, num_todo=None, valid_time=None, wait_time=None,
+                 stop_time=None, num_todo=None, valid_time=-1, wait_time=0,
                  status='unscheduled', **kwargs):
         self.ra = ra
         self.dec = dec

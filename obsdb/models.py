@@ -216,6 +216,18 @@ class Pointing(Base):
         the Event associated with this Pointing, if any
         can also be added with the event_id parameter
 
+    The following secondary relationships are not settable directly,
+    but are populated through the above tables if given:
+
+    Secondary relationships
+    -----------------------
+    grid : `Grid`
+        the Grid that the GridTile associated with this Mpointing,
+        if any, is associated with
+    survey : `Survey`
+        the Survey that the SurveyTile associated with this Mpointing,
+        if any, is associated with
+
     Examples
     --------
     >>> from obsdb import *
@@ -324,6 +336,18 @@ class Pointing(Base):
     grid_tile = relationship('GridTile', back_populates='pointings', uselist=False)
     survey_tile = relationship('SurveyTile', back_populates='pointings', uselist=False)
     event = relationship('Event', back_populates='pointings', uselist=False)
+
+    # Secondary relationships
+    grid = relationship('Grid', secondary='grid_tiles',
+                        primaryjoin='Pointing.grid_tile_id == GridTile.db_id',
+                        secondaryjoin='Grid.db_id == GridTile.grid_id',
+                        back_populates='pointings',
+                        viewonly=True, uselist=False)
+    survey = relationship('Survey', secondary='survey_tiles',
+                          primaryjoin='Pointing.survey_tile_id == SurveyTile.db_id',
+                          secondaryjoin='Survey.db_id == SurveyTile.survey_id',
+                          back_populates='pointings',
+                          viewonly=True, uselist=False)
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -577,6 +601,18 @@ class Mpointing(Base):
         the Event associated with this Mpointing, if any
         can also be added with the event_id parameter
 
+    The following secondary relationships are not settable directly,
+    but are populated through the above tables if given:
+
+    Secondary relationships
+    -----------------------
+    grid : `Grid`
+        the Grid that the GridTile associated with this Mpointing,
+        if any, is associated with
+    survey : `Survey`
+        the Survey that the SurveyTile associated with this Mpointing,
+        if any, is associated with
+
     Examples
     --------
     >>> from obsdb import *
@@ -762,6 +798,18 @@ class Mpointing(Base):
     grid_tile = relationship('GridTile', back_populates='mpointings', uselist=False)
     survey_tile = relationship('SurveyTile', back_populates='mpointings', uselist=False)
     event = relationship('Event', back_populates='mpointings', uselist=False)
+
+    # Secondary relationships
+    grid = relationship('Grid', secondary='grid_tiles',
+                        primaryjoin='Mpointing.grid_tile_id == GridTile.db_id',
+                        secondaryjoin='Grid.db_id == GridTile.grid_id',
+                        back_populates='mpointings',
+                        viewonly=True, uselist=False)
+    survey = relationship('Survey', secondary='survey_tiles',
+                          primaryjoin='Mpointing.survey_tile_id == SurveyTile.db_id',
+                          secondaryjoin='Survey.db_id == SurveyTile.survey_id',
+                          back_populates='mpointings',
+                          viewonly=True, uselist=False)
 
     def __init__(self, object_name=None, ra=None, dec=None,
                  start_rank=None, min_alt=None, min_time=None,
@@ -1221,6 +1269,18 @@ class Grid(Base):
     surveys : list of `Survey`, optional
         the Surveys associated with this Grid, if any
 
+    The following secondary relationships are not settable directly,
+    but are populated through the above tables if given:
+
+    Secondary relationships
+    -----------------------
+    pointings : list of `Pointing`
+        the Pointings that the GridTiles associated with this Grid,
+        if any, are associated with
+    mpointings : list of `Mpointing`
+        the Mpointings that the GridTiles associated with this Grid,
+        if any, are associated with
+
     """
 
     # Set corresponding SQL table name
@@ -1240,6 +1300,18 @@ class Grid(Base):
     # Foreign relationships
     grid_tiles = relationship('GridTile', back_populates='grid', uselist=True)
     surveys = relationship('Survey', back_populates='grid', uselist=True)
+
+    # Secondary relationships
+    pointings = relationship('Pointing', secondary='grid_tiles',
+                             primaryjoin='Grid.db_id == GridTile.grid_id',
+                             secondaryjoin='Pointing.grid_tile_id == GridTile.db_id',
+                             back_populates='grid',
+                             viewonly=True, uselist=True)
+    mpointings = relationship('Mpointing', secondary='grid_tiles',
+                              primaryjoin='Grid.db_id == GridTile.grid_id',
+                              secondaryjoin='Mpointing.grid_tile_id == GridTile.db_id',
+                              back_populates='grid',
+                              viewonly=True, uselist=True)
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1369,6 +1441,15 @@ class Survey(Base):
         the Event associated with this Survey, if any
         can also be added with the event_id parameter
 
+    Secondary relationships
+    -----------------------
+    pointings : list of `Pointing`
+        the Pointings that the SurveyTiles associated with this Survey,
+        if any, are associated with
+    mpointings : list of `Mpointing`
+        the Mpointings that the SurveyTiles associated with this Survey,
+        if any, are associated with
+
     """
 
     # Set corresponding SQL table name
@@ -1388,6 +1469,18 @@ class Survey(Base):
     survey_tiles = relationship('SurveyTile', back_populates='survey')
     grid = relationship('Grid', back_populates='surveys', uselist=False)
     event = relationship('Event', back_populates='surveys', uselist=False)
+
+    # Secondary relationships
+    pointings = relationship('Pointing', secondary='survey_tiles',
+                             primaryjoin='Survey.db_id == SurveyTile.survey_id',
+                             secondaryjoin='Pointing.survey_tile_id == SurveyTile.db_id',
+                             back_populates='survey',
+                             viewonly=True, uselist=True)
+    mpointings = relationship('Mpointing', secondary='survey_tiles',
+                              primaryjoin='Survey.db_id == SurveyTile.survey_id',
+                              secondaryjoin='Mpointing.survey_tile_id == SurveyTile.db_id',
+                              back_populates='survey',
+                              viewonly=True, uselist=True)
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),

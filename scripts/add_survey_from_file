@@ -8,22 +8,17 @@ import time
 import obsdb as db
 
 
-MP_SETTINGS = dict(min_alt=30,
-                   min_time=(60 + 5) * 3,
-                   max_sunalt=-12,
-                   max_moon='B',
-                   min_moonsep=50,
-                   too=0,
-                   num_todo=-1,
-                   valid_time=-1,
-                   wait_time=4320,  # 3 days
-                   )
+MP_SETTINGS = {'num_todo': -1,
+               'wait_time': 4320,  # 3 days
+               'min_time': (60 + 5) * 3,
+               'max_sunalt': -12,
+               'min_moonsep': 50,
+               }
 
-EXP_SETTINGS = dict(num_exp=3,
-                    exptime=60,
-                    filt='L',
-                    binning=1,
-                    imgtype='SCIENCE')
+EXP_SETTINGS = {'num_exp': 3,
+                'exptime': 60,
+                'filt': 'L',
+                }
 
 
 def get_coords_from_file(filename):

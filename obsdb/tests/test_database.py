@@ -81,21 +81,12 @@ with db.open_session() as session:
                     ra=350.785625,
                     dec=18.416472,
                     rank=9,
-                    min_alt=30,
-                    max_sunalt=-15,
                     min_time=3600,
-                    max_moon='G',
-                    min_moonsep=30,
-                    too=0,
                     start_time=Time.now(),
                     stop_time=Time.now() + 3 * u.day,
                     user=user,
                     )
-    e = db.ExposureSet(imgtype='SCIENCE',
-                       filt='G',
-                       exptime=20,
-                       num_exp=20,
-                       binning=2)
+    e = db.ExposureSet(num_exp=20, exptime=20, filt='G')
     p.exposure_sets.append(e)
     session.add(p)
     session.commit()
@@ -106,22 +97,17 @@ with db.open_session() as session:
                       ra=10.685,
                       dec=41.2875,
                       start_rank=9,
-                      min_alt=30,
-                      max_sunalt=-15,
                       min_time=3600,
-                      too=0,
-                      max_moon='B',
-                      min_moonsep=30,
                       num_todo=5,
                       valid_time=[60, 120],
                       wait_time=60,
                       user=user,
                       )
     # and add RGBL exposure set
-    L = db.ExposureSet(imgtype='SCIENCE', filt='L', exptime=120, num_exp=3, binning=2)
-    R = db.ExposureSet(imgtype='SCIENCE', filt='R', exptime=120, num_exp=3, binning=2)
-    G = db.ExposureSet(imgtype='SCIENCE', filt='G', exptime=120, num_exp=3, binning=2)
-    B = db.ExposureSet(imgtype='SCIENCE', filt='B', exptime=120, num_exp=3, binning=2)
+    L = db.ExposureSet(num_exp=3, exptime=120, filt='L')
+    R = db.ExposureSet(num_exp=3, exptime=120, filt='R')
+    G = db.ExposureSet(num_exp=3, exptime=120, filt='G')
+    B = db.ExposureSet(num_exp=3, exptime=120, filt='B')
     mp.exposure_sets = [L, R, G, B]
     session.add(mp)
     session.commit()

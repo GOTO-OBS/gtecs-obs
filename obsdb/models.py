@@ -7,6 +7,8 @@ import hashlib
 from astropy import units as u
 from astropy.time import Time
 
+from gototile.grid import SkyGrid
+
 from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, validates
@@ -114,8 +116,8 @@ class User(Base):
     full_name = Column(String)
 
     # Foreign relationships
-    pointings = relationship('Pointing', back_populates='user', uselist=True)
-    mpointings = relationship('Mpointing', back_populates='user', uselist=True)
+    pointings = relationship('Pointing', back_populates='user')
+    mpointings = relationship('Mpointing', back_populates='user')
 
     def __init__(self, username=None, password=None, full_name=None):
         self.username = username
@@ -147,37 +149,45 @@ class Pointing(Base):
     ----------
     object_name : String
         object name
-    ra : float, optional
+    ra : float
         J2000 right ascension in decimal degrees
         if ra is not given and this Pointing is linked to a GridTile
         then the ra will be extracted from the GridTile
-    dec : float, optional
+    dec : float
         J2000 declination in decimal degrees
         if dec is not given and this Pointing is linked to a GridTile
         then the dec will be extracted from the GridTile
     rank : Integer
         rank to use for pointing
-    min_alt : float
-        minimum altitude to observer at
     min_time : float
         minimum time needed to schedule pointing
-    max_sunalt : float
-        altitude constraint on Sun
-    max_moon : string
-        Moon constraint. one of 'D', 'G', 'B'.
-    min_moonsep : float
-        distance constraint from the Moon, degrees
-    too : bool
+
+    status : string, optional
+        status of the pointing
+        default = 'pending'
+    too : bool, optional
         indicates if this is a Target of Opportunity (ToO)
-    start_time : string, `astropy.time.Time` or datetime.datetime
+        default = False
+    min_alt : float, optional
+        minimum altitude to observe at
+        default = 30
+    max_sunalt : float, optional
+        altitude constraint on Sun
+        default = -15
+    max_moon : string, optional
+        Moon constraint. one of 'D', 'G', 'B'
+        default = 'B'
+    min_moonsep : float, optional
+        distance constraint from the Moon, degrees
+        default = 30
+    start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which pointing is considered valid and can be started
-    stop_time : string, `astropy.time.Time` or datetime.datetime, or None
+        default = Time.now()
+    stop_time : string, `astropy.time.Time` or datetime.datetime, or None, optional
         the latest UTC time at which pointing may be started
         can be None, if so the pointing will stay in the queue indefinitely
         (it can't be marked as expired) and will only leave when observed
-
-    status : string, optional
-        status of pointing, default 'pending'
+        default = None
 
     Attributes
     ----------
@@ -216,6 +226,18 @@ class Pointing(Base):
         the Event associated with this Pointing, if any
         can also be added with the event_id parameter
 
+    The following secondary relationships are not settable directly,
+    but are populated through the above tables if given:
+
+    Secondary relationships
+    -----------------------
+    grid : `Grid`
+        the Grid that the GridTile associated with this Mpointing,
+        if any, is associated with
+    survey : `Survey`
+        the Survey that the SurveyTile associated with this Mpointing,
+        if any, is associated with
+
     Examples
     --------
     >>> from obsdb import *
@@ -224,8 +246,7 @@ class Pointing(Base):
     >>> session = load_session()
 
     Create a new pointing:
-    >>> p = Pointing(object_name='IP Peg', ra=350.785625, dec=18.416472, rank=9, min_alt=30,
-    ... max_sunalt=-15, min_time=3600, max_moon='G', min_moonsep=30, too=False,
+    >>> p = Pointing(object_name='IP Peg', ra=350.785625, dec=18.416472, rank=9, min_time=3600,
     ... start_time=Time.now(), stop_time=Time.now()+3*u.day)
     >>> p
     Pointing(db_id=None, status=None, object_name=IP Peg, ra=350.785625, dec=18.416472, rank=9,
@@ -257,7 +278,7 @@ class Pointing(Base):
     At the moment this Pointing has no Exposure Sets, so it's fairly useless.
 
     We can either add these to the Pointing's exposure_sets list attribute directly:
-    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L', binning=1, imgtype='SCIENCE')
+    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L')
     >>> p.exposure_sets.append(e1)
     >>> session.add(e1)
     >>> session.commit()
@@ -266,9 +287,9 @@ class Pointing(Base):
     ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None)]
 
     or create ExposureSets and assign the pointing to them:
-    >>> e2 = ExposureSet(num_exp=3, exptime=30, filt='R', binning=1, imgtype='SCIENCE', pointing=p)
-    >>> e3 = ExposureSet(num_exp=3, exptime=30, filt='G', binning=1, imgtype='SCIENCE', pointing=p)
-    >>> e4 = ExposureSet(num_exp=3, exptime=30, filt='B', binning=1, imgtype='SCIENCE', pointing=p)
+    >>> e2 = ExposureSet(num_exp=3, exptime=30, filt='R', pointing=p)
+    >>> e3 = ExposureSet(num_exp=3, exptime=30, filt='G', pointing=p)
+    >>> e4 = ExposureSet(num_exp=3, exptime=30, filt='B', pointing=p)
     >>> insert_items(session, [e2, e3, e4])
     >>> session.commit()
     >>> p.exposure_sets
@@ -297,14 +318,14 @@ class Pointing(Base):
     ra = Column(Float)
     dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
     rank = Column(Integer)
-    min_alt = Column(Float)
+    min_alt = Column(Float, default=30)
     max_sunalt = Column(Float, default=-15)
     min_time = Column(Float)
-    max_moon = Column(String(1))
+    max_moon = Column(String(1), default='B')
     min_moonsep = Column(Float, default=30)
     too = Column(Boolean, default=False)
-    start_time = Column(DateTime)
-    stop_time = Column(DateTime)
+    start_time = Column(DateTime, default=datetime.datetime.now())
+    stop_time = Column(DateTime, default=None)
     started_time = Column(DateTime, default=None)
     stopped_time = Column(DateTime, default=None)
 
@@ -317,13 +338,33 @@ class Pointing(Base):
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
-    user = relationship('User', back_populates='pointings', uselist=False)
-    exposure_sets = relationship('ExposureSet', back_populates='pointing', uselist=True)
-    mpointing = relationship('Mpointing', back_populates='pointings', uselist=False)
-    time_block = relationship('TimeBlock', back_populates='pointings', uselist=False)
-    grid_tile = relationship('GridTile', back_populates='pointings', uselist=False)
-    survey_tile = relationship('SurveyTile', back_populates='pointings', uselist=False)
-    event = relationship('Event', back_populates='pointings', uselist=False)
+    user = relationship('User', lazy='joined', back_populates='pointings')
+    exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='pointing')
+    mpointing = relationship('Mpointing', lazy='joined', back_populates='pointings')
+    time_block = relationship('TimeBlock', lazy='joined', back_populates='pointings')
+    grid_tile = relationship('GridTile', lazy='joined', back_populates='pointings')
+    survey_tile = relationship('SurveyTile', lazy='joined', back_populates='pointings')
+    event = relationship('Event', lazy='joined', back_populates='pointings')
+
+    # Secondary relationships
+    grid = relationship('Grid',
+                        lazy='joined',
+                        secondary='grid_tiles',
+                        primaryjoin='Pointing.grid_tile_id == GridTile.db_id',
+                        secondaryjoin='Grid.db_id == GridTile.grid_id',
+                        back_populates='pointings',
+                        viewonly=True,
+                        uselist=False,
+                        )
+    survey = relationship('Survey',
+                          lazy='joined',
+                          secondary='survey_tiles',
+                          primaryjoin='Pointing.survey_tile_id == SurveyTile.db_id',
+                          secondaryjoin='Survey.db_id == SurveyTile.survey_id',
+                          back_populates='pointings',
+                          viewonly=True,
+                          uselist=False,
+                          )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -399,22 +440,27 @@ class ExposureSet(Base):
         exposure time in seconds
     filt : string
         filter to use
-    binning : int
-        binning to apply
-    imgtype : string
+
+    binning : int, optional
+        binning factor to apply
+        default = 1 (no binning)
+    imgtype : string, optional
         indicates the type of exposure set.
         one of SCIENCE, FOCUS, STD, FLAT, BIAS, DARK
-
+        default = 'SCIENCE'
     ut_mask : int, optional
         if set, this is a binary mask which will determine which unit
         telescopes carry out the exposure. A value of 5 (binary 0101) will
         be exposed by cameras 1 and 3.
+        default = None
     ra_offset : float, optional
         the size of the random offset to apply between each exposure
         if not set, no offset will be made
+        default = 0
     dec_offset : float, optional
         the size of the random offset to apply between each exposure
         if not set, no offset will be made
+        default = 0
 
     Attributes
     ----------
@@ -446,19 +492,19 @@ class ExposureSet(Base):
     num_exp = Column(Integer)
     exptime = Column(Float)
     filt = Column('filter', String(2))  # filter is a built in function in Python
-    binning = Column(Integer)
-    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'))
-    ut_mask = Column(Integer, nullable=True)
-    ra_offset = Column(Float, server_default='0.0')
-    dec_offset = Column(Float, server_default='0.0')
+    binning = Column(Integer, default=1)
+    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'), default='SCIENCE')
+    ut_mask = Column(Integer, default=None)
+    ra_offset = Column(Float, default=0)
+    dec_offset = Column(Float, default=0)
 
     # Foreign keys
     pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=False)
     mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
-    pointing = relationship('Pointing', back_populates='exposure_sets', uselist=False)
-    mpointing = relationship('Mpointing', back_populates='exposure_sets', uselist=False)
+    pointing = relationship('Pointing', back_populates='exposure_sets')
+    mpointing = relationship('Mpointing', back_populates='exposure_sets')
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -503,37 +549,49 @@ class Mpointing(Base):
         then the dec will be extracted from the GridTile
     start_rank : Integer
         rank to use for first pointing in series
-    min_alt : float
-        minimum altitude to observer at
+    num_todo : int
+        number of (successful) observations required.
+        less than zero means repeat infinitely.
     min_time : float
         minimum time needed to schedule pointing
-    max_sunalt : float
-        altitude constraint on Sun
-    max_moon : string
-        Moon constraint. one of 'D', 'G', 'B'.
-    min_moonsep : float
-        distance constraint from the Moon, degrees
-    too : bool
-        indicates if this is a Target of Opportunity (ToO)
-    num_todo : int
-        number of (sucsessful) observations required.
-        less than zero means repeat infinitely.
-    valid_time : float or list of float
-        the amount of time the pointing(s) should be valid in the queue.
-        if num_todo is greater than times given the list will be looped.
-    wait_time : float or list of float
-        time to wait between pointings in minutes.
-        if num_todo is greater than times given the list will be looped.
 
     status : string, optional
-        status of mpointing, default 'unscheduled'
+        status of the mpointing
+        default = 'unscheduled'
+    too : bool, optional
+        indicates if this is a Target of Opportunity (ToO)
+        default = False
+    min_alt : float, optional
+        minimum altitude to observe at, degrees
+        default = 30
+    max_sunalt : float, optional
+        altitude constraint on Sun, degrees
+        default = -15
+    max_moon : string, optional
+        Moon constraint
+        one of 'D', 'G', 'B'
+        default = 'B'
+    min_moonsep : float, optional
+        distance constraint from the Moon, degrees
+        default = 30
+    wait_time : float or list of float, optional
+        time to wait between pointings in minutes.
+        if num_todo is greater than times given the list will be looped.
+        default = 0 (no delay)
+    valid_time : float or list of float, optional
+        the amount of time the pointing(s) should be valid in the queue.
+        if num_todo is greater than times given the list will be looped.
+        less than zero means valid indefinitely
+        default = -1 (indefinitely valid)
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which Mpointing is considered valid and can be started
         if not given then set to now, so the Mpointing will start immediately
+        default = Time.now()
     stop_time : string, `astropy.time.Time` or datetime.datetime, optional
         the latest UTC time after which pointings must stop
         if not given the Mpointing will continue creating pointings until
         it is completed
+        default = None
 
     Attributes
     ----------
@@ -577,6 +635,18 @@ class Mpointing(Base):
         the Event associated with this Mpointing, if any
         can also be added with the event_id parameter
 
+    The following secondary relationships are not settable directly,
+    but are populated through the above tables if given:
+
+    Secondary relationships
+    -----------------------
+    grid : `Grid`
+        the Grid that the GridTile associated with this Mpointing,
+        if any, is associated with
+    survey : `Survey`
+        the Survey that the SurveyTile associated with this Mpointing,
+        if any, is associated with
+
     Examples
     --------
     >>> from obsdb import *
@@ -586,9 +656,8 @@ class Mpointing(Base):
     Make an Mpointing.
     Note we set the start_time to midnight, num_todo to 5 and valid_time & wait_time to 10 mins.
     >>> mp = Mpointing(object_name='IP Peg', ra=350.785625, dec=18.416472, start_rank=9,
-    ... min_alt=30, min_time=3600, max_sunalt=-15, max_moon='B', min_moonsep=30, too=False,
-    ... start_time=Time('2018-01-01 00:00:00'), num_todo=5, valid_time=10, wait_time=10,
-    ... user=bob)
+    ... num_todo=5, min_time=3600, start_time=Time('2018-01-01 00:00:00'), valid_time=10,
+    ... wait_time=10, user=bob)
     >>> session.add(mp)
     >>> session.commit()
     >>> mp
@@ -605,9 +674,8 @@ class Mpointing(Base):
     For a more complicated example, give a list to wait_time to have the intervals between
     pointings increase: from 10 minutes, to 20 then 30:
     >>> mp = Mpointing(object_name='IP Peg', ra=350.785625, dec=18.416472, start_rank=9,
-    ... min_alt=30, min_time=3600, max_sunalt=-15, max_moon='B', min_moonsep=30, too=False,
-    ... start_time=Time('2018-01-01 00:00:00'), num_todo=5, valid_time=10, wait_time=[10,20,30],
-    ... user=bob)
+    ... num_todo=5, min_time=3600, start_time=Time('2018-01-01 00:00:00'),valid_time=10,
+    ... wait_time=[10,20,30], user=bob)
     >>> session.add(mp)
     >>> session.commit()
     >>> mp
@@ -635,7 +703,7 @@ class Mpointing(Base):
     *Since there were 5 to do but only 3 blocks we looped back to the start.
 
     Like a Pointing, an Mpointing is only useful if it has at least one Exposure Set:
-    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L', binning=1, imgtype='SCIENCE')
+    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L')
     >>> mp.exposure_sets.append(e1)
     >>> session.add(e1)
     >>> session.commit()
@@ -739,14 +807,14 @@ class Mpointing(Base):
     num_todo = Column(Integer)
     num_completed = Column(Integer)
     infinite = Column(Boolean, default=False)
-    min_alt = Column(Float)
-    max_sunalt = Column(Float)
+    min_alt = Column(Float, default=30)
+    max_sunalt = Column(Float, default=-15)
     min_time = Column(Float)
-    max_moon = Column(String(1))
-    min_moonsep = Column(Float)
+    max_moon = Column(String(1), default='B')
+    min_moonsep = Column(Float, default=30)
     too = Column(Boolean, default=False)
-    start_time = Column(DateTime)
-    stop_time = Column(DateTime)
+    start_time = Column(DateTime, default=datetime.datetime.now())
+    stop_time = Column(DateTime, default=None)
 
     # Foreign keys
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -755,18 +823,38 @@ class Mpointing(Base):
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
-    user = relationship('User', back_populates='mpointings', uselist=False)
-    pointings = relationship('Pointing', back_populates='mpointing', uselist=True)
-    exposure_sets = relationship('ExposureSet', back_populates='mpointing', uselist=True)
-    time_blocks = relationship('TimeBlock', back_populates='mpointing', viewonly=True)
-    grid_tile = relationship('GridTile', back_populates='mpointings', uselist=False)
-    survey_tile = relationship('SurveyTile', back_populates='mpointings', uselist=False)
-    event = relationship('Event', back_populates='mpointings', uselist=False)
+    user = relationship('User', lazy='joined', back_populates='mpointings')
+    pointings = relationship('Pointing', lazy='joined', back_populates='mpointing')
+    exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='mpointing')
+    time_blocks = relationship('TimeBlock', lazy='joined', back_populates='mpointing')
+    grid_tile = relationship('GridTile', lazy='joined', back_populates='mpointings')
+    survey_tile = relationship('SurveyTile', lazy='joined', back_populates='mpointings')
+    event = relationship('Event', lazy='joined', back_populates='mpointings')
+
+    # Secondary relationships
+    grid = relationship('Grid',
+                        lazy='joined',
+                        secondary='grid_tiles',
+                        primaryjoin='Mpointing.grid_tile_id == GridTile.db_id',
+                        secondaryjoin='Grid.db_id == GridTile.grid_id',
+                        back_populates='mpointings',
+                        viewonly=True,
+                        uselist=False,
+                        )
+    survey = relationship('Survey',
+                          lazy='joined',
+                          secondary='survey_tiles',
+                          primaryjoin='Mpointing.survey_tile_id == SurveyTile.db_id',
+                          secondaryjoin='Survey.db_id == SurveyTile.survey_id',
+                          back_populates='mpointings',
+                          viewonly=True,
+                          uselist=False,
+                          )
 
     def __init__(self, object_name=None, ra=None, dec=None,
                  start_rank=None, min_alt=None, min_time=None,
                  max_moon=None, min_moonsep=None, max_sunalt=None, too=None, start_time=None,
-                 stop_time=None, num_todo=None, valid_time=None, wait_time=None,
+                 stop_time=None, num_todo=None, valid_time=-1, wait_time=0,
                  status='unscheduled', **kwargs):
         self.ra = ra
         self.dec = dec
@@ -1164,7 +1252,7 @@ class TimeBlock(Base):
     mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
 
     # Foreign relationships
-    mpointing = relationship('Mpointing', back_populates='time_blocks', uselist=False)
+    mpointing = relationship('Mpointing', back_populates='time_blocks')
     pointings = relationship('Pointing', back_populates='time_block')
 
     def __repr__(self):
@@ -1221,6 +1309,18 @@ class Grid(Base):
     surveys : list of `Survey`, optional
         the Surveys associated with this Grid, if any
 
+    The following secondary relationships are not settable directly,
+    but are populated through the above tables if given:
+
+    Secondary relationships
+    -----------------------
+    pointings : list of `Pointing`
+        the Pointings that the GridTiles associated with this Grid,
+        if any, are associated with
+    mpointings : list of `Mpointing`
+        the Mpointings that the GridTiles associated with this Grid,
+        if any, are associated with
+
     """
 
     # Set corresponding SQL table name
@@ -1238,8 +1338,26 @@ class Grid(Base):
     algorithm = Column(String)
 
     # Foreign relationships
-    grid_tiles = relationship('GridTile', back_populates='grid', uselist=True)
-    surveys = relationship('Survey', back_populates='grid', uselist=True)
+    grid_tiles = relationship('GridTile', back_populates='grid')
+    surveys = relationship('Survey', back_populates='grid')
+
+    # Secondary relationships
+    pointings = relationship('Pointing',
+                             secondary='grid_tiles',
+                             primaryjoin='Grid.db_id == GridTile.grid_id',
+                             secondaryjoin='Pointing.grid_tile_id == GridTile.db_id',
+                             back_populates='grid',
+                             viewonly=True,
+                             uselist=True,
+                             )
+    mpointings = relationship('Mpointing',
+                              secondary='grid_tiles',
+                              primaryjoin='Grid.db_id == GridTile.grid_id',
+                              secondaryjoin='Mpointing.grid_tile_id == GridTile.db_id',
+                              back_populates='grid',
+                              viewonly=True,
+                              uselist=True,
+                              )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1251,6 +1369,13 @@ class Grid(Base):
                    'algorithm={}'.format(self.algorithm),
                    ]
         return 'Grid({})'.format(', '.join(strings))
+
+    def get_skygrid(self):
+        """Create a GOTO-tile SkyGrid from the current database Grid."""
+        fov = {'ra': self.ra_fov * u.deg, 'dec': self.dec_fov * u.deg}
+        overlap = {'ra': self.ra_overlap, 'dec': self.dec_overlap}
+        skygrid = SkyGrid(fov, overlap, kind=self.algorithm)
+        return skygrid
 
 
 class GridTile(Base):
@@ -1314,10 +1439,10 @@ class GridTile(Base):
     grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
 
     # Foreign relationships
-    grid = relationship('Grid', back_populates='grid_tiles', uselist=False)
-    survey_tiles = relationship('SurveyTile', back_populates='grid_tile', uselist=True)
-    mpointings = relationship('Mpointing', back_populates='grid_tile', uselist=True)
-    pointings = relationship('Pointing', back_populates='grid_tile', uselist=True)
+    grid = relationship('Grid', back_populates='grid_tiles')
+    survey_tiles = relationship('SurveyTile', back_populates='grid_tile')
+    mpointings = relationship('Mpointing', back_populates='grid_tile')
+    pointings = relationship('Pointing', back_populates='grid_tile')
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1369,6 +1494,15 @@ class Survey(Base):
         the Event associated with this Survey, if any
         can also be added with the event_id parameter
 
+    Secondary relationships
+    -----------------------
+    pointings : list of `Pointing`
+        the Pointings that the SurveyTiles associated with this Survey,
+        if any, are associated with
+    mpointings : list of `Mpointing`
+        the Mpointings that the SurveyTiles associated with this Survey,
+        if any, are associated with
+
     """
 
     # Set corresponding SQL table name
@@ -1386,8 +1520,26 @@ class Survey(Base):
 
     # Foreign relationships
     survey_tiles = relationship('SurveyTile', back_populates='survey')
-    grid = relationship('Grid', back_populates='surveys', uselist=False)
-    event = relationship('Event', back_populates='surveys', uselist=False)
+    grid = relationship('Grid', back_populates='surveys')
+    event = relationship('Event', back_populates='surveys')
+
+    # Secondary relationships
+    pointings = relationship('Pointing',
+                             secondary='survey_tiles',
+                             primaryjoin='Survey.db_id == SurveyTile.survey_id',
+                             secondaryjoin='Pointing.survey_tile_id == SurveyTile.db_id',
+                             back_populates='survey',
+                             viewonly=True,
+                             uselist=True,
+                             )
+    mpointings = relationship('Mpointing',
+                              secondary='survey_tiles',
+                              primaryjoin='Survey.db_id == SurveyTile.survey_id',
+                              secondaryjoin='Mpointing.survey_tile_id == SurveyTile.db_id',
+                              back_populates='survey',
+                              viewonly=True,
+                              uselist=True,
+                              )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1460,10 +1612,10 @@ class SurveyTile(Base):
     grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=False)
 
     # Foreign relationships
-    survey = relationship('Survey', back_populates='survey_tiles', uselist=False)
-    grid_tile = relationship('GridTile', back_populates='survey_tiles', uselist=False)
-    pointings = relationship('Pointing', back_populates='survey_tile', uselist=True)
-    mpointings = relationship('Mpointing', back_populates='survey_tile', uselist=True)
+    survey = relationship('Survey', back_populates='survey_tiles')
+    grid_tile = relationship('GridTile', back_populates='survey_tiles')
+    pointings = relationship('Pointing', back_populates='survey_tile')
+    mpointings = relationship('Mpointing', back_populates='survey_tile')
 
     def __init__(self, weight=None, survey_id=None, grid_tile_id=None):
         self.current_weight = weight
@@ -1543,9 +1695,9 @@ class Event(Base):
     skymap = Column(String)
 
     # Foreign relationships
-    surveys = relationship('Survey', back_populates='event', uselist=True)
-    pointings = relationship('Pointing', back_populates='event', uselist=True)
-    mpointings = relationship('Mpointing', back_populates='event', uselist=True)
+    surveys = relationship('Survey', back_populates='event')
+    pointings = relationship('Pointing', back_populates='event')
+    mpointings = relationship('Mpointing', back_populates='event')
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1653,9 +1805,9 @@ class ImageLog(Base):
     mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=True)
 
     # Foreign relationships
-    exposure_set = relationship('ExposureSet', backref='image_logs', uselist=False)
-    pointing = relationship('Pointing', backref='image_logs', uselist=False)
-    mpointing = relationship('Mpointing', backref='image_logs', uselist=False)
+    exposure_set = relationship('ExposureSet', backref='image_logs')
+    pointing = relationship('Pointing', backref='image_logs')
+    mpointing = relationship('Mpointing', backref='image_logs')
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),

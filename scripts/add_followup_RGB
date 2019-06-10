@@ -8,33 +8,21 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
-from gototile.grid import SkyGrid
-
-import numpy as np
-
 import obsdb as db
 
 
 def run(name, target_ra, target_dec):
     """Add an Mpointing with 60s exposures in R, G and B filters."""
     with db.open_session() as session:
-        # Find the current Grid in the database
-        db_grids = session.query(db.Grid).all()
-        if not db_grids:
-            raise ValueError('No defined grids found!')
-        else:
-            # Might have multiple grids defined, just take the latest...
-            db_grid = db_grids[-1]
+        # Get the current grid
+        db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
-        fov = {'ra': db_grid.ra_fov * u.deg, 'dec': db_grid.dec_fov * u.deg}
-        overlap = {'ra': db_grid.ra_overlap, 'dec': db_grid.dec_overlap}
-        grid = SkyGrid(fov, overlap, kind=db_grid.algorithm)
+        grid = db_grid.get_skygrid()
 
+        # Find which tile the given coordinates are in
         coord = SkyCoord(target_ra * u.deg, target_dec * u.deg)
-        sep = np.array(coord.separation(grid.coords))
-        tile_index = np.where(sep == (min(sep)))[0][0]
-        tile_name = grid.tilenames[tile_index]
+        tile_name = grid.get_tile(coord)
 
         # Find the matching GridTile
         query = session.query(db.GridTile)
@@ -61,35 +49,23 @@ def run(name, target_ra, target_dec):
         expsets = [{'num_exp': 1,
                     'exptime': 60,
                     'filt': 'R',
-                    'binning': 1,
-                    'imgtype': 'SCIENCE',
                     },
                    {'num_exp': 1,
                     'exptime': 60,
                     'filt': 'G',
-                    'binning': 1,
-                    'imgtype': 'SCIENCE',
                     },
                    {'num_exp': 1,
                     'exptime': 60,
                     'filt': 'B',
-                    'binning': 1,
-                    'imgtype': 'SCIENCE',
                     },
                    ]
 
         mp_data = {'object_name': name,
-                   'too': 0,
                    'start_rank': 0,
                    'num_todo': 1,
-                   'valid_time': -1,
                    'wait_time': 12 * 60,
                    'start_time': str(Time.now()),
                    'stop_time': str(Time.now() + 1 * u.day),
-                   'min_alt': 30,
-                   'max_sunalt': -15,
-                   'max_moon': 'B',
-                   'min_moonsep': 30,
                    'min_time': 450,  # (60+30)*5
                    }
 

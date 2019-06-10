@@ -6,10 +6,6 @@ import getpass
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
-from gototile.grid import SkyGrid
-
-import numpy as np
-
 import obsdb as db
 
 
@@ -148,18 +144,11 @@ def fill_mpointing(session, mpointing):
     while ongrid not in ['y', 'n', 'Y', 'N']:
         ongrid = input('Observe constrained to the grid? [y/n]: ')
     if ongrid in ['y', 'Y']:
-        # Find the current Grid in the database
-        db_grids = session.query(db.Grid).all()
-        if not db_grids:
-            raise ValueError('No defined grids found!')
-        else:
-            # Might have multiple grids defined, just take the latest...
-            db_grid = db_grids[-1]
+        # Get the current grid
+        db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
-        fov = {'ra': db_grid.ra_fov * u.deg, 'dec': db_grid.dec_fov * u.deg}
-        overlap = {'ra': db_grid.ra_overlap, 'dec': db_grid.dec_overlap}
-        grid = SkyGrid(fov, overlap, kind=db_grid.algorithm)
+        grid = db_grid.get_skygrid()
 
         print('    Using grid {}'.format(db_grid.name))
 
@@ -189,10 +178,10 @@ def fill_mpointing(session, mpointing):
                     target_dec = parse_dec(dec_str)
                 except Exception:
                     pass
+
+            # Find which tile the given coordinates are in
             coord = SkyCoord(target_ra * u.deg, target_dec * u.deg)
-            sep = np.array(coord.separation(grid.coords))
-            tile_index = np.where(sep == (min(sep)))[0][0]
-            tile_name = grid.tilenames[tile_index]
+            tile_name = grid.get_tile(coord)
 
         # Find the matching GridTile
         query = session.query(db.GridTile)
@@ -404,9 +393,6 @@ if __name__ == '__main__':
     default_exposure_set = {'num_exp': None,
                             'exptime': None,
                             'filt': None,
-                            # default values:
-                            'binning': 1,
-                            'imgtype': 'SCIENCE',
                             }
 
     print("** Insert pointing into GOTO queue database **")

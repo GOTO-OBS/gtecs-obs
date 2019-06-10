@@ -10,23 +10,17 @@ from astropy.coordinates import SkyCoord
 import obsdb as db
 
 
-MP_SETTINGS = dict(start_rank=800,
-                   min_alt=30,
-                   min_time=(60 + 5) * 3,
-                   max_sunalt=-12,
-                   max_moon='B',
-                   min_moonsep=50,
-                   too=0,
-                   num_todo=3,
-                   valid_time=-1,
-                   wait_time=10080,  # 1 week
-                   )
+MP_SETTINGS = {'start_rank': 800,
+               'num_todo': 3,
+               'wait_time': 10080,  # 1 week
+               'min_time': (60 + 5) * 3,
+               'max_sunalt': -12,
+               }
 
-EXP_SETTINGS = dict(num_exp=3,
-                    exptime=60,
-                    filt='L',
-                    binning=1,
-                    imgtype='SCIENCE')
+EXP_SETTINGS = {'num_exp': 3,
+                'exptime': 60,
+                'filt': 'L',
+                }
 
 
 def get_coords_from_file(filename):

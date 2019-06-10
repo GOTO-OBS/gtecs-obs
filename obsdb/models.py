@@ -246,8 +246,7 @@ class Pointing(Base):
     >>> session = load_session()
 
     Create a new pointing:
-    >>> p = Pointing(object_name='IP Peg', ra=350.785625, dec=18.416472, rank=9, min_alt=30,
-    ... max_sunalt=-15, min_time=3600, max_moon='G', min_moonsep=30, too=False,
+    >>> p = Pointing(object_name='IP Peg', ra=350.785625, dec=18.416472, rank=9, min_time=3600,
     ... start_time=Time.now(), stop_time=Time.now()+3*u.day)
     >>> p
     Pointing(db_id=None, status=None, object_name=IP Peg, ra=350.785625, dec=18.416472, rank=9,
@@ -279,7 +278,7 @@ class Pointing(Base):
     At the moment this Pointing has no Exposure Sets, so it's fairly useless.
 
     We can either add these to the Pointing's exposure_sets list attribute directly:
-    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L', binning=1, imgtype='SCIENCE')
+    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L')
     >>> p.exposure_sets.append(e1)
     >>> session.add(e1)
     >>> session.commit()
@@ -288,9 +287,9 @@ class Pointing(Base):
     ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None)]
 
     or create ExposureSets and assign the pointing to them:
-    >>> e2 = ExposureSet(num_exp=3, exptime=30, filt='R', binning=1, imgtype='SCIENCE', pointing=p)
-    >>> e3 = ExposureSet(num_exp=3, exptime=30, filt='G', binning=1, imgtype='SCIENCE', pointing=p)
-    >>> e4 = ExposureSet(num_exp=3, exptime=30, filt='B', binning=1, imgtype='SCIENCE', pointing=p)
+    >>> e2 = ExposureSet(num_exp=3, exptime=30, filt='R', pointing=p)
+    >>> e3 = ExposureSet(num_exp=3, exptime=30, filt='G', pointing=p)
+    >>> e4 = ExposureSet(num_exp=3, exptime=30, filt='B', pointing=p)
     >>> insert_items(session, [e2, e3, e4])
     >>> session.commit()
     >>> p.exposure_sets
@@ -657,9 +656,8 @@ class Mpointing(Base):
     Make an Mpointing.
     Note we set the start_time to midnight, num_todo to 5 and valid_time & wait_time to 10 mins.
     >>> mp = Mpointing(object_name='IP Peg', ra=350.785625, dec=18.416472, start_rank=9,
-    ... min_alt=30, min_time=3600, max_sunalt=-15, max_moon='B', min_moonsep=30, too=False,
-    ... start_time=Time('2018-01-01 00:00:00'), num_todo=5, valid_time=10, wait_time=10,
-    ... user=bob)
+    ... num_todo=5, min_time=3600, start_time=Time('2018-01-01 00:00:00'), valid_time=10,
+    ... wait_time=10, user=bob)
     >>> session.add(mp)
     >>> session.commit()
     >>> mp
@@ -676,9 +674,8 @@ class Mpointing(Base):
     For a more complicated example, give a list to wait_time to have the intervals between
     pointings increase: from 10 minutes, to 20 then 30:
     >>> mp = Mpointing(object_name='IP Peg', ra=350.785625, dec=18.416472, start_rank=9,
-    ... min_alt=30, min_time=3600, max_sunalt=-15, max_moon='B', min_moonsep=30, too=False,
-    ... start_time=Time('2018-01-01 00:00:00'), num_todo=5, valid_time=10, wait_time=[10,20,30],
-    ... user=bob)
+    ... num_todo=5, min_time=3600, start_time=Time('2018-01-01 00:00:00'),valid_time=10,
+    ... wait_time=[10,20,30], user=bob)
     >>> session.add(mp)
     >>> session.commit()
     >>> mp
@@ -706,7 +703,7 @@ class Mpointing(Base):
     *Since there were 5 to do but only 3 blocks we looped back to the start.
 
     Like a Pointing, an Mpointing is only useful if it has at least one Exposure Set:
-    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L', binning=1, imgtype='SCIENCE')
+    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L')
     >>> mp.exposure_sets.append(e1)
     >>> session.add(e1)
     >>> session.commit()

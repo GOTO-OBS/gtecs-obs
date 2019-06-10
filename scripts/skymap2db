@@ -19,25 +19,18 @@ import obsdb as db
 
 
 # Constant Pointing values
-MPOINTING_SETTINGS = dict(start_rank=2,
-                          min_alt=30,
-                          min_time=(60 + 30) * 3,
-                          max_sunalt=-18,
-                          max_moon='B',
-                          min_moonsep=30,
-                          too=0,
-                          num_todo=5,
-                          valid_time=1440,
-                          wait_time=0,
-                          )
+MP_SETTINGS = {'start_rank': 2,
+               'num_todo': 5,
+               'wait_time': 1440,
+               'min_time': (60 + 30) * 3,
+               'max_sunalt': -18,
+               }
 
 # Constant ExposureSet values
-EXP_SETTINGS = dict(num_exp=3,
-                    exptime=60,
-                    filt='L',
-                    binning=1,
-                    imgtype='SCIENCE',
-                    )
+EXP_SETTINGS = {'num_exp': 3,
+                'exptime': 60,
+                'filt': 'L',
+                }
 
 
 def add_to_database(db_grid, pointings, event_time, event_name, filename):
@@ -84,7 +77,7 @@ def add_to_database(db_grid, pointings, event_time, event_name, filename):
             object_name = '{}_{}'.format(event_name, tilename)
 
             mpointing = db.Mpointing(object_name=object_name,
-                                     **MPOINTING_SETTINGS,
+                                     **MP_SETTINGS,
                                      user=user,
                                      )
             mpointing.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))

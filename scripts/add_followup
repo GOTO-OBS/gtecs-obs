@@ -8,8 +8,6 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
-import numpy as np
-
 import obsdb as db
 
 
@@ -22,10 +20,9 @@ def run(name, target_ra, target_dec):
         # Create a SkyGrid from the database Grid
         grid = db_grid.get_skygrid()
 
+        # Find which tile the given coordinates are in
         coord = SkyCoord(target_ra * u.deg, target_dec * u.deg)
-        sep = np.array(coord.separation(grid.coords))
-        tile_index = np.where(sep == (min(sep)))[0][0]
-        tile_name = grid.tilenames[tile_index]
+        tile_name = grid.get_tile(coord)
 
         # Find the matching GridTile
         query = session.query(db.GridTile)

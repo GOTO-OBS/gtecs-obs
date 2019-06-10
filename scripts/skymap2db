@@ -11,10 +11,8 @@ import getpass
 import os
 import time
 
-import astropy.units as u
 from astropy.time import Time
 
-from gototile.grid import SkyGrid
 from gototile.skymap import SkyMap
 
 import obsdb as db
@@ -109,9 +107,7 @@ def run(filename, hp_lim=0.001, n_lim=20):
         db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
-        fov = {'ra': db_grid.ra_fov * u.deg, 'dec': db_grid.dec_fov * u.deg}
-        overlap = {'ra': db_grid.ra_overlap, 'dec': db_grid.dec_overlap}
-        grid = SkyGrid(fov, overlap, kind=db_grid.algorithm)
+        grid = db_grid.get_skygrid()
 
     # open skymap and get event details
     print('Loading skymap...')

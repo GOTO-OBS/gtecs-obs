@@ -7,6 +7,8 @@ import hashlib
 from astropy import units as u
 from astropy.time import Time
 
+from gototile.grid import SkyGrid
+
 from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, validates
@@ -1370,6 +1372,13 @@ class Grid(Base):
                    'algorithm={}'.format(self.algorithm),
                    ]
         return 'Grid({})'.format(', '.join(strings))
+
+    def get_skygrid(self):
+        """Create a GOTO-tile SkyGrid from the current database Grid."""
+        fov = {'ra': self.ra_fov * u.deg, 'dec': self.dec_fov * u.deg}
+        overlap = {'ra': self.ra_overlap, 'dec': self.dec_overlap}
+        skygrid = SkyGrid(fov, overlap, kind=self.algorithm)
+        return skygrid
 
 
 class GridTile(Base):

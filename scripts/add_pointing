@@ -6,8 +6,6 @@ import getpass
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
-from gototile.grid import SkyGrid
-
 import numpy as np
 
 import obsdb as db
@@ -152,9 +150,7 @@ def fill_mpointing(session, mpointing):
         db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
-        fov = {'ra': db_grid.ra_fov * u.deg, 'dec': db_grid.dec_fov * u.deg}
-        overlap = {'ra': db_grid.ra_overlap, 'dec': db_grid.dec_overlap}
-        grid = SkyGrid(fov, overlap, kind=db_grid.algorithm)
+        grid = db_grid.get_skygrid()
 
         print('    Using grid {}'.format(db_grid.name))
 

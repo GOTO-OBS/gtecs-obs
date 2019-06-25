@@ -46,4 +46,4 @@ After setting up the database and installing the module, you can test it works c
 
 ## Usage instructions
 
-See the GitHub wiki: <https://github.com/GOTO-OBS/obsdb/wiki>.
+See the GitHub wiki: <https://github.com/GOTO-OBS/goto-obsdb/wiki>.

@@ -2,6 +2,10 @@
 
 from contextlib import contextmanager
 
+import numpy as np
+
+import pymysql
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -14,6 +18,11 @@ ENGINE = create_engine('mysql+pymysql://{}'.format(params.DATABASE_LOCATION),
                        echo=params.DATABASE_ECHO,
                        pool_pre_ping=params.DATABASE_PRE_PING)
 
+# Encode Numpy floats
+# https://stackoverflow.com/questions/46205532/
+pymysql.converters.encoders[np.float64] = pymysql.converters.escape_float
+pymysql.converters.conversions = pymysql.converters.encoders.copy()
+pymysql.converters.conversions.update(pymysql.converters.decoders)
 
 @contextmanager
 def open_session():

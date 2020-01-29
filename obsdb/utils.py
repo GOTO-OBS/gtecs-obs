@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Utility functions for using the database."""
 
 import hashlib

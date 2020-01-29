@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Function to create a random pointing for testing."""
 
 from astropy.time import Time

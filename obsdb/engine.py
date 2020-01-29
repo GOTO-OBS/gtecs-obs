@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Session management functions."""
 
 from contextlib import contextmanager

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Python classes mapping on to database tables."""
 
 import datetime

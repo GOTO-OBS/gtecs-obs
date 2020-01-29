@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """A script to approximate what the GOTO sentinel should be doing.
 
 - Read in a LIGO GW skymap

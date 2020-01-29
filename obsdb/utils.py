@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Utility functions for using the database."""
 
 import hashlib
@@ -166,8 +165,8 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     if location is not None:
         # local sidereal time, units of degrees
         lst = time.sidereal_time('mean', location.lon)
-        lo_lim = Longitude(lst - hourangle_limit * u.hourangle).deg
-        up_lim = Longitude(lst + hourangle_limit * u.hourangle).deg
+        lo_lim = float(Longitude(lst - hourangle_limit * u.hourangle).deg)
+        up_lim = float(Longitude(lst + hourangle_limit * u.hourangle).deg)
         if up_lim > lo_lim:
             queue = queue.filter(Pointing.ra < up_lim,
                                  Pointing.ra > lo_lim)
@@ -176,7 +175,7 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
                                      Pointing.ra > lo_lim))
 
         # is latitude ever greater than limit?
-        lat = location.lat.deg
+        lat = float(location.lat.deg)
         queue = queue.filter(Pointing.dec > lat - 90 + altitude_limit,
                              Pointing.dec < lat + 90 - altitude_limit)
 

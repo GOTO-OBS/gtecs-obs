@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """ObsDB module parameters."""
 
 import os

@@ -382,7 +382,7 @@ CREATE DEFINER = CURRENT_USER TRIGGER `pointings_AFTER_UPDATE`
         UPDATE `mpointings` SET `status` = 'unscheduled' WHERE (`mpointings`.`id` = NEW.`mpointing_id` and `mpointings`.`status` = 'scheduled');
       END IF;
       -- If the pointing was completed...
-      IF NEW.`status` = 'completed' THEN
+      IF (OLD.`status` != 'completed' AND NEW.`status` = 'completed') THEN
         -- Increase the Mpointing's completed count
         UPDATE `mpointings` SET `num_completed` = `num_completed` + 1 WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
         -- Add 10 to the current_rank

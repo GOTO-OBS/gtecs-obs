@@ -116,18 +116,24 @@ def run(filename):
             password = getpass.getpass(prompt='Creating default user - give password: ')
             user = db.User('goto', password, 'GOTO Survey')
 
-        # Get the current grid from the database
-        grid = db.get_current_grid(session)
-        print('Using grid "{}"'.format(grid.name))
+        # Create or fetch Survey
+        survey = session.query(db.Survey).filter(db.Survey.name == survey_name).one_or_none()
+        if survey is None:
+            # Get the current grid from the database
+            grid = db.get_current_grid(session)
+            print('Using grid "{}"'.format(grid.name))
 
-        # Create a Survey
-        print('Creating survey database entry...')
-        start = time.time()
-        survey = db.Survey(name=survey_name)
-        survey.grid = grid
-        session.add(survey)
+            print('Creating survey database entry')
+            survey = db.Survey(name=survey_name)
+            survey.grid = grid
+            session.add(survey)
+        else:
+            print('Linking to existing survey:', survey)
+            grid = survey.grid
 
         # Create a SurveyTile for each tile
+        print('Creating survey tiles...')
+        start = time.time()
         survey_tiles = []
         for tile in tiles:
             grid_tile = session.query(db.GridTile).filter(db.GridTile.grid == grid,

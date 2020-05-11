@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""A script add a survey of defined points into the G-TeCS database."""
+
+import argparse
+import getpass
+import time
+
+import obsdb as db
+
+
+MP_SETTINGS = {'wait_time': None,
+               'too': False,
+               'start_rank': None,
+               'num_todo': None,
+               'valid_time': -1,
+               'wait_time': None,
+               'min_alt': 35,
+               'max_sunalt': -12,
+               'max_moon': None,
+               'min_moonsep': None,
+               'min_time': None,
+               }
+
+EXP_SETTINGS = {'num_exp': None,
+                'exptime': None,
+                'filt': None,
+                }
+
+
+def get_tiles_from_file(filename):
+    """Define mini-survey tiles."""
+    with open(filename, 'r') as file:
+        tiles = []
+        for line in file:
+            if line[0] == 'T':
+                tiles.append(line.split())
+    return tiles
+
+
+def run(filename):
+    """Create the mpointings and add them to the database."""
+    # Read tile names from the file
+    tiles = get_tiles_from_file(filename)
+    print('Read in {} tiles'.format(len(tiles)))
+
+    # Get survey name
+    survey_name = input('Survey name: ').replace(' ', '_')
+
+    # Get Mpointing params
+    while MP_SETTINGS['wait_time'] is None:
+        wait_time = input('Delay between observations (in days): ')
+        try:
+            MP_SETTINGS['wait_time'] = float(wait_time) * 24 * 60  # in minutes
+        except Exception:
+            pass
+
+    while MP_SETTINGS['num_todo'] is None:
+        num_todo = input('Number of visits? (-1=infinite): ')
+        try:
+            MP_SETTINGS['num_todo'] = int(num_todo)
+        except Exception:
+            pass
+
+    while MP_SETTINGS['start_rank'] is None:
+        start_rank = input('Pointing initial rank: ')
+        try:
+            MP_SETTINGS['start_rank'] = int(start_rank)
+        except Exception:
+            pass
+
+    while MP_SETTINGS['max_moon'] not in ['D', 'G', 'B']:
+        max_moon = input('Maximum Moon brightness [D/G/B]: ')
+        try:
+            MP_SETTINGS['max_moon'] = max_moon.upper()
+        except Exception:
+            pass
+
+    while MP_SETTINGS['min_moonsep'] is None:
+        min_moonsep = input('Minimum seperation from the Moon (degrees): ')
+        try:
+            MP_SETTINGS['min_moonsep'] = int(min_moonsep)
+        except Exception:
+            pass
+
+    # Get ExposureSet params
+    while EXP_SETTINGS['num_exp'] is None:
+        num_exp = input('Number of exposures: ')
+        try:
+            EXP_SETTINGS['num_exp'] = int(num_exp)
+        except Exception:
+            pass
+
+    while EXP_SETTINGS['exptime'] is None:
+        exptime = input('Exposure time: ')
+        try:
+            EXP_SETTINGS['exptime'] = int(exptime)
+        except Exception:
+            pass
+
+    while EXP_SETTINGS['filt'] not in ['L', 'R', 'G', 'B']:
+        filt = input('Filter [L/R/G/B]: ')
+        try:
+            EXP_SETTINGS['filt'] = filt.upper()
+        except Exception:
+            pass
+
+    # Calculate mintime
+    MP_SETTINGS['min_time'] = (EXP_SETTINGS['exptime'] + 30) * EXP_SETTINGS['num_exp']
+
+    # Add to the database
+    with db.open_session() as session:
+        # get the User, or make it if it doesn't exist
+        try:
+            user = db.get_user(session, username='goto')
+        except ValueError:
+            password = getpass.getpass(prompt='Creating default user - give password: ')
+            user = db.User('goto', password, 'GOTO Survey')
+
+        # Create or fetch Survey
+        survey = session.query(db.Survey).filter(db.Survey.name == survey_name).one_or_none()
+        if survey is None:
+            # Get the current grid from the database
+            grid = db.get_current_grid(session)
+            print('Using grid "{}"'.format(grid.name))
+
+            print('Creating survey database entry')
+            survey = db.Survey(name=survey_name)
+            survey.grid = grid
+            session.add(survey)
+        else:
+            print('Linking to existing survey:', survey)
+            grid = survey.grid
+
+        # Create a SurveyTile for each tile
+        print('Creating survey tiles...')
+        start = time.time()
+        survey_tiles = []
+        for tile in tiles:
+            grid_tile = session.query(db.GridTile).filter(db.GridTile.grid == grid,
+                                                          db.GridTile.name == tile,
+                                                          ).one_or_none()
+            if grid_tile is None:
+                print('Could not find tile entry for tile "{}"!'.format(grid_tile))
+                continue
+
+            survey_tile = db.SurveyTile(weight=1)  # Equal weights
+            survey_tile.survey = survey
+            survey_tile.grid_tile = grid_tile
+            survey_tiles.append(survey_tile)
+
+        db.insert_items(session, survey_tiles)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+        # Create an Mpointing for each tile
+        mpointings = []
+        print('Creating mpointings...')
+        start = time.time()
+        for survey_tile in survey_tiles:
+            name = survey_tile.grid_tile.name
+            mp = db.Mpointing(object_name=survey.name + '_' + name,
+                              **MP_SETTINGS,
+                              user=user,
+                              )
+            mp.grid_tile = survey_tile.grid_tile
+            mp.survey_tile = survey_tile
+            mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
+
+            # Create the first Pointing (i.e. preempt the caretaker)
+            p = mp.get_next_pointing()
+            mp.pointings.append(p)
+
+            mpointings.append(mp)
+
+        db.insert_items(session, mpointings)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+
+if __name__ == '__main__':
+    description = """Create a mini-survey from a list of tile names."""
+
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('file', help='File with tiles', type=str)
+
+    args = parser.parse_args()
+
+    filename = args.file
+
+    run(filename)

@@ -562,7 +562,7 @@ def bulk_update_status(session, items, status):
     if not all(isinstance(item, type(items[0])) for item in items):
         raise ValueError('Items must be all the same type (`Pointing` or `Mpointing`)')
 
-    mappings = [dict(db_id=item.db_id, status=status) for item in items]
+    mappings = [{'db_id': item.db_id, 'status': status} for item in items]
     session.bulk_update_mappings(type(items[0]), mappings)
 
 

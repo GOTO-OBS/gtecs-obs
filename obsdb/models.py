@@ -400,7 +400,7 @@ class Pointing(Base):
         if key == 'stop_time' and field is None:
             value = None
         elif isinstance(field, datetime.datetime):
-            value = field.strftime("%Y-%m-%d %H:%M:%S")
+            value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
             value = field.iso
@@ -410,10 +410,10 @@ class Pointing(Base):
 
         if (key == 'start_time' and self.stop_time is not None):
             if Time(value) >= Time(self.stop_time):
-                raise AssertionError("stop_time must be later than start_time")
+                raise AssertionError('stop_time must be later than start_time')
         elif key == 'stop_time' and value is not None and self.start_time is not None:
             if Time(self.start_time) >= Time(value):
-                raise AssertionError("stop_time must be later than start_time")
+                raise AssertionError('stop_time must be later than start_time')
 
         return value
 
@@ -960,7 +960,7 @@ class Mpointing(Base):
         if key == 'stop_time' and field is None:
             value = None
         elif isinstance(field, datetime.datetime):
-            value = field.strftime("%Y-%m-%d %H:%M:%S")
+            value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
             value = field.iso
@@ -970,10 +970,10 @@ class Mpointing(Base):
 
         if (key == 'start_time' and self.stop_time is not None):
             if Time(value) >= Time(self.stop_time):
-                raise AssertionError("stop_time must be later than start_time")
+                raise AssertionError('stop_time must be later than start_time')
         elif key == 'stop_time' and value is not None and self.start_time is not None:
             if Time(self.start_time) >= Time(value):
-                raise AssertionError("stop_time must be later than start_time")
+                raise AssertionError('stop_time must be later than start_time')
 
         return value
 
@@ -1713,7 +1713,7 @@ class Event(Base):
     def munge_times(self, key, field):
         """Use validators to allow various types of input for UTC."""
         if isinstance(field, datetime.datetime):
-            value = field.strftime("%Y-%m-%d %H:%M:%S")
+            value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
             value = field.iso
@@ -1829,7 +1829,7 @@ class ImageLog(Base):
         Also enforce write_time > start_time.
         """
         if isinstance(field, datetime.datetime):
-            value = field.strftime("%Y-%m-%d %H:%M:%S")
+            value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
             value = field.iso
@@ -1839,9 +1839,9 @@ class ImageLog(Base):
 
         if (key == 'start_time' and self.write_time is not None):
             if Time(value) >= Time(self.write_time):
-                raise AssertionError("write_time must be later than start_time")
+                raise AssertionError('write_time must be later than start_time')
         elif key == 'write_time' and self.write_time is not None:
             if Time(self.start_time) >= Time(value):
-                raise AssertionError("write_time must be later than start_time")
+                raise AssertionError('write_time must be later than start_time')
 
         return value

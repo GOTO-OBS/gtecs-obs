@@ -8,9 +8,10 @@ from astropy.time import Time
 
 from gototile.grid import SkyGrid
 
-from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String)
+from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String,
+                        func, select)
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, validates
+from sqlalchemy.orm import column_property, relationship, validates
 
 
 __all__ = ['User', 'Pointing', 'ExposureSet', 'Mpointing', 'TimeBlock',
@@ -129,6 +130,109 @@ class User(Base):
                    'full_name={}'.format(self.full_name),
                    ]
         return 'User({})'.format(', '.join(strings))
+
+
+class ExposureSet(Base):
+    """A class to represent an Exposure Set.
+
+    An Exposure Set is a set of repeated identical exposures, with the same
+    exposure time, filter, binning factor etc. Each Pointing should have one or more
+    Exposure Sets.
+
+    Like all SQLAlchemy model classes, this object links to the
+    underlying database. You can create an instance, and set its attributes
+    without a database session. Accessing some attributes may require
+    an active database session, and some properties (like the db_id)
+    will be None until the instance is added to the database.
+
+    Parameters
+    ----------
+    num_exp : int
+        number of exposures within the set
+    exptime : float
+        exposure time in seconds
+    filt : string
+        filter to use
+
+    binning : int, optional
+        binning factor to apply
+        default = 1 (no binning)
+    imgtype : string, optional
+        indicates the type of exposure set.
+        one of SCIENCE, FOCUS, STD, FLAT, BIAS, DARK
+        default = 'SCIENCE'
+    ut_mask : int, optional
+        if set, this is a binary mask which will determine which unit
+        telescopes carry out the exposure. A value of 5 (binary 0101) will
+        be exposed by cameras 1 and 3.
+        default = None
+    ra_offset : float, optional
+        the size of the random offset to apply between each exposure
+        if not set, no offset will be made
+        default = 0
+    dec_offset : float, optional
+        the size of the random offset to apply between each exposure
+        if not set, no offset will be made
+        default = 0
+
+    Attributes
+    ----------
+    db_id : int
+        primary database key
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    pointing : `Pointing`, optional
+        the Pointing associated with this Exposure Set, if any
+        can also be added with the pointing_id parameter
+    mpointing : `Mpointing`, optional
+        the Mpointing associated with this Exposure Set, if any
+        can also be added with the mpointing_id parameter
+
+    """
+
+    # Set corresponding SQL table name
+    __tablename__ = 'exposure_sets'
+
+    # Primary key
+    db_id = Column('id', Integer, primary_key=True)
+
+    # Columns
+    num_exp = Column(Integer)
+    exptime = Column(Float)
+    filt = Column('filter', String(2))  # filter is a built in function in Python
+    binning = Column(Integer, default=1)
+    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'), default='SCIENCE')
+    ut_mask = Column(Integer, default=None)
+    ra_offset = Column(Float, default=0)
+    dec_offset = Column(Float, default=0)
+
+    # Foreign keys
+    pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=False)
+    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
+
+    # Foreign relationships
+    pointing = relationship('Pointing', back_populates='exposure_sets')
+    mpointing = relationship('Mpointing', back_populates='exposure_sets')
+
+    def __repr__(self):
+        strings = ['db_id={}'.format(self.db_id),
+                   'num_exp={}'.format(self.num_exp),
+                   'exptime={}'.format(self.exptime),
+                   'filt={}'.format(self.filt),
+                   'binning={}'.format(self.binning),
+                   'imgtype={}'.format(self.imgtype),
+                   'ut_mask={}'.format(self.ut_mask),
+                   'ra_offset={}'.format(self.ra_offset),
+                   'dec_offset={}'.format(self.dec_offset),
+                   'pointing_id={}'.format(self.pointing_id),
+                   'mpointing_id={}'.format(self.mpointing_id),
+                   ]
+        return 'ExposureSet({})'.format(', '.join(strings))
 
 
 class Pointing(Base):
@@ -364,6 +468,11 @@ class Pointing(Base):
                           viewonly=True,
                           uselist=False,
                           )
+    # Column properties
+    num_expsets = column_property(select([func.count(ExposureSet.db_id)])
+                                  .where(ExposureSet.pointing_id == db_id)
+                                  .correlate_except(ExposureSet)
+                                  )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -416,109 +525,6 @@ class Pointing(Base):
                 raise AssertionError('stop_time must be later than start_time')
 
         return value
-
-
-class ExposureSet(Base):
-    """A class to represent an Exposure Set.
-
-    An Exposure Set is a set of repeated identical exposures, with the same
-    exposure time, filter, binning factor etc. Each Pointing should have one or more
-    Exposure Sets.
-
-    Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an instance, and set its attributes
-    without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the db_id)
-    will be None until the instance is added to the database.
-
-    Parameters
-    ----------
-    num_exp : int
-        number of exposures within the set
-    exptime : float
-        exposure time in seconds
-    filt : string
-        filter to use
-
-    binning : int, optional
-        binning factor to apply
-        default = 1 (no binning)
-    imgtype : string, optional
-        indicates the type of exposure set.
-        one of SCIENCE, FOCUS, STD, FLAT, BIAS, DARK
-        default = 'SCIENCE'
-    ut_mask : int, optional
-        if set, this is a binary mask which will determine which unit
-        telescopes carry out the exposure. A value of 5 (binary 0101) will
-        be exposed by cameras 1 and 3.
-        default = None
-    ra_offset : float, optional
-        the size of the random offset to apply between each exposure
-        if not set, no offset will be made
-        default = 0
-    dec_offset : float, optional
-        the size of the random offset to apply between each exposure
-        if not set, no offset will be made
-        default = 0
-
-    Attributes
-    ----------
-    db_id : int
-        primary database key
-        only populated when the instance is added to the database
-
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
-
-    Relationships
-    -------------
-    pointing : `Pointing`, optional
-        the Pointing associated with this Exposure Set, if any
-        can also be added with the pointing_id parameter
-    mpointing : `Mpointing`, optional
-        the Mpointing associated with this Exposure Set, if any
-        can also be added with the mpointing_id parameter
-
-    """
-
-    # Set corresponding SQL table name
-    __tablename__ = 'exposure_sets'
-
-    # Primary key
-    db_id = Column('id', Integer, primary_key=True)
-
-    # Columns
-    num_exp = Column(Integer)
-    exptime = Column(Float)
-    filt = Column('filter', String(2))  # filter is a built in function in Python
-    binning = Column(Integer, default=1)
-    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'), default='SCIENCE')
-    ut_mask = Column(Integer, default=None)
-    ra_offset = Column(Float, default=0)
-    dec_offset = Column(Float, default=0)
-
-    # Foreign keys
-    pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=False)
-    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
-
-    # Foreign relationships
-    pointing = relationship('Pointing', back_populates='exposure_sets')
-    mpointing = relationship('Mpointing', back_populates='exposure_sets')
-
-    def __repr__(self):
-        strings = ['db_id={}'.format(self.db_id),
-                   'num_exp={}'.format(self.num_exp),
-                   'exptime={}'.format(self.exptime),
-                   'filt={}'.format(self.filt),
-                   'binning={}'.format(self.binning),
-                   'imgtype={}'.format(self.imgtype),
-                   'ut_mask={}'.format(self.ut_mask),
-                   'ra_offset={}'.format(self.ra_offset),
-                   'dec_offset={}'.format(self.dec_offset),
-                   'pointing_id={}'.format(self.pointing_id),
-                   'mpointing_id={}'.format(self.mpointing_id),
-                   ]
-        return 'ExposureSet({})'.format(', '.join(strings))
 
 
 class Mpointing(Base):

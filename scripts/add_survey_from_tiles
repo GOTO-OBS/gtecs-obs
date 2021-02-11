@@ -14,7 +14,7 @@ MP_SETTINGS = {'wait_time': None,
                'num_todo': None,
                'valid_time': -1,
                'wait_time': None,
-               'min_alt': 35,
+               'min_alt': None,
                'max_sunalt': -12,
                'max_moon': None,
                'min_moonsep': None,
@@ -65,6 +65,13 @@ def run(filename):
         start_rank = input('Pointing initial rank: ')
         try:
             MP_SETTINGS['start_rank'] = int(start_rank)
+        except Exception:
+            pass
+
+    while MP_SETTINGS['min_alt'] is None:
+        min_alt = input('Minimum altitude limit (degrees): ')
+        try:
+            MP_SETTINGS['min_alt'] = int(min_alt)
         except Exception:
             pass
 

@@ -5,7 +5,7 @@ import argparse
 import getpass
 import time
 
-import obsdb as db
+from gtecs.obs import database as db
 
 
 MP_SETTINGS = {'num_todo': -1,

@@ -9,7 +9,7 @@ import astropy.units as u
 
 from gototile.grid import SkyGrid
 
-import obsdb as db
+from gtecs.obs import database as db
 
 
 MP_SETTINGS = {'start_rank': 999,

@@ -5,7 +5,7 @@ import sys
 
 from astropy.time import Time
 
-import obsdb as db
+from gtecs.obs import database as db
 
 
 def gtxt(text):

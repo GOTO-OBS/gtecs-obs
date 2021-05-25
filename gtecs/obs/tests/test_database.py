@@ -9,7 +9,7 @@ import time
 from astropy import units as u
 from astropy.time import Time
 
-import obsdb as db
+from gtecs.obs import database as db
 
 
 # add a user

@@ -15,7 +15,7 @@ from astropy.time import Time
 
 from gototile.skymap import SkyMap
 
-import obsdb as db
+from gtecs.obs import database as db
 
 
 # Constant Pointing values

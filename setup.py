@@ -1,9 +1,7 @@
-"""Setup script for the obsdb package."""
+"""Setup script for the gtecs-obs package."""
 import glob
 
-from setuptools import setup
-
-PACKAGES = ['obsdb']
+from setuptools import setup, find_namespace_packages
 
 REQUIRES = ['sqlalchemy>=1.2',
             'pymysql',
@@ -11,21 +9,15 @@ REQUIRES = ['sqlalchemy>=1.2',
             'configobj',
             ]
 
-# Get the version string
-__version__ = None
-with open('obsdb/version.py') as f:
-    exec(f.read())  # Should set __version__
-
-setup(name='obsdb',
-      version=__version__,
-      description='Observation Database API for GOTO',
+setup(name='gtecs-obs',
+      version='0',
+      description='G-TeCS functions for observation scheduling',
       url='http://github.com/GOTO/goto-obsdb',
       author='Martin Dyer',
       author_email='martin.dyer@sheffield.ac.uk',
       install_requires=REQUIRES,
-      packages=PACKAGES,
-      package_data={'': ['data/*']},
-      include_package_data=True,
+      packages=find_namespace_packages(include=['gtecs*']),
+      package_data={'gtecs': ['obs/data/*']},
       scripts=glob.glob('scripts/*'),
       zip_safe=False,
       )

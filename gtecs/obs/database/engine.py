@@ -9,7 +9,7 @@ import pymysql
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from . import params
+from .. import params
 
 __all__ = ['open_session', 'load_session']
 

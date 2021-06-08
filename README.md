@@ -1,14 +1,18 @@
-# ObsDB
+# G-TeCS obs package
 
-**ObsDB** is the Python interface to the GOTO Observatory observation database. It was initially part of the [G-TeCS](https://github.com/GOTO-OBS/g-tecs) control system but was split out on 31 Jan 2018.
+**G-TeCS** (*gee-teks*) is the GOTO Telescope Control System.
+
+This package (`gtecs-obs`) contains functions for organising and scheduling observations.
 
 Note this module is Python3 only and has been developed for Linux, otherwise use at your own risk.
 
 ## Requirements
 
-ObsDB requires several Python modules, which should be included during installation.
+This package requires several Python modules, which should be included during installation.
 
-Some of the scripts included also require the GOTO-tile module to be installed:
+This package doesn't require any other G-TeCS packages to be installed, but it itself is a requirement of several of them.
+
+This package requires the following packages created for GOTO:
 
 - [GOTO-tile](https://github.com/GOTO-OBS/goto-tile)
 
@@ -18,13 +22,13 @@ Once you've downloaded or cloned the repository, in the base directory run:
 
     pip3 install . --user
 
-You should then be able to import the module using `import obsdb` within Python.
+You should then be able to import the module from within Python.
 
 Several scripts from the `scripts` folder should also be added to your path.
 
 ### Setting up the database
 
-Make sure MariaDB is installed (reccomended over MySQL).
+Make sure MariaDB is installed (recommended over MySQL).
 
 Start a session as root:
 
@@ -42,8 +46,10 @@ When installing ObsDB, copy the included `.obsdb.conf` file to one of the above 
 
 ### Testing
 
-After setting up the database and installing the module, you can test it works correctly using the included `test_database.py` script in the `obsdb/tests/` directory. Note this script assumes you start from a completely clean, empty database.
+After setting up the database and installing the module, you can test it works correctly using the `test_database.py` script in the `/tests/` directory.
 
-## Usage instructions
+Note this script assumes you start from a completely clean, empty database.
 
-See the GitHub wiki: <https://github.com/GOTO-OBS/goto-obsdb/wiki>.
+## Usage
+
+TODO

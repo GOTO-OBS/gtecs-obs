@@ -40,9 +40,9 @@ Setup the `goto_obs` database by sourcing from the schema included in this repos
 
 ### Configuration
 
-The module will look for a file named `.obsdb.conf` either in the user's home directory or any path specified by the `OBSDB_CONF` environment variable. An example file is included in the base directory of this repository.
+The module will look for a file named `.obs.conf` either in the user's home directory, the `gtecs` subdirectory, or a path specified by the `GTECS_CONF` environment variable. An example file is included in the base directory of this repository.
 
-When installing ObsDB, copy the included `.obsdb.conf` file to one of the above locations, and change the database parameters to specify how to connect to your local database.
+After installing this package copy this sample config file to one of the above locations, and change the file path parameters to specify where you want the package to save files.
 
 ### Testing
 

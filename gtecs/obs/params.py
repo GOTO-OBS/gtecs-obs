@@ -1,4 +1,4 @@
-"""ObsDB module parameters."""
+"""Package parameters."""
 
 import os
 import sys
@@ -15,24 +15,23 @@ except ImportError:
 import validate
 
 
-# Try to find .obsdb.conf file, look in the home directory and
-# anywhere specified by OBSDB_CONF environment variable
-paths = [os.path.expanduser('~')]
-if "OBSDB_CONF" in os.environ:
-    OBSDB_CONF_PATH = os.environ["OBSDB_CONF"]
-    paths.append(OBSDB_CONF_PATH)
-else:
-    OBSDB_CONF_PATH = None
-
 # Load configspec file for default configuration
 CONFIGSPEC = pkg_resources.read_text('gtecs.obs.data', 'configspec.ini').split('\n')
+config = configobj.ConfigObj({}, configspec=CONFIGSPEC)
+
+# Try to find the config file, look in the home directory and
+# anywhere specified by GTECS_CONF environment variable
+CONFIG_FILE = '.obs.conf'
+home = os.path.expanduser('~')
+paths = [home, os.path.join(home, 'gtecs'), os.path.join(home, '.gtecs')]
+if 'GTECS_CONF' in os.environ:
+    paths.append(os.environ['GTECS_CONF'])
 
 # Load the config file as a ConfigObj
-config = configobj.ConfigObj({}, configspec=CONFIGSPEC)
 CONFIG_FILE_PATH = None
 for loc in paths:
     try:
-        with open(os.path.join(loc, '.obsdb.conf')) as source:
+        with open(os.path.join(loc, CONFIG_FILE)) as source:
             config = configobj.ConfigObj(source, configspec=CONFIGSPEC)
             CONFIG_FILE_PATH = loc
     except IOError:

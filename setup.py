@@ -6,7 +6,6 @@ from setuptools import setup, find_namespace_packages
 REQUIRES = ['sqlalchemy>=1.2',
             'pymysql',
             'astropy',
-            'configobj',
             ]
 
 setup(name='gtecs-obs',

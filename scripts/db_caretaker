@@ -7,7 +7,7 @@ import time
 
 from astropy.time import Time
 
-import obsdb as db
+from gtecs.obs import database as db
 
 
 def there_can_only_be_one():

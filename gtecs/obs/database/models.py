@@ -239,7 +239,7 @@ class Pointing(Base):
 
     Examples
     --------
-    >>> from obsdb import *
+    >>> from gtecs.obs.database import *
     >>> from astropy import units as u
     >>> from astropy.time import Time
     >>> session = load_session()
@@ -648,7 +648,7 @@ class Mpointing(Base):
 
     Examples
     --------
-    >>> from obsdb import *
+    >>> from gtecs.obs.database import *
     >>> from astropy.time import Time
     >>> bob = get_user(session, username='bob')
 
@@ -1000,7 +1000,7 @@ class Mpointing(Base):
 
         Returns
         -------
-        current_block : `obsdb.TimeBlock`
+        current_block : `TimeBlock`
             The current time block (may be None).
 
         """
@@ -1019,7 +1019,7 @@ class Mpointing(Base):
 
         Returns
         -------
-        last : `obsdb.TimeBlock`
+        last : `TimeBlock`
             The last block done (may be None).
 
         """
@@ -1044,7 +1044,7 @@ class Mpointing(Base):
 
         Returns
         -------
-        next_block : `obsdb.TimeBlock`
+        next_block : `TimeBlock`
             The next block to do after the current one (may be None).
 
         """

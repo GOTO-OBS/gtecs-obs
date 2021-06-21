@@ -1,6 +1,6 @@
 -- GOTO ObsDB Database Schema
 -- run this script in MariaDB using
--- "SOURCE path/to/script/goto-obsdb/schema.sql;"
+-- "SOURCE path/to/script/schema.sql;"
 -- NB this will drop the current database if it exists, so be careful!
 
 -- -----------------------------------------------------

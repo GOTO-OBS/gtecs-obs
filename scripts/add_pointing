@@ -6,7 +6,7 @@ import getpass
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
-import obsdb as db
+from gtecs.obs import database as db
 
 
 def parse_ra(ra_str):

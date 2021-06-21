@@ -8,7 +8,7 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
-import obsdb as db
+from gtecs.obs import database as db
 
 
 def run(name, target_ra, target_dec):

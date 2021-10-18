@@ -2,15 +2,14 @@
 
 import os
 
-from astroplan import Observer
 from astroplan.moon import moon_illumination
 
-from astropy import coordinates as coord, units as u
+from astropy import units as u
+from astropy.coordinates import AltAz, ICRS, get_sun, get_moon
 from astropy.time import Time
 
 from gtecs.obs import database as db
 
-from . import astronomy
 from . import params
 
 
@@ -20,9 +19,6 @@ html_size2 = '<font size=2 color=black face=\"Courier New\">\n'
 html_size5 = '<font size=5 color=black face=\"Courier New\">\n'
 popup_str = ('<div class=\"apple_overlay\" id=\"overlay\">' +
              '<div class=\"contentWrap\"></div>' + '</div>')
-
-# set observing location
-observer = Observer(astronomy.observatory_location())
 
 # set debug level
 debug = 1
@@ -104,7 +100,7 @@ def write_flag_file(pointing, time, all_constraint_names, pointing_info):
                 stop = 'None'
             f.write('stop_time = ' + str(stop) + '<br>\n')
 
-            target = coord.ICRS(pointing.ra * u.deg, pointing.dec * u.deg)
+            target = ICRS(pointing.ra * u.deg, pointing.dec * u.deg)
             ra = target.ra.to_string(sep=':', precision=2, unit=u.hour)
             dec = target.dec.to_string(sep=':', precision=2)
             f.write('ra = ' + ra + '<br>\n')
@@ -163,7 +159,7 @@ def write_exp_file(db_id, exposure_sets):
             f.write("</table></body></html>")
 
 
-def write_queue_page():
+def write_queue_page(observer):
     """Write the GOTO queue page."""
     # load any needed infomation saved by the scheduler
     time, all_constraint_names, pointing_list = import_queue_file()
@@ -203,14 +199,16 @@ def write_queue_page():
         lst = time.sidereal_time('mean', longitude=observer.location.lon)
         f.write(lst.to_string(sep=':', precision=2))
 
+        altaz_frame = AltAz(obstime=time, location=observer.location)
+
         f.write('  SunAlt: ')
-        sun = coord.get_sun(time)
-        sun_alt, _ = astronomy.altaz_from_radec(sun.ra.value, sun.dec.value, time)
+        sun = get_sun(time)
+        sun_alt = sun.transform_to(altaz_frame).alt.degree
         f.write('{:.1f} deg'.format(sun_alt))
 
         f.write('  MoonAlt: ')
-        moon = coord.get_moon(time)
-        moon_alt, _ = astronomy.altaz_from_radec(moon.ra.value, moon.dec.value, time)
+        moon = get_moon(time)
+        moon_alt = moon.transform_to(altaz_frame).alt.degree
         f.write('{:.1f} deg'.format(moon_alt))
 
         f.write('  MoonPhase: ')
@@ -266,7 +264,7 @@ def write_queue_page():
                        str(pointing.object_name) + '</a>' + popup_str)
 
             # find ra/dec
-            target = coord.ICRS(pointing.ra * u.deg, pointing.dec * u.deg)
+            target = ICRS(pointing.ra * u.deg, pointing.dec * u.deg)
             ra = target.ra.to_string(sep=':', precision=2, unit=u.hour)
             dec = target.dec.to_string(sep=':', precision=2)
 

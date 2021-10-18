@@ -10,7 +10,8 @@ from astroplan import (AltitudeConstraint, AtNightConstraint,
                        Observer, TimeConstraint)
 from astroplan.constraints import _get_altaz
 
-from astropy import coordinates as coord, units as u
+from astropy import units as u
+from astropy.coordinates import EarthLocation, SkyCoord
 from astropy.time import Time
 
 from erfa import ErfaWarning
@@ -21,11 +22,9 @@ from gtecs.obs import database as db
 
 from scipy import interpolate
 
-from . import astronomy
-# from . import astropy_speedups  # noqa: F401 to ignore unused module
-from . import html
 from . import params
-
+from .astronomy import time_to_set
+from .html import write_queue_page
 
 warnings.simplefilter('ignore', ErfaWarning)
 
@@ -79,15 +78,6 @@ class ArtificialHorizonConstraint(Constraint):
         altaz = _get_altaz(times, observer, targets)['altaz']
         alt_limit = self.get_alt_limit(altaz.az) * u.deg
         return altaz.alt > alt_limit
-
-
-def time_to_set(observer, targets, now):
-    """Time until ``target``s next set below the horizon."""
-    # Create grid of times
-    set_times = astronomy._rise_set_trig(now, targets, observer.location,
-                                         'next', 'setting')
-    seconds_until_set = (set_times - now).to(u.s)
-    return seconds_until_set
 
 
 class Pointing(object):
@@ -186,9 +176,9 @@ class PointingQueue(object):
             return
 
         # Create pointing data arrays
-        self.targets = coord.SkyCoord([float(p.ra) for p in self.pointings],
-                                      [float(p.dec) for p in self.pointings],
-                                      unit=u.deg, frame='icrs')
+        self.targets = SkyCoord([float(p.ra) for p in self.pointings],
+                                [float(p.dec) for p in self.pointings],
+                                unit=u.deg, frame='icrs')
         self.mintimes = u.Quantity([float(p.mintime) for p in self.pointings], unit=u.s)
 
     def __len__(self):
@@ -555,7 +545,7 @@ def check_queue(time=None, location=None, horizon=None,
 
     location : `~astropy.coordinates.EarthLocation`, optional
         The location of the observer on Earth.
-        Default is `gtecs.control.astronomy.observatory_location()`.
+        Default is `EarthLocation.of_site('lapalma')`.
 
     horizon : float, or tuple of (azs, alts), optional
         The horizon limits at the given site, either a flat value or varying with azimuth.
@@ -585,7 +575,7 @@ def check_queue(time=None, location=None, horizon=None,
 
     # Create an observer and load horizon file if not given
     if location is None:
-        location = astronomy.observatory_location()
+        location = EarthLocation.of_site('lapalma')
     observer = Observer(location)
     if horizon is None:
         horizon = 30
@@ -607,7 +597,7 @@ def check_queue(time=None, location=None, horizon=None,
         queue.write_to_file(time, observer, queue_file)
     if write_html:
         # TODO this could be run from elsewhere
-        html.write_queue_page()
+        write_queue_page(observer)
 
     # Work out what to do next
     new_pointing = what_to_do_next(current_pointing, highest_pointing, log)

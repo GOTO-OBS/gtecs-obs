@@ -5,7 +5,7 @@ import os
 from astroplan.moon import moon_illumination
 
 from astropy import units as u
-from astropy.coordinates import AltAz, ICRS, get_sun, get_moon
+from astropy.coordinates import AltAz, ICRS, get_moon, get_sun
 from astropy.time import Time
 
 from . import database as db

@@ -20,7 +20,7 @@ def _equation_of_time(time):
         times (array)
 
     Returns
-    ----------
+    -------
     ret1 : `~astropy.units.Quantity`
         the equation of time
 

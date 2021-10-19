@@ -16,9 +16,9 @@ from astropy.time import Time
 
 from erfa import ErfaWarning
 
-import numpy as np
-
 from gtecs.obs import database as db
+
+import numpy as np
 
 from scipy import interpolate
 

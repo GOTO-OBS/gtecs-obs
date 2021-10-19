@@ -6,19 +6,15 @@ import argparse
 from astroplan import Observer
 
 from astropy import units as u
+from astropy.coordinates import EarthLocation
 from astropy.time import Time
 
-from gtecs.control import astronomy
-from gtecs.control.scheduler import PointingQueue
-from gtecs.control.style import boldtxt, gtxt, rtxt, ytxt
+from gtecs.common.style import boldtxt, gtxt, rtxt, ytxt
+from gtecs.obs.scheduler import PointingQueue
 
 
-def run(time, limit):
+def run(time, observer, horizon, limit=None):
     """Print the current queue."""
-    time.precision = 0
-    observer = Observer(astronomy.observatory_location())
-    horizon = astronomy.get_horizon()
-
     # Create Queue from DB
     queue = PointingQueue.from_database(time, observer)
     if len(queue) == 0:
@@ -87,24 +83,42 @@ def run(time, limit):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-t', '--time', nargs='?', default=None,
-                        help='Time to check the queue at')
-    parser.add_argument('-s', '--sunalt', nargs='?', default=None,
-                        help='Sun altitude to check the queue at (next)')
-    parser.add_argument('-n', '--lines', nargs='?', type=int, default=20,
-                        help='Number of lines to print')
-    parser.add_argument('-a', '--all', action='store_true', default=False)
+    time_group = parser.add_mutually_exclusive_group()
+    time_group.add_argument('-t', '--time',
+                            help='Time to check the queue at (default=Now)')
+    time_group.add_argument('-s', '--sunalt', default=None,
+                            help='Sun altitude to check the queue at (next)')
+    parser.add_argument('-S', '--site', type=str, default='lapalma',
+                        help='Site to observe from (default="LaPalma")')
+    parser.add_argument('-l', '--horizon-limit', type=int, default=30,
+                        help='Telescope horizon limit (default=30 degrees)')
+    lines_group = parser.add_mutually_exclusive_group()
+    lines_group.add_argument('-n', '--lines', type=int, default=20,
+                             help='Number of lines to print (default=20)')
+    lines_group.add_argument('-a', '--all', action='store_true', default=False,
+                             help='Print all items in the queue')
     args = parser.parse_args()
+
+    location = EarthLocation.of_site(args.site)
+    observer = Observer(location)
 
     if args.time:
         time = Time(args.time)
     elif args.sunalt:
         sunalt = float(args.sunalt) * u.deg
-        today = astronomy.night_startdate()
-        time = astronomy.sunalt_time(today, sunalt,
-                                     Time.now() < astronomy.local_midnight(today))
+        time = Time.now()
+        if observer.sun_altaz(time).alt > sunalt:
+            # Sun is above, get next time it sets below
+            time = observer.sun_set_time(time, which='next', horizon=sunalt)
+        else:
+            # Sun is below, get next time it rises above
+            time = observer.sun_rise_time(time, which='next', horizon=sunalt)
     else:
         time = Time.now()
+    time.precision = 0
+
+    min_alt = args.horizon_limit
+    horizon = ([0, 90, 180, 270, 360], [min_alt, min_alt, min_alt, min_alt, min_alt])
 
     if args.all:
         limit = -1
@@ -113,4 +127,4 @@ if __name__ == '__main__':
     else:
         limit = 20
 
-    run(time, limit)
+    run(time, observer, horizon, limit)

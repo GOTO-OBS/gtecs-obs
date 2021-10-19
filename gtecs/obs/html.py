@@ -8,8 +8,7 @@ from astropy import units as u
 from astropy.coordinates import AltAz, ICRS, get_sun, get_moon
 from astropy.time import Time
 
-from gtecs.obs import database as db
-
+from . import database as db
 from . import params
 
 
@@ -22,9 +21,6 @@ popup_str = ('<div class=\"apple_overlay\" id=\"overlay\">' +
 
 # set debug level
 debug = 1
-
-# define paths
-HTML_PATH = os.path.join(params.FILE_PATH, 'html')
 
 # interval between automatic refreshes
 html_refresh = 15
@@ -58,7 +54,7 @@ def import_queue_file():
 def write_flag_file(pointing, time, all_constraint_names, pointing_info):
     """Write flag file for a given pointing."""
     db_id, altaznow, altazlater, constraint_names, valid_arr = pointing_info
-    flag_filename = os.path.join(HTML_PATH, 'ID_{}_flags.html'.format(db_id))
+    flag_filename = os.path.join(params.HTML_PATH, 'ID_{}_flags.html'.format(db_id))
 
     with open(flag_filename, 'w') as f:
         f.write('<html><body>\n')
@@ -124,7 +120,7 @@ def write_flag_file(pointing, time, all_constraint_names, pointing_info):
 
 def write_exp_file(db_id, exposure_sets):
     """Write exposure files for a pointing."""
-    exp_filename = os.path.join(HTML_PATH, 'ID_{}_exp.html'.format(db_id))
+    exp_filename = os.path.join(params.HTML_PATH, 'ID_{}_exp.html'.format(db_id))
 
     # unlike the flags, exposure info dosn't change
     # so don't re-write the files if they're already there!
@@ -164,7 +160,7 @@ def write_queue_page(observer):
     # load any needed infomation saved by the scheduler
     time, all_constraint_names, pointing_list = import_queue_file()
 
-    queue_filename = os.path.join(HTML_PATH, 'queue.html')
+    queue_filename = os.path.join(params.HTML_PATH, 'queue.html')
     with open(queue_filename, 'w') as f:
         f.write('<html><head>\n')
         f.write('<script src=\"jquery.tools.min.js\"></script>' +
@@ -219,8 +215,6 @@ def write_queue_page(observer):
             moonstring = "G"
         elif 0.65 <= moon_ill <= 1.00:
             moonstring = "B"
-        if moon_alt < params.DARK_MOON_ALT_LIMIT:
-            moonstring = "D"
         f.write('{:.2f} [{}]'.format(moon_ill, moonstring))
 
         f.write('<br><br>' +

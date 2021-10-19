@@ -29,6 +29,9 @@ from .html import write_queue_page
 warnings.simplefilter('ignore', ErfaWarning)
 
 
+MOON_PHASES = {'B': 1, 'G': 0.65, 'D': 0.25}
+
+
 def apply_constraints(constraints, observer, targets, times):
     """Determine if the targets are observable for given times, observer, and constraints.
 
@@ -242,7 +245,7 @@ class PointingQueue(object):
         self.constraints['ArtHoriz'] = ArtificialHorizonConstraint(*horizon)
 
         # Moon
-        moonphases = [float(params.MOON_PHASES[p.maxmoon]) for p in self.pointings]
+        moonphases = [MOON_PHASES[p.maxmoon] for p in self.pointings]
         self.constraints['Moon'] = MoonIlluminationConstraint(None, moonphases)
 
         # MoonSep

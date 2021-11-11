@@ -615,9 +615,7 @@ class Mpointing(Base):
         primary database key
         only populated when the instance is added to the database
     current_rank : int
-        rank for next pointing to be scheduled
-    initial_rank : int
-        initial rank set (it will increase as pointings are observed)
+        rank for next pointing to be scheduled (it will increase as pointings are observed)
     num_completed : int
         number of successfully completed pointings
     num_remaining : int
@@ -678,7 +676,7 @@ class Mpointing(Base):
     >>> session.commit()
     >>> mp
     Mpointing(db_id=1, status=unscheduled, num_todo=5, num_completed=0, num_remaining=5,
-    infinite=False, object_name=IP Peg, ra=350.785, dec=18.4165, current_rank=9, initial_rank=9,
+    infinite=False, object_name=IP Peg, ra=350.785, dec=18.4165, current_rank=9, start_rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
     start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
@@ -696,7 +694,7 @@ class Mpointing(Base):
     >>> session.commit()
     >>> mp
     Mpointing(db_id=2, status=unscheduled, num_todo=5, num_completed=0, num_remaining=5,
-    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, initial_rank=9,
+    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, start_rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
     start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
@@ -755,7 +753,7 @@ class Mpointing(Base):
     As it has a pending Pointing associated with it the Mpointing status is now 'scheduled':
     >>> mp
     Mpointing(db_id=1, status=scheduled, num_todo=5, num_completed=0, num_remaining=5,
-    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, initial_rank=9,
+    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, start_rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
     start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
@@ -771,7 +769,7 @@ class Mpointing(Base):
     time_block_id=1, grid_tile_id=None, survey_tile_id=None, event_id=None)
     >>> mp
     Mpointing(db_id=1, status=scheduled, num_todo=5, num_completed=0, num_remaining=5,
-    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, initial_rank=9,
+    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, start_rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
     start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
@@ -785,7 +783,7 @@ class Mpointing(Base):
     time_block_id=1, grid_tile_id=None, survey_tile_id=None, event_id=None)
     >>> mp
     Mpointing(db_id=1, status=unscheduled, num_todo=5, num_completed=1, num_remaining=4,
-    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=19, initial_rank=9,
+    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=19, start_rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
     start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
@@ -819,7 +817,7 @@ class Mpointing(Base):
     ra = Column(Float, nullable=False)
     dec = Column('decl', Float, nullable=False)  # dec is reserved in SQL so can't be a column name
     current_rank = Column(Integer, nullable=False)
-    initial_rank = Column(Integer, nullable=False)
+    start_rank = Column(Integer, nullable=False)
     num_todo = Column(Integer, nullable=False)
     num_completed = Column(Integer, nullable=False, default=0)
     infinite = Column(Boolean, nullable=False, default=False)
@@ -877,8 +875,7 @@ class Mpointing(Base):
         self.dec = dec
         self.object_name = object_name
         self.start_rank = start_rank
-        self.current_rank = start_rank
-        self.initial_rank = start_rank
+        self.current_rank = start_rank  # always start at initial rank
         self.max_moon = max_moon
         self.min_moonsep = min_moonsep
         self.min_alt = min_alt
@@ -952,7 +949,7 @@ class Mpointing(Base):
                    'ra={}'.format(self.ra),
                    'dec={}'.format(self.dec),
                    'current_rank={}'.format(self.current_rank),
-                   'initial_rank={}'.format(self.initial_rank),
+                   'start_rank={}'.format(self.start_rank),
                    'min_alt={}'.format(self.min_alt),
                    'max_sunalt={}'.format(self.max_sunalt),
                    'min_time={}'.format(self.min_time),
@@ -1869,8 +1866,6 @@ class ImageLog(Base):
 TRIGGERS = [
     # Mpointing trigger before insert
     # If no coordinates are given but it's linked to a grid tile then use its coordinates.
-    # Also if current_rank is not given then we set it to the initial_rank
-    # TODO: Could the latter be in the Python __init__?
     """CREATE TRIGGER `mpointings_BEFORE_INSERT` BEFORE INSERT ON `mpointings` FOR EACH ROW
     BEGIN
     IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`decl` is NULL)) THEN
@@ -1878,10 +1873,6 @@ TRIGGERS = [
                         WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
         SET NEW.`decl` = (SELECT `decl` FROM `grid_tiles`
                             WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
-    END IF;
-    IF ((NEW.`current_rank` is NULL) and (NEW.`initial_rank` is not NULL))
-    THEN
-        SET NEW.`current_rank` = NEW.`initial_rank`;
     END IF;
     END
     """,

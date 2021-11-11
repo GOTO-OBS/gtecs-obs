@@ -1,5 +1,6 @@
 """Session management functions."""
 
+import os
 from contextlib import contextmanager
 
 import numpy as np
@@ -11,12 +12,8 @@ from sqlalchemy.orm import sessionmaker
 
 from .. import params
 
-__all__ = ['open_session', 'load_session']
+__all__ = ['get_engine', 'open_session', 'load_session']
 
-
-ENGINE = create_engine('mysql+pymysql://{}'.format(params.DATABASE_LOCATION),
-                       echo=params.DATABASE_ECHO,
-                       pool_pre_ping=params.DATABASE_PRE_PING)
 
 # Encode Numpy floats
 # https://stackoverflow.com/questions/46205532/
@@ -25,14 +22,32 @@ pymysql.converters.conversions = pymysql.converters.encoders.copy()
 pymysql.converters.conversions.update(pymysql.converters.decoders)
 
 
+def get_engine(url=params.DATABASE_URL, db_name=params.DATABASE_NAME,
+               echo=params.DATABASE_ECHO, *args, **kwargs):
+    """Create the database engine."""
+    if db_name:
+        url = os.path.join(url, db_name)
+    engine = create_engine(f'mysql+pymysql://{url}?charset=utf8',
+                           echo=echo,
+                           pool_pre_ping=params.DATABASE_PRE_PING,
+                           *args, *kwargs)
+    return engine
+
+
 @contextmanager
-def open_session():
+def open_session(echo=params.DATABASE_ECHO):
     """Create a DB session context manager.
 
     Automatically takes care of commiting changes
     to DB when scope closes and rolls back on exceptions.
 
     Needless to say it also closes the session when it goes out of scope.
+
+    Parameters
+    ----------
+    echo : bool
+        If True, echo SQL output.
+        Default is `gtecs.obs.params.DATABASE_ECHO`
 
     Returns
     -------
@@ -52,7 +67,8 @@ def open_session():
     Note it was committed automatically when leaving the context.
 
     """
-    new_session = sessionmaker(bind=ENGINE)
+    engine = get_engine(echo=echo)
+    new_session = sessionmaker(bind=engine)
     session = new_session()
     try:
         yield session
@@ -64,11 +80,17 @@ def open_session():
         session.close()
 
 
-def load_session():
+def load_session(echo=params.DATABASE_ECHO):
     """Create a DB session.
 
     By making a DB session this way, you must commit and rollback changes
     yourself.
+
+    Parameters
+    ----------
+    echo : bool
+        If True, echo SQL output.
+        Default is `gtecs.obs.params.DATABASE_ECHO`
 
     Returns
     -------
@@ -91,6 +113,7 @@ def load_session():
     User(db_id=1, username=bob, full_name=Bob Marley)
 
     """
-    new_session = sessionmaker(bind=ENGINE)
+    engine = get_engine(echo=echo)
+    new_session = sessionmaker(bind=engine)
     session = new_session()
     return session

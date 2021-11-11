@@ -6,10 +6,10 @@ from astropy import units as u
 from astropy.coordinates import Longitude
 from astropy.time import Time
 
-from sqlalchemy import create_engine, or_
+from sqlalchemy import or_
 from sqlalchemy.exc import ProgrammingError
 
-from .engine import open_session
+from .engine import get_engine, open_session
 from .models import Base, Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, TRIGGERS, User
 from .. import params
 
@@ -42,9 +42,8 @@ def create_database(overwrite=False, verbose=False):
         If True, echo SQL output.
 
     """
-    base_url = f'{params.DATABASE_USER}:{params.DATABASE_PASSWORD}@{params.DATABASE_HOST}'
-    base_engine = create_engine(f'mysql+pymysql://{base_url}?charset=utf8', echo=verbose)
-    with base_engine.connect() as conn:
+    engine = get_engine(db_name=None, echo=verbose)
+    with engine.connect() as conn:
         if not overwrite:
             try:
                 conn.execute('CREATE DATABASE `goto_obs`')  # will raise if it exists
@@ -58,14 +57,12 @@ def create_database(overwrite=False, verbose=False):
 def fill_database(verbose=False):
     """Fill a blank database with the ObsDB metadata."""
     # Create the schema from the base
-    base_url = f'{params.DATABASE_USER}:{params.DATABASE_PASSWORD}@{params.DATABASE_HOST}'
-    db_url = f'{base_url}/{params.DATABASE_NAME}'
-    db_engine = create_engine(f'mysql+pymysql://{db_url}?charset=utf8', echo=verbose)
-    Base.metadata.create_all(db_engine)
+    engine = get_engine(echo=verbose)
+    Base.metadata.create_all(engine)
 
     # Create triggers
     for trigger in TRIGGERS:
-        with db_engine.connect() as conn:
+        with engine.connect() as conn:
             conn.execute(trigger)
 
 

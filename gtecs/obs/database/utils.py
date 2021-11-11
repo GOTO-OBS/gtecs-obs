@@ -30,28 +30,32 @@ __all__ = ['create_database', 'fill_database',
 
 
 def create_database(overwrite=False, verbose=False):
-    """Create the blank goto_obs database.
+    """Create the blank database.
+
+    The name of the database is 'goto_obs' by default, it can be changed in
+    `gtecs.obs.params.DATABASE_NAME`.
 
     Parameters
     ----------
     overwrite : bool, default=False
-        If True and a database named 'goto_obs' exists then drop it before creating the new one.
+        If True and the database already exists then drop it before creating the new one.
         If False and the database already exists then an error is raised.
 
     verbose : bool, default=False
         If True, echo SQL output.
 
     """
+    db_name = params.DATABASE_NAME
     engine = get_engine(db_name=None, echo=verbose)
     with engine.connect() as conn:
         if not overwrite:
             try:
-                conn.execute('CREATE DATABASE `goto_obs`')  # will raise if it exists
+                conn.execute(f'CREATE DATABASE `{db_name}`')  # will raise if it exists
             except ProgrammingError as err:
-                raise ValueError('WARNING: goto_obs database already exists!') from err
+                raise ValueError(f'WARNING: Database "{db_name}" already exists!') from err
         else:
-            conn.execute('DROP DATABASE IF EXISTS `goto_obs`')
-            conn.execute('CREATE DATABASE `goto_obs`')
+            conn.execute(f'DROP DATABASE IF EXISTS `{db_name}`')
+            conn.execute(f'CREATE DATABASE `{db_name}`')
 
 
 def fill_database(verbose=False):

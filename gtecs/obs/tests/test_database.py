@@ -63,9 +63,6 @@ with db.open_session() as session:
     db.insert_items(session, [e, g, gt1, gt2, s, st1, st2])
     session.commit()
 
-    # check the survey tile weight updated correctly
-    assert st1.initial_weight == st1.current_weight == 0.5
-
     # print them to check __repr__
     print(e, end='\n\n')
     print(g, end='\n\n')

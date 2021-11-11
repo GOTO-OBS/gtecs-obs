@@ -1578,17 +1578,13 @@ class SurveyTile(Base):
     Parameters
     ----------
     weight : float
-        initial weighting for this tile (between 0 and 1)
+        weighting for this tile (between 0 and 1)
 
     Attributes
     ----------
     db_id : int
         primary database key
         only populated when the instance is added to the database
-    current_weight : float
-        the current weighting of this tile
-    initial_weight : float
-        the initial weighting of this tile (it be modified as neighbours are observed)
 
     When created the instance can be linked to the following other tables,
     otherwise they are populated when it is added to the database:
@@ -1618,8 +1614,7 @@ class SurveyTile(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    current_weight = Column(Float, nullable=False)
-    initial_weight = Column(Float, nullable=False)
+    weight = Column(Float, nullable=False)
 
     # Foreign keys
     survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=False)
@@ -1632,15 +1627,13 @@ class SurveyTile(Base):
     mpointings = relationship('Mpointing', back_populates='survey_tile')
 
     def __init__(self, weight=None, survey_id=None, grid_tile_id=None):
-        self.current_weight = weight
-        self.initial_weight = weight
+        self.weight = weight
         self.survey_id = survey_id
         self.grid_tile_id = grid_tile_id
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
-                   'current_weight={}'.format(self.current_weight),
-                   'initial_weight={}'.format(self.initial_weight),
+                   'weight={}'.format(self.weight),
                    'survey_id={}'.format(self.survey_id),
                    'grid_tile_id={}'.format(self.grid_tile_id),
                    ]
@@ -1952,17 +1945,6 @@ TRIGGERS = [
                     WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
             END IF;
         END IF;
-    END IF;
-    END
-    """,
-    # SurveyTile trigger before insert
-    # If the current_weight is not given then we set it to the initial_weight
-    # TODO: This could easily be a Python __init__, if we even need the different weights any more?
-    """CREATE TRIGGER `survey_tiles_BEFORE_INSERT`
-    BEFORE INSERT ON `survey_tiles` FOR EACH ROW
-    BEGIN
-    IF ((NEW.`current_weight` is NULL) and (NEW.`initial_weight` is not NULL)) THEN
-        SET NEW.`current_weight` = NEW.`initial_weight`;
     END IF;
     END
     """,

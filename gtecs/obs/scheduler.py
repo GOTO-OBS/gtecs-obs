@@ -139,7 +139,7 @@ class Pointing(object):
         # weight is stored on the Survey Tile, if it has one
         # If not it effectively contains 100% of the target, so weight=1
         if db_pointing.survey_tile:
-            weight = db_pointing.survey_tile.current_weight
+            weight = db_pointing.survey_tile.weight
         else:
             weight = 1
 

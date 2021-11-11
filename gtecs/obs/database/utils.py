@@ -6,13 +6,16 @@ from astropy import units as u
 from astropy.coordinates import Longitude
 from astropy.time import Time
 
-from sqlalchemy import or_
+from sqlalchemy import create_engine, or_
+from sqlalchemy.exc import ProgrammingError
 
 from .engine import open_session
-from .models import Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, User
+from .models import Base, Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, TRIGGERS, User
+from .. import params
 
 
-__all__ = ['get_user', 'validate_user',
+__all__ = ['create_database', 'fill_database',
+           'get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
@@ -24,6 +27,46 @@ __all__ = ['get_user', 'validate_user',
            'update_pointing_status', 'bulk_update_status',
            'mark_completed', 'mark_aborted', 'mark_interrupted', 'mark_running',
            ]
+
+
+def create_database(overwrite=False, verbose=False):
+    """Create the blank goto_obs database.
+
+    Parameters
+    ----------
+    overwrite : bool, default=False
+        If True and a database named 'goto_obs' exists then drop it before creating the new one.
+        If False and the database already exists then an error is raised.
+
+    verbose : bool, default=False
+        If True, echo SQL output.
+
+    """
+    base_url = f'{params.DATABASE_USER}:{params.DATABASE_PASSWORD}@{params.DATABASE_HOST}'
+    base_engine = create_engine(f'mysql+pymysql://{base_url}?charset=utf8', echo=verbose)
+    with base_engine.connect() as conn:
+        if not overwrite:
+            try:
+                conn.execute('CREATE DATABASE `goto_obs`')  # will raise if it exists
+            except ProgrammingError as err:
+                raise ValueError('WARNING: goto_obs database already exists!') from err
+        else:
+            conn.execute('DROP DATABASE IF EXISTS `goto_obs`')
+            conn.execute('CREATE DATABASE `goto_obs`')
+
+
+def fill_database(verbose=False):
+    """Fill a blank database with the ObsDB metadata."""
+    # Create the schema from the base
+    base_url = f'{params.DATABASE_USER}:{params.DATABASE_PASSWORD}@{params.DATABASE_HOST}'
+    db_url = f'{base_url}/{params.DATABASE_NAME}'
+    db_engine = create_engine(f'mysql+pymysql://{db_url}?charset=utf8', echo=verbose)
+    Base.metadata.create_all(db_engine)
+
+    # Create triggers
+    for trigger in TRIGGERS:
+        with db_engine.connect() as conn:
+            conn.execute(trigger)
 
 
 def get_user(session, username):

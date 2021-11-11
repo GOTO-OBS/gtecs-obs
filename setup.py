@@ -3,7 +3,7 @@ import glob
 
 from setuptools import setup, find_namespace_packages
 
-REQUIRES = ['sqlalchemy>=1.2',
+REQUIRES = ['sqlalchemy>=1.4',
             'pymysql',
             'astropy',
             'astroplan',

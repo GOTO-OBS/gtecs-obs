@@ -24,6 +24,7 @@ pymysql.converters.encoders[np.float64] = pymysql.converters.escape_float
 pymysql.converters.conversions = pymysql.converters.encoders.copy()
 pymysql.converters.conversions.update(pymysql.converters.decoders)
 
+
 @contextmanager
 def open_session():
     """Create a DB session context manager.

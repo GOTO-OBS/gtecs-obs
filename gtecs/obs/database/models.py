@@ -8,22 +8,35 @@ from astropy.time import Time
 
 from gototile.grid import SkyGrid
 
-from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String)
+from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text)
+from sqlalchemy import text
+from sqlalchemy.dialects.mysql import TIMESTAMP
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, validates
 
 
 __all__ = ['User', 'Pointing', 'ExposureSet', 'Mpointing', 'TimeBlock',
-           'Grid', 'GridTile', 'Survey', 'SurveyTile', 'Event', 'ImageLog']
+           'Grid', 'GridTile', 'Survey', 'SurveyTile', 'Event', 'ImageLog',
+           'TRIGGERS']
 
-
-Base = declarative_base()
 
 pointing_status_list = Enum('pending', 'running', 'completed',
                             'aborted', 'interrupted', 'expired', 'deleted')
 
 mpointing_status_list = Enum('unscheduled', 'scheduled', 'completed',
                              'aborted', 'expired', 'deleted')
+
+
+class Utf8Base:
+    """A simple base to force the table to use UTF8 encoding.
+
+    See https://stackoverflow.com/questions/63488890/
+    """
+
+    __table_args__ = {'mysql_default_charset': 'utf8'}
+
+
+Base = declarative_base(cls=Utf8Base)
 
 
 class User(Base):
@@ -43,7 +56,7 @@ class User(Base):
         a short user name
     password : string
         password for authentication
-        the password is stored as a hash in the database, so the unshased string isn't stored
+        the password is stored as a hash in the database, so the unhashed string isn't stored
     full_name : string
         the user's full name.
 
@@ -74,7 +87,7 @@ class User(Base):
     >>> session = load_session()
     >>> session.add(bob)
 
-    Note the db_id will still be None until the changes are commited:
+    Note the db_id will still be None until the changes are committed:
     >>> bob
     User(db_id=None, username=bob, full_name=Bob Marley)
     >>> session.commit()
@@ -110,9 +123,9 @@ class User(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    username = Column(String)
-    password_hash = Column('password', String)  # Don't allow access to the unhashed password
-    full_name = Column(String)
+    username = Column(String(255), nullable=False, unique=True)
+    password_hash = Column('password', String(255), nullable=False)
+    full_name = Column(Text, nullable=False)
 
     # Foreign relationships
     pointings = relationship('Pointing', back_populates='user')
@@ -146,7 +159,7 @@ class Pointing(Base):
 
     Parameters
     ----------
-    object_name : String
+    object_name : str
         object name
     ra : float
         J2000 right ascension in decimal degrees
@@ -312,21 +325,23 @@ class Pointing(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    status = Column(pointing_status_list, default='pending')
-    object_name = Column('object', String)  # object is a built in class in Python
-    ra = Column(Float)
-    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
-    rank = Column(Integer)
-    min_alt = Column(Float, default=30)
-    max_sunalt = Column(Float, default=-15)
-    min_time = Column(Float)
-    max_moon = Column(String(1), default='B')
-    min_moonsep = Column(Float, default=30)
-    too = Column(Boolean, default=False)
-    start_time = Column(DateTime, default=datetime.datetime.now())
-    stop_time = Column(DateTime, default=None)
-    started_time = Column(DateTime, default=None)
-    stopped_time = Column(DateTime, default=None)
+    status = Column(pointing_status_list, nullable=False, index=True, default='pending')
+    object_name = Column('object', Text, nullable=False)  # object is a built in class in Python
+    ra = Column(Float, nullable=False)
+    dec = Column('decl', Float, nullable=False)  # dec is reserved in SQL so can't be a column name
+    rank = Column(Integer, nullable=False)
+    min_alt = Column(Float, nullable=False, default=30)
+    max_sunalt = Column(Float, nullable=False, default=-15)
+    min_time = Column(Float, nullable=False)
+    max_moon = Column(String(1), nullable=False, default='B')
+    min_moonsep = Column(Float, nullable=False, default=30)
+    too = Column(Boolean, nullable=False, default=False)
+    start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow())
+    stop_time = Column(DateTime, nullable=True, index=True, default=None)
+    started_time = Column(DateTime, nullable=True, default=None)
+    stopped_time = Column(DateTime, nullable=True, default=None)
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign keys
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -410,10 +425,10 @@ class Pointing(Base):
 
         if (key == 'start_time' and self.stop_time is not None):
             if Time(value) >= Time(self.stop_time):
-                raise AssertionError("stop_time must be later than start_time")
+                raise AssertionError('stop_time must be later than start_time')
         elif key == 'stop_time' and value is not None and self.start_time is not None:
             if Time(self.start_time) >= Time(value):
-                raise AssertionError("stop_time must be later than start_time")
+                raise AssertionError('stop_time must be later than start_time')
 
         return value
 
@@ -488,14 +503,16 @@ class ExposureSet(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    num_exp = Column(Integer)
-    exptime = Column(Float)
-    filt = Column('filter', String(2))  # filter is a built in function in Python
-    binning = Column(Integer, default=1)
-    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'), default='SCIENCE')
+    num_exp = Column(Integer, nullable=False)
+    exptime = Column(Float, nullable=False)
+    filt = Column('filter',   # filter is a built in function in Python
+                  String(1), nullable=False)
+    binning = Column(Integer, nullable=False, default=1)
+    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'), nullable=False,
+                     default='SCIENCE')
     ut_mask = Column(Integer, default=None)
-    ra_offset = Column(Float, default=0)
-    dec_offset = Column(Float, default=0)
+    ra_offset = Column(Float, nullable=False, default=0)
+    dec_offset = Column(Float, nullable=False, default=0)
 
     # Foreign keys
     pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=False)
@@ -536,7 +553,7 @@ class Mpointing(Base):
 
     Parameters
     ----------
-    object_name : String
+    object_name : str
         object name
     ra : float, optional
         J2000 right ascension in decimal degrees
@@ -797,23 +814,24 @@ class Mpointing(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    status = Column(mpointing_status_list, default='unscheduled')
-    object_name = Column('object', String)  # object is a built in class in Python
-    ra = Column(Float)
-    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
-    current_rank = Column(Integer)
-    initial_rank = Column(Integer)
-    num_todo = Column(Integer)
-    num_completed = Column(Integer)
-    infinite = Column(Boolean, default=False)
-    min_alt = Column(Float, default=30)
-    max_sunalt = Column(Float, default=-15)
-    min_time = Column(Float)
-    max_moon = Column(String(1), default='B')
-    min_moonsep = Column(Float, default=30)
-    too = Column(Boolean, default=False)
-    start_time = Column(DateTime, default=datetime.datetime.now())
-    stop_time = Column(DateTime, default=None)
+    status = Column(mpointing_status_list, nullable=False, index=True, default='unscheduled')
+    object_name = Column('object', Text, nullable=False)  # object is a built in class in Python
+    ra = Column(Float, nullable=False)
+    dec = Column('decl', Float, nullable=False)  # dec is reserved in SQL so can't be a column name
+    current_rank = Column(Integer, nullable=False)
+    initial_rank = Column(Integer, nullable=False)
+    num_todo = Column(Integer, nullable=False)
+    num_completed = Column(Integer, nullable=False, default=0)
+    infinite = Column(Boolean, nullable=False, default=False)
+    min_alt = Column(Float, nullable=False, default=30)
+    max_sunalt = Column(Float, nullable=False, default=-15)
+    min_time = Column(Float, nullable=False)
+    max_moon = Column(String(1), nullable=False, default='B')
+    min_moonsep = Column(Float, nullable=False, default=30)
+    too = Column(Boolean, nullable=False, default=False)
+    start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow(),
+                        server_default=text('CURRENT_TIMESTAMP'))
+    stop_time = Column(DateTime, nullable=True, index=True, default=None)
 
     # Foreign keys
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -970,10 +988,10 @@ class Mpointing(Base):
 
         if (key == 'start_time' and self.stop_time is not None):
             if Time(value) >= Time(self.stop_time):
-                raise AssertionError("stop_time must be later than start_time")
+                raise AssertionError('stop_time must be later than start_time')
         elif key == 'stop_time' and value is not None and self.start_time is not None:
             if Time(self.start_time) >= Time(value):
-                raise AssertionError("stop_time must be later than start_time")
+                raise AssertionError('stop_time must be later than start_time')
 
         return value
 
@@ -1242,10 +1260,10 @@ class TimeBlock(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    block_num = Column(Integer)
-    valid_time = Column(Integer)
-    wait_time = Column(Integer)
-    current = Column(Boolean, default=False)
+    block_num = Column(Integer, nullable=False, index=True)
+    valid_time = Column(Float, nullable=False)
+    wait_time = Column(Float, nullable=False)
+    current = Column(Boolean, nullable=False, index=True, default=False)
 
     # Foreign keys
     mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
@@ -1329,12 +1347,12 @@ class Grid(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    name = Column(String)
-    ra_fov = Column(Float)
-    dec_fov = Column(Float)
-    ra_overlap = Column(Float)
-    dec_overlap = Column(Float)
-    algorithm = Column(String)
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    ra_fov = Column(Float, nullable=False)
+    dec_fov = Column(Float, nullable=False)
+    ra_overlap = Column(Float, nullable=False)
+    dec_overlap = Column(Float, nullable=False)
+    algorithm = Column(String(255), nullable=False)
 
     # Foreign relationships
     grid_tiles = relationship('GridTile', back_populates='grid')
@@ -1430,9 +1448,9 @@ class GridTile(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    name = Column(String)
-    ra = Column(Float)
-    dec = Column('decl', Float)  # dec is reserved in SQL so can't be a column name
+    name = Column(String(255), nullable=False, index=True)
+    ra = Column(Float, nullable=False)
+    dec = Column('decl', Float, nullable=False)  # dec is reserved in SQL so can't be a column name
 
     # Foreign keys
     grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
@@ -1511,7 +1529,7 @@ class Survey(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    name = Column(String)
+    name = Column(String(255), nullable=False, index=True)
 
     # Foreign keys
     grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
@@ -1603,8 +1621,8 @@ class SurveyTile(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    current_weight = Column(Float)
-    initial_weight = Column(Float)
+    current_weight = Column(Float, nullable=False)
+    initial_weight = Column(Float, nullable=False)
 
     # Foreign keys
     survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=False)
@@ -1655,7 +1673,7 @@ class Event(Base):
         the type of event, e.g. GW, GRB
 
     time : string, `astropy.time.Time` or datetime.datetime, optional
-        time the event occured
+        time the event occurred
     skymap : string, optional
         the location of the source skymap file
 
@@ -1686,12 +1704,13 @@ class Event(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    name = Column(String)
-    ivorn = Column(String, unique=True)
-    source = Column(String)
-    event_type = Column('type', String)  # type is a built in function in Python
+    name = Column(String(255), nullable=False, index=True)
+    ivorn = Column(String(255), nullable=False, unique=True)
+    source = Column(String(255), nullable=False)
+    # type is a built in function in Python
+    event_type = Column('type', String(255), nullable=False, index=True)
     time = Column(DateTime)
-    skymap = Column(String)
+    skymap = Column(String(255))
 
     # Foreign relationships
     surveys = relationship('Survey', back_populates='event')
@@ -1713,7 +1732,7 @@ class Event(Base):
     def munge_times(self, key, field):
         """Use validators to allow various types of input for UTC."""
         if isinstance(field, datetime.datetime):
-            value = field.strftime("%Y-%m-%d %H:%M:%S")
+            value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
             value = field.iso
@@ -1789,14 +1808,14 @@ class ImageLog(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    filename = Column(String)
-    run_number = Column(Integer)
-    ut = Column(Integer)
-    ut_mask = Column(Integer)
-    start_time = Column(DateTime)
-    write_time = Column(DateTime)
-    set_position = Column(Integer, default=1)
-    set_total = Column(Integer, default=1)
+    filename = Column(String(30), nullable=False, unique=True)
+    run_number = Column(Integer, nullable=False, index=True)
+    ut = Column(Integer, nullable=False)
+    ut_mask = Column(Integer, nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    write_time = Column(DateTime, nullable=False, index=True)
+    set_position = Column(Integer, nullable=False, default=1)
+    set_total = Column(Integer, nullable=False, default=1)
 
     # Foreign keys
     exposure_set_id = Column(Integer, ForeignKey('exposure_sets.id'), nullable=True)
@@ -1829,7 +1848,7 @@ class ImageLog(Base):
         Also enforce write_time > start_time.
         """
         if isinstance(field, datetime.datetime):
-            value = field.strftime("%Y-%m-%d %H:%M:%S")
+            value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
             value = field.iso
@@ -1839,9 +1858,121 @@ class ImageLog(Base):
 
         if (key == 'start_time' and self.write_time is not None):
             if Time(value) >= Time(self.write_time):
-                raise AssertionError("write_time must be later than start_time")
+                raise AssertionError('write_time must be later than start_time')
         elif key == 'write_time' and self.write_time is not None:
             if Time(self.start_time) >= Time(value):
-                raise AssertionError("write_time must be later than start_time")
+                raise AssertionError('write_time must be later than start_time')
 
         return value
+
+
+TRIGGERS = [
+    # Mpointing trigger before insert
+    # If no coordinates are given but it's linked to a grid tile then use its coordinates.
+    # Also if current_rank is not given then we set it to the initial_rank
+    # TODO: Could the latter be in the Python __init__?
+    """CREATE TRIGGER `mpointings_BEFORE_INSERT` BEFORE INSERT ON `mpointings` FOR EACH ROW
+    BEGIN
+    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`decl` is NULL)) THEN
+        SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles`
+                        WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
+        SET NEW.`decl` = (SELECT `decl` FROM `grid_tiles`
+                            WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
+    END IF;
+    IF ((NEW.`current_rank` is NULL) and (NEW.`initial_rank` is not NULL))
+    THEN
+        SET NEW.`current_rank` = NEW.`initial_rank`;
+    END IF;
+    END
+    """,
+    # Mpointing trigger before update
+    # If enough pointings are done then set the status to completed (if not infinite)
+    # TODO: This could be part of the Python-only status
+    """CREATE TRIGGER `mpointings_BEFORE_UPDATE` BEFORE UPDATE ON `mpointings` FOR EACH ROW
+    BEGIN
+    IF (NEW.`num_completed` = NEW.`num_todo` and NEW.`infinite` = 0) THEN
+        SET NEW.`status` = 'completed';
+    END IF;
+    END
+    """,
+    # Pointing trigger before insert
+    # If no coordinates are given but it's linked to a grid tile then use its coordinates.
+    """CREATE TRIGGER `pointings_BEFORE_INSERT` BEFORE INSERT ON `pointings` FOR EACH ROW
+    BEGIN
+    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`decl` is NULL)) THEN
+        SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles`
+                        WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
+        SET NEW.`decl` = (SELECT `decl` FROM `grid_tiles`
+                          WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
+    END IF;
+    END
+    """,
+    # Pointing trigger after insert
+    # If the Pointing is pending and linked to a TimeBlock then set all other blocks to not current
+    # and this block to current.
+    # Also mark the linked Mpointing as scheduled.
+    """CREATE TRIGGER `pointings_AFTER_INSERT` AFTER INSERT ON `pointings` FOR EACH ROW
+    BEGIN
+    IF (NEW.`time_block_id` is not NULL) AND (NEW.status = 'pending') THEN
+        UPDATE `time_blocks` SET `current` = FALSE
+            WHERE (NEW.`mpointing_id` = `time_blocks`.`mpointing_id`);
+        UPDATE `time_blocks` SET `current` = TRUE
+            WHERE (NEW.`time_block_id` = `time_blocks`.`id`);
+    END IF;
+    IF (NEW.`mpointing_id` is not NULL) AND (NEW.status = 'pending') THEN
+        UPDATE `mpointings` SET `status` = 'scheduled'
+            WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
+    END IF;
+    END
+    """,
+    # Pointing trigger before update
+    # If the pointing has been marked running or finished then store the started/stopped time
+    """CREATE TRIGGER `pointings_BEFORE_UPDATE` BEFORE UPDATE ON `pointings` FOR EACH ROW
+    BEGIN
+    IF (OLD.`status` != 'running' AND NEW.`status` = 'running') THEN
+        SET NEW.`started_time` = UTC_TIMESTAMP();
+    END IF;
+    IF (OLD.`status` IN ('pending', 'running') AND NEW.`status` NOT IN ('pending', 'running')) THEN
+        SET NEW.`stopped_time` = UTC_TIMESTAMP();
+    END IF;
+    END
+    """,
+    # Pointing trigger after update
+    # If the pointing is finished and the linked mpointing is scheduled then mark it as unscheduled
+    # Then if the pointing was completed then increase the Mpointing's completed count and
+    # add 10 to the current_rank (only if the Mpointing is not infinite)
+    # NB we only trigger if the timestamp has changed
+    """CREATE TRIGGER `pointings_AFTER_UPDATE` AFTER UPDATE ON `pointings` FOR EACH ROW
+    BEGIN
+    DECLARE is_infinite INT;
+    IF (NEW.`ts` <> OLD.`ts`) THEN
+        IF NEW.`status` NOT IN ('pending', 'running') THEN
+            UPDATE `mpointings` SET `status` = 'unscheduled'
+                WHERE (`mpointings`.`id` = NEW.`mpointing_id` and
+                       `mpointings`.`status` = 'scheduled');
+        END IF;
+        IF (OLD.`status` != 'completed' AND NEW.`status` = 'completed') THEN
+            UPDATE `mpointings` SET `num_completed` = `num_completed` + 1
+                WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
+            SELECT `infinite` INTO is_infinite FROM `mpointings`
+                WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
+            IF is_infinite = 0 THEN
+                UPDATE `mpointings` SET `current_rank` = `current_rank` + 10
+                    WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
+            END IF;
+        END IF;
+    END IF;
+    END
+    """,
+    # SurveyTile trigger before insert
+    # If the current_weight is not given then we set it to the initial_weight
+    # TODO: This could easily be a Python __init__, if we even need the different weights any more?
+    """CREATE TRIGGER `survey_tiles_BEFORE_INSERT`
+    BEFORE INSERT ON `survey_tiles` FOR EACH ROW
+    BEGIN
+    IF ((NEW.`current_weight` is NULL) and (NEW.`initial_weight` is not NULL)) THEN
+        SET NEW.`current_weight` = NEW.`initial_weight`;
+    END IF;
+    END
+    """,
+]

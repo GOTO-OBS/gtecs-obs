@@ -28,15 +28,9 @@ Several scripts from the `scripts` folder should also be added to your path.
 
 ### Setting up the database
 
-Make sure MariaDB is installed (recommended over MySQL).
+Make sure MariaDB is installed and configured (recommended over MySQL).
 
-Start a session as root:
-
-    mysql -u root -p
-
-Setup the `goto_obs` database by sourcing from the schema included in this repository:
-
-    mysql> source schema.sql
+Then run the `setup_obs.db` script to create a blank database with all the required tables.
 
 ### Configuration
 

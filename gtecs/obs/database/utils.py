@@ -80,7 +80,7 @@ def get_user(session, username):
         short name of user
 
     Returns
-    --------
+    -------
     user : `User`
         the User class for the given username
 
@@ -237,7 +237,7 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     # actually get the queue
     pending_pointings = queue.all()
 
-    # find the current pointing too, with a seperate query
+    # find the current pointing too, with a separate query
     current_pointing = session.query(Pointing).filter(Pointing.status == 'running').one_or_none()
 
     return current_pointing, pending_pointings
@@ -481,7 +481,7 @@ def get_events(session, event_type=None, source=None):
 
 
 def delete_event_pointings(session, event):
-    """Set all the Mpointings and Pointings assosiated with the given Event to deleted.
+    """Set all the Mpointings and Pointings associated with the given Event to deleted.
 
     Note this doesn't physically delete the rows from the database tables,
     it just sets the statuses to 'deleted'.
@@ -553,7 +553,7 @@ def insert_items(session, items):
     use one of the bulk_insert routines instead.
 
     Parameters
-    -----------
+    ----------
     session : `sqlalchemy.Session.session`
         the session object
     items : `gtecs.obs.database.models.Base`
@@ -605,7 +605,7 @@ def bulk_update_status(session, items, status):
     if not all(isinstance(item, type(items[0])) for item in items):
         raise ValueError('Items must be all the same type (`Pointing` or `Mpointing`)')
 
-    mappings = [dict(db_id=item.db_id, status=status) for item in items]
+    mappings = [{'db_id': item.db_id, 'status': status} for item in items]
     session.bulk_update_mappings(type(items[0]), mappings)
 
 

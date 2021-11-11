@@ -11,7 +11,7 @@ def make_random_pointing(user, num_expsets=None, time=None):
     """Make a random pointing for testing.
 
     It should be observable from La Palma at the time of creation.
-    However not all pointings will be valid in the queue immedietly due to
+    However not all pointings will be valid in the queue immediately due to
     random start and stop times.
 
     Parameters

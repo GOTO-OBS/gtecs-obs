@@ -415,7 +415,7 @@ class Pointing(Base):
         if key == 'stop_time' and field is None:
             value = None
         elif isinstance(field, datetime.datetime):
-            value = field.strftime("%Y-%m-%d %H:%M:%S")
+            value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
             value = field.iso
@@ -978,7 +978,7 @@ class Mpointing(Base):
         if key == 'stop_time' and field is None:
             value = None
         elif isinstance(field, datetime.datetime):
-            value = field.strftime("%Y-%m-%d %H:%M:%S")
+            value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
             value = field.iso

@@ -1,6 +1,7 @@
 """Create a blank observing database."""
 
 import argparse
+import getpass
 
 from gtecs.obs import database as db
 
@@ -14,6 +15,13 @@ def run(overwrite=False, verbose=False):
     # Create the schema from the base
     print('Filling database schema...')
     db.fill_database(verbose)
+
+    # Create the default user
+    print('---')
+    password = getpass.getpass(prompt='Creating default user - give password: ')
+    user = db.User('goto', password, 'GOTO Survey')
+    with db.open_session() as session:
+        session.add(user)
 
     print('Done')
 

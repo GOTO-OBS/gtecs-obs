@@ -328,7 +328,7 @@ class Pointing(Base):
     status = Column(pointing_status_list, nullable=False, index=True, default='pending')
     object_name = Column('object', Text, nullable=False)  # object is a built in class in Python
     ra = Column(Float, nullable=False)
-    dec = Column('decl', Float, nullable=False)  # dec is reserved in SQL so can't be a column name
+    dec = Column(Float, nullable=False)
     rank = Column(Integer, nullable=False)
     min_alt = Column(Float, nullable=False, default=30)
     max_sunalt = Column(Float, nullable=False, default=-15)
@@ -815,7 +815,7 @@ class Mpointing(Base):
     status = Column(mpointing_status_list, nullable=False, index=True, default='unscheduled')
     object_name = Column('object', Text, nullable=False)  # object is a built in class in Python
     ra = Column(Float, nullable=False)
-    dec = Column('decl', Float, nullable=False)  # dec is reserved in SQL so can't be a column name
+    dec = Column(Float, nullable=False)
     current_rank = Column(Integer, nullable=False)
     start_rank = Column(Integer, nullable=False)
     num_todo = Column(Integer, nullable=False)
@@ -1447,7 +1447,7 @@ class GridTile(Base):
     # Columns
     name = Column(String(255), nullable=False, index=True)
     ra = Column(Float, nullable=False)
-    dec = Column('decl', Float, nullable=False)  # dec is reserved in SQL so can't be a column name
+    dec = Column(Float, nullable=False)
 
     # Foreign keys
     grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
@@ -1861,10 +1861,10 @@ TRIGGERS = [
     # If no coordinates are given but it's linked to a grid tile then use its coordinates.
     """CREATE TRIGGER `mpointings_BEFORE_INSERT` BEFORE INSERT ON `mpointings` FOR EACH ROW
     BEGIN
-    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`decl` is NULL)) THEN
+    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`dec` is NULL)) THEN
         SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles`
                         WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
-        SET NEW.`decl` = (SELECT `decl` FROM `grid_tiles`
+        SET NEW.`dec` = (SELECT `dec` FROM `grid_tiles`
                             WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
     END IF;
     END
@@ -1883,10 +1883,10 @@ TRIGGERS = [
     # If no coordinates are given but it's linked to a grid tile then use its coordinates.
     """CREATE TRIGGER `pointings_BEFORE_INSERT` BEFORE INSERT ON `pointings` FOR EACH ROW
     BEGIN
-    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`decl` is NULL)) THEN
+    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`dec` is NULL)) THEN
         SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles`
                         WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
-        SET NEW.`decl` = (SELECT `decl` FROM `grid_tiles`
+        SET NEW.`dec` = (SELECT `dec` FROM `grid_tiles`
                           WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
     END IF;
     END

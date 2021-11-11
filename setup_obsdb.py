@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Create a blank observing database."""
 
 import argparse

@@ -2,7 +2,6 @@
 """A script add an inverse survey of defined points into the G-TeCS database."""
 
 import argparse
-import getpass
 import time
 
 from astropy.coordinates import SkyCoord
@@ -80,12 +79,8 @@ def run(filename):
     # Add to the database
     mpointings = []
     with db.open_session() as session:
-        # get the User, or make it if it doesn't exist
-        try:
-            user = db.get_user(session, username='goto')
-        except ValueError:
-            password = getpass.getpass(prompt="Creating default user - give password: ")
-            user = db.User('goto', password, 'GOTO Survey')
+        # get default User
+        user = db.get_user(session, username='goto')
 
         # create Mpointings
         print('Creating mpointings...')

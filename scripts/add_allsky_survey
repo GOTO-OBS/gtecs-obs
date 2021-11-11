@@ -2,7 +2,6 @@
 """A script to fill G-TeCS database using GOTO-tile."""
 
 import argparse
-import getpass
 import time
 
 import astropy.units as u
@@ -34,12 +33,8 @@ def run(fov, overlap):
 
     # Add to the database
     with db.open_session() as session:
-        # get the User, or make it if it doesn't exist
-        try:
-            user = db.get_user(session, username='goto')
-        except ValueError:
-            password = getpass.getpass(prompt="Creating default user - give password: ")
-            user = db.User('goto', password, 'GOTO Survey')
+        # get default User
+        user = db.get_user(session, username='goto')
 
         # create a Grid
         print('Creating grid...')

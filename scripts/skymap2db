@@ -7,7 +7,6 @@
 """
 
 import argparse
-import getpass
 import os
 import time
 
@@ -36,12 +35,8 @@ EXP_SETTINGS = {'num_exp': 3,
 def add_to_database(db_grid, pointings, event_time, event_name, filename):
     """Add an event and its tiles to the GOTO database."""
     with db.open_session() as session:
-        # get the User, or make it if it doesn't exist
-        try:
-            user = db.get_user(session, username='goto')
-        except ValueError:
-            password = getpass.getpass(prompt="Creating default user - give password: ")
-            user = db.User('goto', password, 'GOTO Survey')
+        # Get default User
+        user = db.get_user(session, username='goto')
 
         # Create Event
         event = db.Event(name=event_name,

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """A script to allow simple adding of pointings to the scheduler database."""
 
-import getpass
-
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
@@ -397,12 +395,8 @@ if __name__ == '__main__':
 
     print("** Insert pointing into GOTO queue database **")
     with db.open_session() as session:
-        # get the User, or make it if it doesn't exist
-        try:
-            user = db.get_user(session, username='goto')
-        except ValueError:
-            password = getpass.getpass(prompt="Creating default user - give password: ")
-            user = db.User('goto', password, 'GOTO Survey')
+        # Get default User
+        user = db.get_user(session, username='goto')
 
         # Fill Mpointing infomation
         mpointing = default_mpointing.copy()

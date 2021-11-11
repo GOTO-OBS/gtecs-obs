@@ -38,12 +38,8 @@ def run(name, target_ra, target_dec):
                                                                     db_grid_tile.dec,
                                                                     ))
 
-        # Get the User, or make it if it doesn't exist
-        try:
-            user = db.get_user(session, username='goto')
-        except ValueError:
-            print('ERROR: No database user found')
-            return
+        # Get default User
+        user = db.get_user(session, username='goto')
 
         # Get Mpointing and ExposureSet data
         expsets = [{'num_exp': 1,

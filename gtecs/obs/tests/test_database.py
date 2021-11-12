@@ -3,7 +3,6 @@
 Assume we start from a clean database.
 """
 
-import sys
 import time
 
 from astropy import units as u
@@ -14,12 +13,6 @@ from gtecs.obs import database as db
 
 # add a user
 with db.open_session() as session:
-    # check if the database is empty
-    users = session.query(db.User).all()
-    if users:
-        print('Error: Database is not empty')
-        sys.exit(1)
-
     # create a test user
     user = db.User(username='goto_test', password='password', full_name='GOTO Test Observer')
     print(user)
@@ -28,7 +21,8 @@ with db.open_session() as session:
     print(user, end='\n\n')
 
     # check the password was stored correctly
-    assert db.validate_user(session, username='goto_test', password='password')
+    if not db.validate_user(session, username='goto_test', password='password'):
+        raise ValueError('Failed to validate user')
 
 with db.open_session() as session:
     # create an event
@@ -125,28 +119,28 @@ with db.open_session() as session:
     db.insert_items(session, more_pointings)
 
     # now check how many we have
-    npoints = len(db.get_pointings(session))
+    n_points = len(db.get_pointings(session))
     current, pending = db.get_queue(session)
     expired = db.get_expired_pointings(session)
-    nqueue = len(pending)
-    print("{} points in database".format(npoints))
-    print("{} points in queue".format(nqueue))
-    print("{} expired pointings\n".format(len(expired)))
+    n_queue = len(pending)
+    print('{} points in database'.format(n_points))
+    print('{} points in queue'.format(n_queue))
+    print('{} expired pointings\n'.format(len(expired)))
 
     # clean expired pointings
     print('Cleaning expired pointings')
     db.bulk_update_status(session, expired, 'expired')
 
     # now check how many we have
-    npoints = len(db.get_pointings(session))
+    n_points = len(db.get_pointings(session))
     current, pending = db.get_queue(session)
     expired = db.get_expired_pointings(session)
     marked = db.get_pointings(session, status='expired')
-    nqueue = len(pending)
-    print("{} points in database".format(npoints))
-    print("{} points in queue".format(nqueue))
-    print("{} unmarked expired pointings".format(len(expired)))
-    print("{} marked expired pointings\n".format(len(marked)))
+    n_queue = len(pending)
+    print('{} points in database'.format(n_points))
+    print('{} points in queue'.format(n_queue))
+    print('{} unmarked expired pointings'.format(len(expired)))
+    print('{} marked expired pointings\n'.format(len(marked)))
 
 time.sleep(5)
 
@@ -208,13 +202,13 @@ with db.open_session() as s:
     mps_to_schedule = db.get_mpointings(s, status='unscheduled')
     print('There are {} Mpointings to schedule'.format(len(mps_to_schedule)))
 
-    npoints = len(db.get_pointings(s))
+    n_points = len(db.get_pointings(s))
     current, pending = db.get_queue(s)
     expired = db.get_expired_pointings(s)
     marked = db.get_pointings(s, status='expired')
-    nqueue = len(pending)
+    n_queue = len(pending)
 
-    print("{} points in database".format(npoints))
-    print("{} points in queue".format(nqueue))
-    print("{} unmarked expired pointings".format(len(expired)))
-    print("{} marked expired pointings\n".format(len(marked)))
+    print('{} points in database'.format(n_points))
+    print('{} points in queue'.format(n_queue))
+    print('{} unmarked expired pointings'.format(len(expired)))
+    print('{} marked expired pointings\n'.format(len(marked)))

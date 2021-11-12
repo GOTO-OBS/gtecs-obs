@@ -226,8 +226,8 @@ class ExposureSet(Base):
     dec_offset = Column(Float, nullable=False, default=0)
 
     # Foreign keys
-    pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=False)
-    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
+    pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=True)
+    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=True)
 
     # Foreign relationships
     pointing = relationship('Pointing', back_populates='exposure_sets')

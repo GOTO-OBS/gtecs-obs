@@ -491,6 +491,7 @@ class Pointing(Base):
     num_expsets = column_property(select([func.count(ExposureSet.db_id)])
                                   .where(ExposureSet.pointing_id == db_id)
                                   .correlate_except(ExposureSet)
+                                  .scalar_subquery()
                                   )
 
     def __repr__(self):

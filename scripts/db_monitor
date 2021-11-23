@@ -58,11 +58,10 @@ with db.open_session() as session:
             elif pointing.status == 'completed':
                 status = gtxt('completed')
             elif pointing.status == 'pending':
-                if t > Time(pointing.start_time):
-                    status = btxt('pending')
-                else:
-                    wait = Time(pointing.start_time) - t
-                    status = 'upcoming ({:.1f}h)'.format(wait.to('hour').value)
+                status = btxt('pending')
+            elif pointing.status == 'upcoming':
+                wait = Time(pointing.start_time) - t
+                status = 'upcoming ({:.1f}h)'.format(wait.to('hour').value)
             else:
                 status = pointing.status
             print(status, end='\n')

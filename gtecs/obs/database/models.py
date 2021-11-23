@@ -280,6 +280,12 @@ class Pointing(Base):
     too : bool, optional
         indicates if this is a Target of Opportunity (ToO)
         default = False
+    tel_mask : int, optional
+        if set, this is a binary mask which will determine which telescopes
+        can carry out the observation.
+        A value of 4 (binary (0100) means only observable by Telescope 3, a value of
+        5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
+        default = None (no restriction)
     min_alt : float, optional
         minimum altitude to observe at
         default = 30
@@ -445,6 +451,7 @@ class Pointing(Base):
     max_moon = Column(String(1), nullable=False, default='B')
     min_moonsep = Column(Float, nullable=False, default=30)
     too = Column(Boolean, nullable=False, default=False)
+    tel_mask = Column(Integer, default=None)
     start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow())
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
     # # Status
@@ -513,6 +520,7 @@ class Pointing(Base):
                    'max_moon={}'.format(self.max_moon),
                    'min_moonsep={}'.format(self.min_moonsep),
                    'too={}'.format(self.too),
+                   'tel_mask={}'.format(self.tel_mask),
                    'start_time={}'.format(self.start_time),
                    'stop_time={}'.format(self.stop_time),
                    'running_time={}'.format(self.running_time),
@@ -703,13 +711,35 @@ class Pointing(Base):
 
         self.finished_time = time
 
-    def mark_running(self, telescope=None, telescope_id=None, time=None):
+    @property
+    def valid_telescopes(self):
+        """Get a list of valid Telescope IDs, if any, based on the tel_mask."""
+        if self.tel_mask is None:
+            return None
+        tel_mask_str = str(bin(self.tel_mask))[2:]
+        valid_dict = {i + 1: bool(int(d)) for i, d in enumerate(tel_mask_str[::-1])}
+        return [tel for tel in valid_dict if valid_dict[tel] is True]
+
+    @valid_telescopes.setter
+    def valid_telescopes(self, telescope_ids):
+        if telescope_ids is None:
+            self.tel_mask = None
+        else:
+            if not isinstance(telescope_ids, (list, tuple)):
+                telescope_ids = [telescope_ids]
+            telescope_ids = {int(t) for t in telescope_ids}
+            tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
+            self.tel_mask = tel_mask
+
+    def mark_running(self, telescope_id=None, telescope=None, time=None):
         """Mark this Pointing as running on the given telescope."""
         if time is None:
             time = Time.now()
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
-        if telescope is None and telescope_id is None:
+        if isinstance(telescope, Telescope) and telescope_id is None:
+            telescope_id = telescope.db_id
+        if telescope_id is None:
             raise ValueError('Pointings must be linked to a Telescope when marked running')
 
         if self.status_at_time(time) == 'deleted':
@@ -727,10 +757,10 @@ class Pointing(Base):
             raise ValueError(f'Pointing is already linked to a Telescope: {self.telescope}')
 
         self.running_time = time
-        if telescope is not None:
-            self.telescope = telescope
-        elif telescope_id is not None:
-            self.telescope_id = telescope_id
+        if self.valid_telescopes and telescope_id not in self.valid_telescopes:
+            raise ValueError(f'Telescope ID ({telescope_id}) not in '
+                             f'list of valid telescopes ({self.valid_telescopes})')
+        self.telescope_id = telescope_id
 
     def mark_finished(self, completed=True, time=None):
         """Mark this Pointing as stopped, either completed (True) or interrupted (False)."""
@@ -789,6 +819,12 @@ class Mpointing(Base):
     too : bool, optional
         indicates if this is a Target of Opportunity (ToO)
         default = False
+    tel_mask : int, optional
+        if set, this is a binary mask which will determine which telescopes
+        can carry out the observation.
+        A value of 4 (binary (0100) means only observable by Telescope 3, a value of
+        5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
+        default = None (no restriction)
     min_alt : float, optional
         minimum altitude to observe at, degrees
         default = 30
@@ -1039,6 +1075,7 @@ class Mpointing(Base):
     max_moon = Column(String(1), nullable=False, default='B')
     min_moonsep = Column(Float, nullable=False, default=30)
     too = Column(Boolean, nullable=False, default=False)
+    tel_mask = Column(Integer, default=None)
     start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow(),
                         server_default=text('CURRENT_TIMESTAMP'))
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
@@ -1094,8 +1131,8 @@ class Mpointing(Base):
 
     def __init__(self, object_name=None, ra=None, dec=None,
                  start_rank=None, min_alt=None, min_time=None,
-                 max_moon=None, min_moonsep=None, max_sunalt=None, too=None, start_time=None,
-                 stop_time=None, num_todo=None, valid_time=-1, wait_time=0,
+                 max_moon=None, min_moonsep=None, max_sunalt=None, too=None, tel_mask=None,
+                 start_time=None, stop_time=None, num_todo=None, valid_time=-1, wait_time=0,
                  **kwargs):
         self.ra = ra
         self.dec = dec
@@ -1107,6 +1144,7 @@ class Mpointing(Base):
         self.min_time = min_time
         self.max_sunalt = max_sunalt
         self.too = too
+        self.tel_mask = tel_mask
         self.start_time = start_time if start_time is not None else datetime.datetime.utcnow()
         self.stop_time = stop_time
         self.num_todo = num_todo
@@ -1177,6 +1215,7 @@ class Mpointing(Base):
                    'max_moon={}'.format(self.max_moon),
                    'min_moonsep={}'.format(self.min_moonsep),
                    'too={}'.format(self.too),
+                   'tel_mask={}'.format(self.tel_mask),
                    'start_time={}'.format(self.start_time),
                    'stop_time={}'.format(self.stop_time),
                    'deleted_time={}'.format(self.deleted_time),
@@ -1333,6 +1372,26 @@ class Mpointing(Base):
         for pointing in self.pointings:
             if pointing.status in ['upcoming', 'pending']:
                 pointing.mark_deleted(time=time)
+
+    @property
+    def valid_telescopes(self):
+        """Get a list of valid Telescope IDs, if any, based on the tel_mask."""
+        if self.tel_mask is None:
+            return None
+        tel_mask_str = str(bin(self.tel_mask))[2:]
+        valid_dict = {i + 1: bool(int(d)) for i, d in enumerate(tel_mask_str[::-1])}
+        return [tel for tel in valid_dict if valid_dict[tel] is True]
+
+    @valid_telescopes.setter
+    def valid_telescopes(self, telescope_ids):
+        if telescope_ids is None:
+            self.tel_mask = None
+        else:
+            if not isinstance(telescope_ids, (list, tuple)):
+                telescope_ids = [telescope_ids]
+            telescope_ids = {int(t) for t in telescope_ids}
+            tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
+            self.tel_mask = tel_mask
 
     @hybrid_property
     def current_rank(self):
@@ -1519,6 +1578,7 @@ class Mpointing(Base):
                      max_moon=self.max_moon,
                      min_moonsep=self.min_moonsep,
                      too=self.too,
+                     tel_mask=self.tel_mask,
                      start_time=start_time,
                      stop_time=stop_time,
                      mpointing=self,
@@ -1711,6 +1771,11 @@ class Site(Base):
         """Return an Astropy EarthLocation for this Site."""
         return EarthLocation(self.latitude * u.deg, self.longitude * u.deg, self.height * u.m)
 
+    @property
+    def tel_mask(self):
+        """Get the binary telescope mask for the telescopes at this site."""
+        return sum(t.tel_mask for t in self.telescopes)  # Isn't binary neat!
+
 
 class Telescope(Base):
     """A class to represent a Telescope to observe Pointings.
@@ -1805,6 +1870,13 @@ class Telescope(Base):
     def status(self):
         return case([(self.observing.is_(True), 'observing')],
                     else_='idle')
+
+    @property
+    def tel_mask(self):
+        """Get the binary telescope mask for this Telescope."""
+        if self.db_id is None:
+            raise ValueError('Telescope needs to be added to database to assign ID')
+        return 2 ** (self.db_id - 1)
 
 
 class Grid(Base):

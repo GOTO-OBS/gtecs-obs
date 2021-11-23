@@ -25,20 +25,31 @@ with db.open_session() as session:
         raise ValueError('Failed to validate user')
 
 with db.open_session() as session:
-    # create an event
-    e = db.Event(name='event', ivorn='ivo://goto', source='made-up', event_type='FAKE')
+    # create a site
+    si = db.Site.from_name('LaPalma')
 
-    # create a grid
+    # and two telescopes at that site
+    t1 = db.Telescope(name='North Telescope', tel=1)
+    t2 = db.Telescope(name='South Telescope', tel=2)
+    t1.site = si
+    t2.site = si
+
+    # and create a grid
     g = db.Grid(name='testgrid',
                 ra_fov=10, dec_fov=10,
                 ra_overlap=0.5, dec_overlap=0.5,
                 algorithm='NA')
+    t1.grid = g
+    t2.grid = g
 
     # and a few grid tiles
     gt1 = db.GridTile(name='T0001', ra=100, dec=20)
     gt1.grid = g
     gt2 = db.GridTile(name='T0002', ra=100, dec=40)
     gt2.grid = g
+
+    # create an event
+    e = db.Event(name='event', ivorn='ivo://goto', source='made-up', event_type='FAKE')
 
     # and a survey
     s = db.Survey(name='GOTO event survey')
@@ -53,19 +64,25 @@ with db.open_session() as session:
     st2.survey = s
     st2.grid_tile = gt2
 
-    # add them
-    db.insert_items(session, [e, g, gt1, gt2, s, st1, st2])
+    # add them all
+    db.insert_items(session, [si, t1, t2, g, gt1, gt2, e, s, st1, st2])
     session.commit()
 
     # print them to check __repr__
-    print(e, end='\n\n')
+    print(si, end='\n\n')
+    print(t1)
+    print(t2, end='\n\n')
     print(g, end='\n\n')
     print(gt1)
     print(gt2, end='\n\n')
+    print(e, end='\n\n')
     print(s, end='\n\n')
     print(st1)
     print(st2, end='\n\n')
+time.sleep(2)
 
+
+with db.open_session() as session:
     # let's make a Pointing
     user = db.get_user(session, username='goto_test')
     p = db.Pointing(object_name='IP Peg',
@@ -166,7 +183,7 @@ with db.open_session() as s:
         now = Time(next_pointing.start_time) + 30 * u.s
 
         print(now, f'Marking Pointing {next_pointing.db_id} as running')
-        next_pointing.mark_running(time=now)
+        next_pointing.mark_running(telescope_id=1, time=now)
         s.commit()
         print_summary(mp, now)
         time.sleep(1)

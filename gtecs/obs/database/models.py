@@ -4,6 +4,7 @@ import datetime
 import hashlib
 
 from astropy import units as u
+from astropy.coordinates import EarthLocation
 from astropy.time import Time
 
 from gototile.grid import SkyGrid
@@ -18,7 +19,9 @@ from sqlalchemy.sql import and_, case, or_
 
 
 __all__ = ['User', 'Pointing', 'ExposureSet', 'Mpointing', 'TimeBlock',
-           'Grid', 'GridTile', 'Survey', 'SurveyTile', 'Event', 'ImageLog',
+           'Site', 'Telescope',
+           'Grid', 'GridTile', 'Survey', 'SurveyTile', 'Event',
+           'ImageLog',
            'TRIGGERS']
 
 
@@ -1598,6 +1601,176 @@ class TimeBlock(Base):
         return 'TimeBlock({})'.format(', '.join(strings))
 
 
+class Site(Base):
+    """A class to represent an observing Site.
+
+    Sites are used to group Telescopes, which are then linked to Pointings to observe.
+
+    Like all SQLAlchemy model classes, this object links to the
+    underlying database. You can create an instance, and set its attributes
+    without a database session. Accessing some attributes may require
+    an active database session, and some properties (like the db_id)
+    will be None until the instance is added to the database.
+
+    Parameters
+    ----------
+    name : str
+        name of this site (must be unique)
+    latitude : float
+        latitude of this site, in degrees
+    longitude : float
+        longitude of this site, in degrees
+    height : float
+        height of this site, in metres above sea level
+
+    Attributes
+    ----------
+    db_id : int
+        primary database key
+        only populated when the instance is added to the database
+    location : `astropy.cooridnates.EarthLocation`
+        Astropy EarthLocation class for this Site
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    telescopes : list of `Telescope`, optional
+        the Telescopes associated with this Site, if any
+
+    """
+
+    # Set corresponding SQL table name
+    __tablename__ = 'sites'
+
+    # Primary key
+    db_id = Column('id', Integer, primary_key=True)
+
+    # Columns
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    height = Column(Float, nullable=False)
+
+    # Foreign relationships
+    telescopes = relationship('Telescope', back_populates='site')
+
+    def __init__(self, name=None, latitude=None, longitude=None, height=None):
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+        self.height = height
+
+    def __repr__(self):
+        strings = ['db_id={}'.format(self.db_id),
+                   'name="{}"'.format(self.name),
+                   'latitude={}'.format(self.latitude),
+                   'longitude={}'.format(self.longitude),
+                   'height={}'.format(self.height),
+                   ]
+        return 'Site({})'.format(', '.join(strings))
+
+    @classmethod
+    def from_location(cls, location, name=None):
+        """Create a Site from an Astropy `EarthLocation` class and a name string."""
+        if not isinstance(location, EarthLocation):
+            raise ValueError('"location" must be an `astropy.coordinates.EarthLocation`')
+        if hasattr(location.info, 'name'):
+            name = location.info.name
+        if name is None:
+            raise ValueError('Missing name for site')
+
+        return cls(name=name,
+                   latitude=location.lat.value,
+                   longitude=location.lon.value,
+                   height=location.height.value,
+                   )
+
+    @classmethod
+    def from_name(cls, name):
+        """Create a Site from a name recognised by Astropy's `EarthLocation.of_site()`."""
+        location = EarthLocation.of_site(name)
+        return cls.from_location(location)
+
+    @property
+    def location(self):
+        """Return an Astropy EarthLocation for this Site."""
+        return EarthLocation(self.latitude * u.deg, self.longitude * u.deg, self.height * u.m)
+
+
+class Telescope(Base):
+    """A class to represent a Telescope to observe Pointings.
+
+    Telescopes should be linked to a Site, and can be linked to an observing Grid.
+
+    Like all SQLAlchemy model classes, this object links to the
+    underlying database. You can create an instance, and set its attributes
+    without a database session. Accessing some attributes may require
+    an active database session, and some properties (like the db_id)
+    will be None until the instance is added to the database.
+
+    Parameters
+    ----------
+    name : str
+        name of this telescope (must be unique)
+    tel : int
+        number of this telescope (must be unique)
+
+    Attributes
+    ----------
+    db_id : int
+        primary database key
+        only populated when the instance is added to the database
+
+    When created the instance can be linked to the following other tables,
+    otherwise they are populated when it is added to the database:
+
+    Relationships
+    -------------
+    site : `Site`
+        the Site associated with this Telescope
+        required before addition to the database
+        can also be added with the site_id parameter
+
+    grid : `Grid`, optional
+        the Grid associated with this Telescope, if any
+        can also be added with the grid_id parameter
+
+    """
+
+    # Set corresponding SQL table name
+    __tablename__ = 'telescopes'
+
+    # Primary key
+    db_id = Column('id', Integer, primary_key=True)
+
+    # Columns
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    tel = Column(Integer, nullable=False, unique=True, index=True)
+
+    # Foreign keys
+    site_id = Column(Integer, ForeignKey('sites.id'), nullable=False)
+    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=True)
+
+    # Foreign relationships
+    site = relationship('Site', back_populates='telescopes')
+    grid = relationship('Grid', back_populates='telescopes')
+
+    def __init__(self, name=None, tel=None):
+        self.name = name
+        self.tel = tel
+
+    def __repr__(self):
+        strings = ['db_id={}'.format(self.db_id),
+                   'name="{}"'.format(self.name),
+                   'tel={}'.format(self.tel),
+                   'site_id={}'.format(self.site_id),
+                   'grid_id={}'.format(self.grid_id),
+                   ]
+        return 'Telescope({})'.format(', '.join(strings))
+
+
 class Grid(Base):
     """A class to represent a Grid on the stellar sphere.
 
@@ -1640,6 +1813,8 @@ class Grid(Base):
         the Grid Tiles associated with this Grid, if any
     surveys : list of `Survey`, optional
         the Surveys associated with this Grid, if any
+    telescopes : list of `Telescope`, optional
+        the Telescopes associated with this Grid, if any
 
     The following secondary relationships are not settable directly,
     but are populated through the above tables if given:
@@ -1672,6 +1847,7 @@ class Grid(Base):
     # Foreign relationships
     grid_tiles = relationship('GridTile', back_populates='grid')
     surveys = relationship('Survey', back_populates='grid')
+    telescopes = relationship('Telescope', back_populates='grid')
 
     # Secondary relationships
     pointings = relationship('Pointing',

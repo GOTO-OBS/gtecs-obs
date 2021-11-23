@@ -640,20 +640,20 @@ class Pointing(Base):
             time = Time(time)
 
         if (self.running_time is None and self.finished_time is not None and
-                time > Time(self.finished_time)):
+                time >= Time(self.finished_time)):
             return 'deleted'
-        elif (self.running_time is not None and time > Time(self.running_time) and
+        elif (self.running_time is not None and time >= Time(self.running_time) and
               (self.finished_time is None or time < Time(self.finished_time))):
             return 'running'
-        elif (self.finished_time is not None and time > Time(self.finished_time) and
+        elif (self.finished_time is not None and time >= Time(self.finished_time) and
               self.completed):
             return 'completed'
-        elif (self.finished_time is not None and time > Time(self.finished_time) and
+        elif (self.finished_time is not None and time >= Time(self.finished_time) and
               not self.completed):
             return 'interrupted'
         elif time < Time(self.start_time):
             return 'upcoming'
-        elif self.stop_time is not None and time > Time(self.stop_time):
+        elif self.stop_time is not None and time >= Time(self.stop_time):
             return 'expired'
         else:
             return 'pending'
@@ -666,20 +666,20 @@ class Pointing(Base):
             time = time.datetime
 
         c = case([(and_(self.running_time.is_(None), self.finished_time.isnot(None),
-                        time > self.finished_time),
+                        time >= self.finished_time),
                    'deleted'),
-                  (and_(self.running_time.isnot(None), time > self.running_time,
+                  (and_(self.running_time.isnot(None), time >= self.running_time,
                         or_(self.finished_time.is_(None), time < self.finished_time)),
                    'running'),
-                  (and_(self.finished_time.isnot(None), time > self.finished_time,
+                  (and_(self.finished_time.isnot(None), time >= self.finished_time,
                         self.completed.is_(True)),
                    'completed'),
-                  (and_(self.finished_time.isnot(None), time > self.finished_time,
+                  (and_(self.finished_time.isnot(None), time >= self.finished_time,
                         self.completed.is_(False)),
                    'interrupted'),
                   (time < self.start_time,
                    'upcoming'),
-                  (and_(self.stop_time.isnot(None), time > self.stop_time),
+                  (and_(self.stop_time.isnot(None), time >= self.stop_time),
                    'expired'),
                   ],
                  else_='pending')
@@ -1276,7 +1276,7 @@ class Mpointing(Base):
         elif self.start_time is not None and time < Time(self.start_time):
             # The Mpointing hasn't yet reached its start time: upcoming
             return 'upcoming'
-        elif self.stop_time is not None and time > Time(self.stop_time):
+        elif self.stop_time is not None and time >= Time(self.stop_time):
             # The Mpointing has passed its start time: expired
             return 'expired'
         elif not self.scheduled:
@@ -1310,7 +1310,7 @@ class Mpointing(Base):
                       'completed'),
                      (and_(self.start_time.isnot(None), time < self.start_time),
                       'upcoming'),
-                     (and_(self.stop_time.isnot(None), time > self.stop_time),
+                     (and_(self.stop_time.isnot(None), time >= self.stop_time),
                       'expired'),
                      (self.scheduled.is_(False),
                       'unscheduled'),

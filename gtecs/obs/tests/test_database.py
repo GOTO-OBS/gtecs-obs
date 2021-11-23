@@ -175,12 +175,17 @@ with db.open_session() as s:
         print(now, 'Creating Pointing')
         s.add(next_pointing)
         s.commit()
-
+        print_summary(mp, now)
         time.sleep(1)
         print()
 
-        # skip ahead until the pointing is pending
-        now = Time(next_pointing.start_time) + 30 * u.s
+        if next_pointing.status == 'upcoming':
+            # skip ahead until the pointing is pending
+            print(now, 'Skipping ahead to Pointing start time')
+            now = Time(next_pointing.start_time) + 30 * u.s
+            print_summary(mp, now)
+            time.sleep(1)
+            print()
 
         print(now, f'Marking Pointing {next_pointing.db_id} as running')
         next_pointing.mark_running(telescope_id=1, time=now)

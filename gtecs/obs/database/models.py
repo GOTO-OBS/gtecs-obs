@@ -9,22 +9,17 @@ from astropy.time import Time
 from gototile.grid import SkyGrid
 
 from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
-from sqlalchemy import func, select, text
+from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.mysql import TIMESTAMP
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import column_property, relationship, validates
+from sqlalchemy.sql import and_, case, or_
 
 
 __all__ = ['User', 'Pointing', 'ExposureSet', 'Mpointing', 'TimeBlock',
            'Grid', 'GridTile', 'Survey', 'SurveyTile', 'Event', 'ImageLog',
            'TRIGGERS']
-
-
-pointing_status_list = Enum('pending', 'running', 'completed',
-                            'aborted', 'interrupted', 'expired', 'deleted')
-
-mpointing_status_list = Enum('unscheduled', 'scheduled', 'completed',
-                             'aborted', 'expired', 'deleted')
 
 
 class Utf8Base:
@@ -105,8 +100,8 @@ class User(Base):
     >>> bob.pointings
     [Pointing(db_id=1, status=pending, object_name=random_object, ra=28.2859, dec=60.8787, rank=62,
     ... min_alt=30.0, max_sunalt=-15.0, min_time=184.365, max_moon=G, min_moonsep=30.0, too=False,
-    ... start_time=2019-02-18 16:53:38, stop_time=2019-02-24 16:53:38, started_time=None,
-    ... stopped_time=None, user_id=1, mpointing_id=None, time_block_id=None, grid_tile_id=None,
+    ... start_time=2019-02-18 16:53:38, stop_time=2019-02-24 16:53:38, running_time=None,
+    ... finished_time=None, user_id=1, mpointing_id=None, time_block_id=None, grid_tile_id=None,
     ... survey_tile_id=None, event_id=None)]
 
     Note the Pointing has Bob's user_id=1.
@@ -279,9 +274,6 @@ class Pointing(Base):
     min_time : float
         minimum time needed to schedule pointing
 
-    status : string, optional
-        status of the pointing
-        default = 'pending'
     too : bool, optional
         indicates if this is a Target of Opportunity (ToO)
         default = False
@@ -311,13 +303,15 @@ class Pointing(Base):
     db_id : int
         primary database key
         only populated when the instance is added to the database
+    status : string
+        status of the pointing
     num_expsets : int
         the number of exposure sets linked to this pointing
         should be the same as len(self.exposure_sets), but much faster
-    started_time : datetime.datetime, or None
+    running_time : datetime.datetime, or None
         if the pointing has started (been marked running)
         this will give the time it was updated
-    stopped_time : datetime.datetime, or None
+    finished_time : datetime.datetime, or None
         if the pointing has finished (either completed or cancelled for
         some reason) this will give the time it was updated
 
@@ -371,8 +365,8 @@ class Pointing(Base):
     >>> p
     Pointing(db_id=None, status=None, object_name=IP Peg, ra=350.785625, dec=18.416472, rank=9,
     min_alt=30, max_sunalt=-15, min_time=3600, max_moon=G, min_moonsep=30, too=False,
-    start_time=2019-02-25 10:40:50, stop_time=2019-02-28 10:40:50, started_time=None,
-    stopped_time=None, user_id=None, mpointing_id=None, time_block_id=None, grid_tile_id=None,
+    start_time=2019-02-25 10:40:50, stop_time=2019-02-28 10:40:50, running_time=None,
+    finished_time=None, user_id=None, mpointing_id=None, time_block_id=None, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
 
     However it can't be insterted into the database until it is assigned to a User:
@@ -389,8 +383,8 @@ class Pointing(Base):
     >>> p
     Pointing(db_id=1, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=G, min_moonsep=30.0, too=False,
-    start_time=2019-02-25 10:48:02, stop_time=2019-02-28 10:48:02, started_time=None,
-    stopped_time=None, user_id=1, mpointing_id=None, time_block_id=None, grid_tile_id=None,
+    start_time=2019-02-25 10:48:02, stop_time=2019-02-28 10:48:02, running_time=None,
+    finished_time=None, user_id=1, mpointing_id=None, time_block_id=None, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
 
     Note the changes to above are db_id=1, status=pending and user_id=1.
@@ -433,11 +427,12 @@ class Pointing(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    status = Column(pointing_status_list, nullable=False, index=True, default='pending')
+    # # Basic properties
     object_name = Column('object', Text, nullable=False)  # object is a built in class in Python
     ra = Column(Float, nullable=False)
     dec = Column(Float, nullable=False)
     rank = Column(Integer, nullable=False)
+    # # Constraints
     min_alt = Column(Float, nullable=False, default=30)
     max_sunalt = Column(Float, nullable=False, default=-15)
     min_time = Column(Float, nullable=False)
@@ -446,8 +441,11 @@ class Pointing(Base):
     too = Column(Boolean, nullable=False, default=False)
     start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow())
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
-    started_time = Column(DateTime, nullable=True, default=None)
-    stopped_time = Column(DateTime, nullable=True, default=None)
+    # # Status
+    running_time = Column(DateTime, nullable=True, default=None)
+    finished_time = Column(DateTime, nullable=True, default=None)
+    completed = Column(Boolean, nullable=False, default=False)
+    # # Update timestamp (TODO: Do we still need this? Or should more tables have it?)
     ts = Column(TIMESTAMP(fsp=3), nullable=False,
                 server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
@@ -509,8 +507,8 @@ class Pointing(Base):
                    'too={}'.format(self.too),
                    'start_time={}'.format(self.start_time),
                    'stop_time={}'.format(self.stop_time),
-                   'started_time={}'.format(self.started_time),
-                   'stopped_time={}'.format(self.stopped_time),
+                   'running_time={}'.format(self.running_time),
+                   'finished_time={}'.format(self.finished_time),
                    'user_id={}'.format(self.user_id),
                    'mpointing_id={}'.format(self.mpointing_id),
                    'time_block_id={}'.format(self.time_block_id),
@@ -520,15 +518,17 @@ class Pointing(Base):
                    ]
         return 'Pointing({})'.format(', '.join(strings))
 
-    @validates('start_time', 'stop_time')
-    def munge_times(self, key, field):
-        """Use validators to allow various types of input for UTC.
+    @validates('start_time', 'stop_time', 'running_time', 'finished_time')
+    def validate_times(self, key, field):
+        """Use validators to allow various types of input for times.
 
-        Also enforce write_time > start_time.
+        Also enforce stop_time > start_time and finished_time > running_time.
         """
-        if key == 'stop_time' and field is None:
-            value = None
-        elif isinstance(field, datetime.datetime):
+        if key != 'start_time' and field is None:
+            # start_time is not nullable, the others are
+            return None
+
+        if isinstance(field, datetime.datetime):
             value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
@@ -537,14 +537,140 @@ class Pointing(Base):
             # just hope the string works!
             value = str(field)
 
-        if (key == 'start_time' and self.stop_time is not None):
-            if Time(value) >= Time(self.stop_time):
-                raise AssertionError('stop_time must be later than start_time')
-        elif key == 'stop_time' and value is not None and self.start_time is not None:
-            if Time(self.start_time) >= Time(value):
-                raise AssertionError('stop_time must be later than start_time')
+        # force start_time > stop_time
+        if (key == 'start_time' and self.stop_time is not None and
+                Time(value) >= Time(self.stop_time)):
+            raise ValueError(f'start_time must be before stop_time ({self.stop_time})')
+        if (key == 'stop_time' and self.start_time is not None and
+                Time(self.start_time) >= Time(value)):
+            raise ValueError(f'stop_time must be after start_time ({self.start_time})')
+
+        # force running_time > finished_time
+        if (key == 'running_time' and self.finished_time is not None and
+                Time(value) >= Time(self.finished_time)):
+            raise ValueError(f'running_time must be before finished_time ({self.finished_time})')
+        if (key == 'finished_time' and self.running_time is not None and
+                Time(self.running_time) >= Time(value)):
+            raise ValueError(f'finished_time must be after running_time ({self.running_time})')
 
         return value
+
+    @hybrid_property
+    def status(self):
+        """Return a string giving the current status."""
+        # We could have a system of status_at_time(time), but it's a lot of effort...
+        # I got there for Pointings, fairly easy to check if the e.g. finished_time > time.
+        # You can do it with hybrid_methods instead of hybrid_properties.
+        # But Mpointings make things so much more complicated: num_completed_at_time(), how do you
+        # deal with Pointings which didn't exist at that time but were created afterwards?
+        # How could you schedule a Pointing in the past? It's not worth thinking about.
+        time = Time.now()
+
+        if self.running_time is None and self.finished_time is not None:
+            # The Pointing was marked as finished before it started: deleted
+            return 'deleted'
+        elif self.running_time is not None and self.finished_time is None:
+            # The Pointing has started but hasn't finished yet: running
+            return 'running'
+        elif self.finished_time is not None and self.completed:
+            # The Pointing has finished and is flagged as completed: completed
+            return 'completed'
+        elif self.finished_time is not None and not self.completed:
+            # The Pointing has finished and is not flagged as completed: interrupted
+            return 'interrupted'
+        elif time < Time(self.start_time):  # start_time can't be None
+            # The Pointing hasn't yet reached its start time: upcoming
+            return 'upcoming'
+        elif self.stop_time is not None and time > Time(self.stop_time):
+            # The Pointing has passed its start time: expired
+            return 'expired'
+        else:
+            # The Pointing isn't running or finished: pending
+            return 'pending'
+
+    @status.setter
+    def status(self, value):
+        if value == 'deleted':
+            self.mark_deleted()
+        elif value == 'running':
+            self.mark_running()
+        elif value == 'completed':
+            self.mark_finished(completed=True)
+        elif value == 'interrupted':
+            self.mark_finished(completed=False)
+        elif value in ['upcoming', 'expired', 'pending']:
+            raise ValueError(f'Can not set status to "{value}", change start/stop times instead')
+        else:
+            raise ValueError(f'Invalid status: "{value}"')
+
+    @status.expression
+    def status(self):
+        time = datetime.datetime.utcnow()
+        return case([(and_(self.running_time.is_(None), self.finished_time.isnot(None)),
+                      'deleted'),
+                     (and_(self.running_time.isnot(None), self.finished_time.is_(None)),
+                      'running'),
+                     (and_(self.finished_time.isnot(None), self.completed.is_(True)),
+                      'completed'),
+                     (and_(self.finished_time.isnot(None), self.completed.is_(False)),
+                      'interrupted'),
+                     (time < self.start_time,
+                      'upcoming'),
+                     (and_(self.stop_time.isnot(None), time > self.stop_time),
+                      'expired'),
+                     ],
+                    else_='pending')
+
+    def mark_deleted(self, time=None):
+        """Mark this Pointing as deleted."""
+        if self.status == 'deleted':
+            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
+        if self.status == 'expired':
+            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
+        if self.status == 'running':
+            raise ValueError(f'Pointing is already running (at {self.running_time})')
+        if self.status in ['completed', 'interrupted']:
+            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
+
+        if time is None:
+            time = Time.now()
+        self.finished_time = time
+
+    def mark_running(self, time=None):
+        """Mark this Pointing as running."""
+        if self.status == 'deleted':
+            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
+        if self.status == 'upcoming':
+            raise ValueError(f'Pointing has not yet reached its start time (at {self.start_time})')
+        if self.status == 'expired':
+            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
+        if self.status == 'running':
+            raise ValueError(f'Pointing is already running (at {self.running_time})')
+        if self.status in ['completed', 'interrupted']:
+            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
+
+        if time is None:
+            time = Time.now()
+        self.running_time = time
+
+        # Eventually we'll want to link to a Telescope at this point...
+
+    def mark_finished(self, completed=True, time=None):
+        """Mark this Pointing as stopped, either completed (True) or interrupted (False)."""
+        if self.status == 'deleted':
+            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
+        if self.status == 'expired':
+            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
+        if self.status in ['completed', 'interrupted']:
+            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
+        if self.status != 'running':
+            raise ValueError('Pointing is not running (use mark_deleted to stop before running)')
+
+        if time is None:
+            time = Time.now()
+        self.finished_time = time
+
+        self.completed = completed
 
 
 class Mpointing(Base):
@@ -580,9 +706,6 @@ class Mpointing(Base):
     min_time : float
         minimum time needed to schedule pointing
 
-    status : string, optional
-        status of the mpointing
-        default = 'unscheduled'
     too : bool, optional
         indicates if this is a Target of Opportunity (ToO)
         default = False
@@ -623,6 +746,8 @@ class Mpointing(Base):
     db_id : int
         primary database key
         only populated when the instance is added to the database
+    status : string
+        status of the mpointing
     current_rank : int
         rank for next pointing to be scheduled (it will increase as pointings are observed)
     num_completed : int
@@ -740,8 +865,8 @@ class Mpointing(Base):
     >>> p
     Pointing(db_id=None, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00, started_time=None,
-    stopped_time=None, user_id=None, mpointing_id=None, time_block_id=None, grid_tile_id=None,
+    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00, running_time=None,
+    finished_time=None, user_id=None, mpointing_id=None, time_block_id=None, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
 
     Once it's added to the database you will see the times and IDs set:
@@ -750,8 +875,8 @@ class Mpointing(Base):
     >>> p
     Pointing(db_id=1, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00, started_time=None,
-    stopped_time=None, user_id=1, mpointing_id=1, time_block_id=1, grid_tile_id=None,
+    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00, running_time=None,
+    finished_time=None, user_id=1, mpointing_id=1, time_block_id=1, grid_tile_id=None,
     survey_tile_id=None, event_id=None)
 
     Check the Exposure Sets:
@@ -774,7 +899,7 @@ class Mpointing(Base):
     Pointing(db_id=1, status=running, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
     start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00,
-    started_time=2019-02-25 11:45:51, stopped_time=None, user_id=1, mpointing_id=1,
+    running_time=2019-02-25 11:45:51, finished_time=None, user_id=1, mpointing_id=1,
     time_block_id=1, grid_tile_id=None, survey_tile_id=None, event_id=None)
     >>> mp
     Mpointing(db_id=1, status=scheduled, num_todo=5, num_completed=0, num_remaining=5,
@@ -788,7 +913,7 @@ class Mpointing(Base):
     Pointing(db_id=1, status=completed, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
     min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
     start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00,
-    started_time=2019-02-25 11:50:52, stopped_time=2019-02-25 11:52:09, user_id=1, mpointing_id=1,
+    running_time=2019-02-25 11:50:52, finished_time=2019-02-25 11:52:09, user_id=1, mpointing_id=1,
     time_block_id=1, grid_tile_id=None, survey_tile_id=None, event_id=None)
     >>> mp
     Mpointing(db_id=1, status=unscheduled, num_todo=5, num_completed=1, num_remaining=4,
@@ -798,8 +923,8 @@ class Mpointing(Base):
     survey_tile_id=None, event_id=None)
     >>> session.close()
 
-    Things to note: after marking the Pointing as running the Pointing's started_time was filled,
-    but nothing else changed. After marking it as completed the stopped_time was filled, but the
+    Things to note: after marking the Pointing as running the Pointing's running_time was filled,
+    but nothing else changed. After marking it as completed the finished_time was filled, but the
     Mpointing was also reset to unscheduled and the num_completed went up by one (and num_remaining
     went down by 1).
 
@@ -821,15 +946,13 @@ class Mpointing(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    status = Column(mpointing_status_list, nullable=False, index=True, default='unscheduled')
+    # # Basic properties
     object_name = Column('object', Text, nullable=False)  # object is a built in class in Python
     ra = Column(Float, nullable=False)
     dec = Column(Float, nullable=False)
-    current_rank = Column(Integer, nullable=False)
     start_rank = Column(Integer, nullable=False)
     num_todo = Column(Integer, nullable=False)
-    num_completed = Column(Integer, nullable=False, default=0)
-    infinite = Column(Boolean, nullable=False, default=False)
+    # # Constraints
     min_alt = Column(Float, nullable=False, default=30)
     max_sunalt = Column(Float, nullable=False, default=-15)
     min_time = Column(Float, nullable=False)
@@ -839,6 +962,8 @@ class Mpointing(Base):
     start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow(),
                         server_default=text('CURRENT_TIMESTAMP'))
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
+    # # Status
+    deleted_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -875,28 +1000,36 @@ class Mpointing(Base):
                           uselist=False,
                           )
 
+    # Column properties
+    last_observed = column_property(select([Pointing.finished_time])
+                                    .where(and_(Pointing.mpointing_id == db_id,
+                                                Pointing.status == 'completed',
+                                                )
+                                           )
+                                    .order_by(Pointing.finished_time.desc())
+                                    .limit(1)
+                                    .correlate_except(Pointing)
+                                    .scalar_subquery()
+                                    )
+
     def __init__(self, object_name=None, ra=None, dec=None,
                  start_rank=None, min_alt=None, min_time=None,
                  max_moon=None, min_moonsep=None, max_sunalt=None, too=None, start_time=None,
                  stop_time=None, num_todo=None, valid_time=-1, wait_time=0,
-                 status='unscheduled', **kwargs):
+                 **kwargs):
         self.ra = ra
         self.dec = dec
         self.object_name = object_name
         self.start_rank = start_rank
-        self.current_rank = start_rank  # always start at initial rank
         self.max_moon = max_moon
         self.min_moonsep = min_moonsep
         self.min_alt = min_alt
         self.min_time = min_time
         self.max_sunalt = max_sunalt
         self.too = too
-        self.start_time = start_time if start_time is not None else Time.now()
+        self.start_time = start_time if start_time is not None else datetime.datetime.utcnow()
         self.stop_time = stop_time
-        self.status = status
-        self.infinite = False  # changed below
         self.num_todo = num_todo
-        self.num_completed = 0
 
         # now add time blocks
         if valid_time is not None and wait_time is not None:
@@ -911,9 +1044,8 @@ class Mpointing(Base):
             else:
                 wait_times = wait_time
 
-            # check if infinite
             if num_todo < 0:
-                self.infinite = True
+                # defined as infinite
                 self.num_todo = -1
 
             # create TimeBlock objects
@@ -967,6 +1099,7 @@ class Mpointing(Base):
                    'too={}'.format(self.too),
                    'start_time={}'.format(self.start_time),
                    'stop_time={}'.format(self.stop_time),
+                   'deleted_time={}'.format(self.deleted_time),
                    'user_id={}'.format(self.user_id),
                    'grid_tile_id={}'.format(self.grid_tile_id),
                    'survey_tile_id={}'.format(self.survey_tile_id),
@@ -974,16 +1107,17 @@ class Mpointing(Base):
                    ]
         return 'Mpointing({})'.format(', '.join(strings))
 
-    @validates('start_time', 'stop_time')
-    def munge_times(self, key, field):
-        """Use validators to allow various types of input for UTC.
+    @validates('start_time', 'stop_time', 'deleted_time')
+    def validate_times(self, key, field):
+        """Use validators to allow various types of input for times.
 
-        Also enforce stop_time > start_time
-        NB stop_time is None be default
+        Also enforce stop_time > start_time.
         """
-        if key == 'stop_time' and field is None:
-            value = None
-        elif isinstance(field, datetime.datetime):
+        if key != 'start_time' and field is None:
+            # start_time is not nullable, the others are
+            return None
+
+        if isinstance(field, datetime.datetime):
             value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
             field.precision = 0  # no D.P on seconds
@@ -992,30 +1126,138 @@ class Mpointing(Base):
             # just hope the string works!
             value = str(field)
 
-        if (key == 'start_time' and self.stop_time is not None):
-            if Time(value) >= Time(self.stop_time):
-                raise AssertionError('stop_time must be later than start_time')
-        elif key == 'stop_time' and value is not None and self.start_time is not None:
-            if Time(self.start_time) >= Time(value):
-                raise AssertionError('stop_time must be later than start_time')
+        # force start_time > stop_time
+        if (key == 'start_time' and self.stop_time is not None and
+                Time(value) >= Time(self.stop_time)):
+            raise ValueError(f'start_time must be before stop_time ({self.stop_time})')
+        if (key == 'stop_time' and self.start_time is not None and
+                Time(self.start_time) >= Time(value)):
+            raise ValueError(f'stop_time must be after start_time ({self.start_time})')
 
         return value
 
-    @property
+    @hybrid_property
+    def scheduled(self):
+        """Return True if currently linked to a pending or running Pointing."""
+        return any(p.status in ['upcoming', 'pending', 'running'] for p in self.pointings)
+
+    @scheduled.expression
+    def scheduled(self):
+        return exists().where(and_(Pointing.mpointing_id == self.db_id,
+                                   or_(Pointing.status == 'upcoming',
+                                       Pointing.status == 'pending',
+                                       Pointing.status == 'running',
+                                       )
+                                   ))
+
+    @hybrid_property
+    def infinite(self):
+        """Return if the Mpointing is infinite."""
+        return self.num_todo < 0
+
+    @hybrid_property
+    def num_completed(self):
+        """Return the number of Pointings successfully completed."""
+        return sum(p.status == 'completed' for p in self.pointings)
+
+    @num_completed.expression
+    def num_completed(self):
+        return select([func.count(Pointing.db_id)]).\
+            where(and_(Pointing.mpointing_id == self.db_id,
+                       Pointing.status == 'completed',
+                       )).scalar_subquery()
+
+    @hybrid_property
     def num_remaining(self):
-        """Return the number of observations remaining.
+        """Return the number of observations remaining (num_todo - num_completed).
 
-        Returns
-        -------
-        num_remaining : int
-            defined as num_todo - num_completed
-            if Mpointing.infinite == True returns -1
-
+        Returns -1 for infinite Mpointings.
         """
         if self.infinite:
             return -1
         else:
             return self.num_todo - self.num_completed
+
+    @num_remaining.expression
+    def num_remaining(self):
+        return case([(self.infinite, -1)],
+                    else_=self.num_todo - self.num_completed)
+
+    @hybrid_property
+    def status(self):
+        """Return a string giving the current status."""
+        time = Time.now()
+        if self.deleted_time is not None:
+            # The Mpointing has been deleted before it completed: deleted
+            return 'deleted'
+        elif self.num_remaining == 0:
+            # The Mpointing has enough completed Pointings: completed
+            return 'completed'
+        elif self.start_time is not None and time < Time(self.start_time):
+            # The Mpointing hasn't yet reached its start time: upcoming
+            return 'upcoming'
+        elif self.stop_time is not None and time > Time(self.stop_time):
+            # The Mpointing has passed its start time: expired
+            return 'expired'
+        elif not self.scheduled:
+            # The Mpointing doesn't have a pending Pointing: unscheduled
+            return 'unscheduled'
+        else:
+            # The Mpointing has a pending Pointing: scheduled
+            return 'scheduled'
+
+    @status.setter
+    def status(self, value):
+        if value == 'deleted':
+            self.mark_deleted()
+        elif value == 'completed':
+            raise ValueError('Can not set status to "completed", mark Pointings instead')
+        elif value in ['upcoming', 'expired']:
+            raise ValueError(f'Can not set status to "{value}", change start/stop times instead')
+        elif value == 'unscheduled':
+            raise ValueError('Can not set status to "unscheduled", mark Pointings instead')
+        elif value == 'scheduled':
+            raise ValueError('Can not set status to "scheduled", use `get_next_pointing()`')
+        else:
+            raise ValueError(f'Invalid status: "{value}"')
+
+    @status.expression
+    def status(self):
+        time = datetime.datetime.utcnow()
+        return case([(self.deleted_time.isnot(None),
+                      'deleted'),
+                     (self.num_remaining == 0,
+                      'completed'),
+                     (and_(self.start_time.isnot(None), time < self.start_time),
+                      'upcoming'),
+                     (and_(self.stop_time.isnot(None), time > self.stop_time),
+                      'expired'),
+                     (self.scheduled.is_(False),
+                      'unscheduled'),
+                     ],
+                    else_='scheduled')
+
+    def mark_deleted(self, time=None):
+        """Mark this Mpointing (and any pending Pointings) as deleted."""
+        if self.status == 'deleted':
+            raise ValueError(f'Mpointing is already deleted (at={self.deleted_time})')
+        if self.status == 'expired':
+            raise ValueError(f'Mpointing is already expired (at {self.stop_time})')
+        if self.status == 'completed':
+            raise ValueError('Mpointing is already completed')
+
+        if time is None:
+            time = Time.now()
+        self.deleted_time = time
+
+        for pointing in self.pointings:
+            if pointing.status in ['upcoming', 'pending']:
+                pointing.mark_deleted(time=time)
+
+    @hybrid_property
+    def current_rank(self):
+        """Calculate current rank as the starting rank + 10 * the number of completed Pointings."""
+        return self.start_rank + 10 * self.num_completed
 
     def get_current_block(self):
         """Return the current time block.
@@ -1182,6 +1424,10 @@ class Mpointing(Base):
                 # can happen if the Mpointing has a stop_time
                 return None
 
+        # mark the new block as current
+        current_block.current = False
+        next_block.current = True
+
         # now create a pointing
         p = Pointing(object_name=self.object_name,
                      ra=self.ra,
@@ -1195,7 +1441,6 @@ class Mpointing(Base):
                      too=self.too,
                      start_time=start_time,
                      stop_time=stop_time,
-                     status='pending',
                      mpointing=self,
                      user=self.user,
                      time_block=next_block,
@@ -1728,8 +1973,8 @@ class Event(Base):
         return 'Event({})'.format(', '.join(strings))
 
     @validates('time')
-    def munge_times(self, key, field):
-        """Use validators to allow various types of input for UTC."""
+    def validate_times(self, key, field):
+        """Use validators to allow various types of input for times."""
         if isinstance(field, datetime.datetime):
             value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
@@ -1841,8 +2086,8 @@ class ImageLog(Base):
         return 'ImageLog({})'.format(', '.join(strings))
 
     @validates('start_time', 'write_time')
-    def munge_times(self, key, field):
-        """Use validators to allow various types of input for UTC.
+    def validate_times(self, key, field):
+        """Use validators to allow various types of input for times.
 
         Also enforce write_time > start_time.
         """
@@ -1855,12 +2100,13 @@ class ImageLog(Base):
             # just hope the string works!
             value = str(field)
 
-        if (key == 'start_time' and self.write_time is not None):
-            if Time(value) >= Time(self.write_time):
-                raise AssertionError('write_time must be later than start_time')
-        elif key == 'write_time' and self.write_time is not None:
-            if Time(self.start_time) >= Time(value):
-                raise AssertionError('write_time must be later than start_time')
+        # force write_time > start_time
+        if (key == 'start_time' and self.write_time is not None and
+                Time(value) >= Time(self.write_time)):
+            raise ValueError(f'start_time must be before write_time ({self.write_time})')
+        if (key == 'write_time' and self.start_time is not None and
+                Time(self.start_time) >= Time(value)):
+            raise ValueError(f'write_time must be after start_time ({self.start_time})')
 
         return value
 
@@ -1878,16 +2124,6 @@ TRIGGERS = [
     END IF;
     END
     """,
-    # Mpointing trigger before update
-    # If enough pointings are done then set the status to completed (if not infinite)
-    # TODO: This could be part of the Python-only status
-    """CREATE TRIGGER `mpointings_BEFORE_UPDATE` BEFORE UPDATE ON `mpointings` FOR EACH ROW
-    BEGIN
-    IF (NEW.`num_completed` = NEW.`num_todo` and NEW.`infinite` = 0) THEN
-        SET NEW.`status` = 'completed';
-    END IF;
-    END
-    """,
     # Pointing trigger before insert
     # If no coordinates are given but it's linked to a grid tile then use its coordinates.
     """CREATE TRIGGER `pointings_BEFORE_INSERT` BEFORE INSERT ON `pointings` FOR EACH ROW
@@ -1897,63 +2133,6 @@ TRIGGERS = [
                         WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
         SET NEW.`dec` = (SELECT `dec` FROM `grid_tiles`
                           WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
-    END IF;
-    END
-    """,
-    # Pointing trigger after insert
-    # If the Pointing is pending and linked to a TimeBlock then set all other blocks to not current
-    # and this block to current.
-    # Also mark the linked Mpointing as scheduled.
-    """CREATE TRIGGER `pointings_AFTER_INSERT` AFTER INSERT ON `pointings` FOR EACH ROW
-    BEGIN
-    IF (NEW.`time_block_id` is not NULL) AND (NEW.status = 'pending') THEN
-        UPDATE `time_blocks` SET `current` = FALSE
-            WHERE (NEW.`mpointing_id` = `time_blocks`.`mpointing_id`);
-        UPDATE `time_blocks` SET `current` = TRUE
-            WHERE (NEW.`time_block_id` = `time_blocks`.`id`);
-    END IF;
-    IF (NEW.`mpointing_id` is not NULL) AND (NEW.status = 'pending') THEN
-        UPDATE `mpointings` SET `status` = 'scheduled'
-            WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
-    END IF;
-    END
-    """,
-    # Pointing trigger before update
-    # If the pointing has been marked running or finished then store the started/stopped time
-    """CREATE TRIGGER `pointings_BEFORE_UPDATE` BEFORE UPDATE ON `pointings` FOR EACH ROW
-    BEGIN
-    IF (OLD.`status` != 'running' AND NEW.`status` = 'running') THEN
-        SET NEW.`started_time` = UTC_TIMESTAMP();
-    END IF;
-    IF (OLD.`status` IN ('pending', 'running') AND NEW.`status` NOT IN ('pending', 'running')) THEN
-        SET NEW.`stopped_time` = UTC_TIMESTAMP();
-    END IF;
-    END
-    """,
-    # Pointing trigger after update
-    # If the pointing is finished and the linked mpointing is scheduled then mark it as unscheduled
-    # Then if the pointing was completed then increase the Mpointing's completed count and
-    # add 10 to the current_rank (only if the Mpointing is not infinite)
-    # NB we only trigger if the timestamp has changed
-    """CREATE TRIGGER `pointings_AFTER_UPDATE` AFTER UPDATE ON `pointings` FOR EACH ROW
-    BEGIN
-    DECLARE is_infinite INT;
-    IF (NEW.`ts` <> OLD.`ts`) THEN
-        IF NEW.`status` NOT IN ('pending', 'running') THEN
-            UPDATE `mpointings` SET `status` = 'unscheduled'
-                WHERE (`mpointings`.`id` = NEW.`mpointing_id` and
-                       `mpointings`.`status` = 'scheduled');
-        END IF;
-        IF (OLD.`status` != 'completed' AND NEW.`status` = 'completed') THEN
-            UPDATE `mpointings` SET `num_completed` = `num_completed` + 1
-                WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
-            SELECT `infinite` INTO is_infinite FROM `mpointings`
-                WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
-            IF is_infinite = 0 THEN
-                UPDATE `mpointings` SET `current_rank` = `current_rank` + 10
-                    WHERE (NEW.`mpointing_id` = `mpointings`.`id`);
-            END IF;
-        END IF;
     END IF;
     END
     """,

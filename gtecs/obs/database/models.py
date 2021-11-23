@@ -12,7 +12,7 @@ from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integ
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.mysql import TIMESTAMP
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import column_property, relationship, validates
 from sqlalchemy.sql import and_, case, or_
 
@@ -558,12 +558,6 @@ class Pointing(Base):
     @hybrid_property
     def status(self):
         """Return a string giving the current status."""
-        # We could have a system of status_at_time(time), but it's a lot of effort...
-        # I got there for Pointings, fairly easy to check if the e.g. finished_time > time.
-        # You can do it with hybrid_methods instead of hybrid_properties.
-        # But Mpointings make things so much more complicated: num_completed_at_time(), how do you
-        # deal with Pointings which didn't exist at that time but were created afterwards?
-        # How could you schedule a Pointing in the past? It's not worth thinking about.
         time = Time.now()
 
         if self.running_time is None and self.finished_time is not None:
@@ -621,53 +615,123 @@ class Pointing(Base):
                      ],
                     else_='pending')
 
+    @hybrid_method
+    def status_at_time(self, time):
+        """Return a string giving the status at the given time (for testing and simulations)."""
+        # This is very useful for running through simulations.
+        # Really we also need Mpointing.status_at_time(), but that's a lot more complicated.
+        # All the properties will need versions, e.g. num_completed_at_time().
+        # Then how do you deal with Pointings which didn't exist at that time but were created
+        # afterwards? Do we need a Pointing.creation_time? We could have it set on creation,
+        # but for simulations we need to fake that time.
+        # How could you schedule a Pointing in the past or future?
+        # It's just not worth thinking about. When simulating the queue the scheduler can just get
+        # Pointings which will be pending at the given time.
+        if isinstance(time, (str, datetime.datetime)):
+            time = Time(time)
+
+        if (self.running_time is None and self.finished_time is not None and
+                time > Time(self.finished_time)):
+            return 'deleted'
+        elif (self.running_time is not None and time > Time(self.running_time) and
+              (self.finished_time is None or time < Time(self.finished_time))):
+            return 'running'
+        elif (self.finished_time is not None and time > Time(self.finished_time) and
+              self.completed):
+            return 'completed'
+        elif (self.finished_time is not None and time > Time(self.finished_time) and
+              not self.completed):
+            return 'interrupted'
+        elif time < Time(self.start_time):
+            return 'upcoming'
+        elif self.stop_time is not None and time > Time(self.stop_time):
+            return 'expired'
+        else:
+            return 'pending'
+
+    @status_at_time.expression
+    def status_at_time(self, time):
+        if isinstance(time, str):
+            time = Time(time)
+        if isinstance(time, Time):
+            time = time.datetime
+
+        c = case([(and_(self.running_time.is_(None), self.finished_time.isnot(None),
+                        time > self.finished_time),
+                   'deleted'),
+                  (and_(self.running_time.isnot(None), time > self.running_time,
+                        or_(self.finished_time.is_(None), time < self.finished_time)),
+                   'running'),
+                  (and_(self.finished_time.isnot(None), time > self.finished_time,
+                        self.completed.is_(True)),
+                   'completed'),
+                  (and_(self.finished_time.isnot(None), time > self.finished_time,
+                        self.completed.is_(False)),
+                   'interrupted'),
+                  (time < self.start_time,
+                   'upcoming'),
+                  (and_(self.stop_time.isnot(None), time > self.stop_time),
+                   'expired'),
+                  ],
+                 else_='pending')
+        return c
+
     def mark_deleted(self, time=None):
         """Mark this Pointing as deleted."""
-        if self.status == 'deleted':
-            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
-        if self.status == 'expired':
-            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
-        if self.status == 'running':
-            raise ValueError(f'Pointing is already running (at {self.running_time})')
-        if self.status in ['completed', 'interrupted']:
-            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
-
         if time is None:
             time = Time.now()
+        if isinstance(time, (str, datetime.datetime)):
+            time = Time(time)
+
+        if self.status_at_time(time) == 'deleted':
+            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
+        if self.status_at_time(time) == 'expired':
+            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
+        if self.status_at_time(time) == 'running':
+            raise ValueError(f'Pointing is already running (at {self.running_time})')
+        if self.status_at_time(time) in ['completed', 'interrupted']:
+            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
+
         self.finished_time = time
 
     def mark_running(self, time=None):
         """Mark this Pointing as running."""
-        if self.status == 'deleted':
-            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
-        if self.status == 'upcoming':
-            raise ValueError(f'Pointing has not yet reached its start time (at {self.start_time})')
-        if self.status == 'expired':
-            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
-        if self.status == 'running':
-            raise ValueError(f'Pointing is already running (at {self.running_time})')
-        if self.status in ['completed', 'interrupted']:
-            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
-
         if time is None:
             time = Time.now()
+        if isinstance(time, (str, datetime.datetime)):
+            time = Time(time)
+
+        if self.status_at_time(time) == 'deleted':
+            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
+        if self.status_at_time(time) == 'upcoming':
+            raise ValueError(f'Pointing has not yet reached its start time (at {self.start_time})')
+        if self.status_at_time(time) == 'expired':
+            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
+        if self.status_at_time(time) == 'running':
+            raise ValueError(f'Pointing is already running (at {self.running_time})')
+        if self.status_at_time(time) in ['completed', 'interrupted']:
+            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
+
         self.running_time = time
 
         # Eventually we'll want to link to a Telescope at this point...
 
     def mark_finished(self, completed=True, time=None):
         """Mark this Pointing as stopped, either completed (True) or interrupted (False)."""
-        if self.status == 'deleted':
-            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
-        if self.status == 'expired':
-            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
-        if self.status in ['completed', 'interrupted']:
-            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
-        if self.status != 'running':
-            raise ValueError('Pointing is not running (use mark_deleted to stop before running)')
-
         if time is None:
             time = Time.now()
+        if isinstance(time, (str, datetime.datetime)):
+            time = Time(time)
+
+        if self.status_at_time(time) == 'deleted':
+            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
+        if self.status_at_time(time) == 'expired':
+            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
+        if self.status_at_time(time) in ['completed', 'interrupted']:
+            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
+        if self.status_at_time(time) != 'running':
+            raise ValueError('Pointing is not running (use mark_deleted to stop before running)')
+
         self.finished_time = time
 
         self.completed = completed

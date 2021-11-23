@@ -127,76 +127,60 @@ with db.open_session() as session:
     print('{} points in queue'.format(n_queue))
     print('{} expired pointings\n'.format(len(expired)))
 
-    # clean expired pointings
-    print('Cleaning expired pointings')
-    db.bulk_update_status(session, expired, 'expired')
-
-    # now check how many we have
-    n_points = len(db.get_pointings(session))
-    current, pending = db.get_queue(session)
-    expired = db.get_expired_pointings(session)
-    marked = db.get_pointings(session, status='expired')
-    n_queue = len(pending)
-    print('{} points in database'.format(n_points))
-    print('{} points in queue'.format(n_queue))
-    print('{} unmarked expired pointings'.format(len(expired)))
-    print('{} marked expired pointings\n'.format(len(marked)))
-
 time.sleep(5)
+print('-------')
 
 # now let's go through a caretaker step
 with db.open_session() as s:
-    # first remove expired pointings
-    expired = db.get_expired_pointings(s)
-    if len(expired) > 0:
-        db.bulk_update_status(s, expired, 'expired')
-    print('Marked {} pointings as expired'.format(len(expired)))
-
-    # which Mpointings need pointings submitting?
-    mps_to_schedule = db.get_mpointings(s, status='unscheduled')
-    print('There are {} Mpointings to schedule'.format(len(mps_to_schedule)))
-
-    pointings_to_add = []
-    for mp in mps_to_schedule:
-        print('Scheduling mp #{}'.format(mp.db_id))
-        next_pointing = mp.get_next_pointing()
-        if next_pointing:
-            pointings_to_add.append(next_pointing)
-    db.insert_items(s, pointings_to_add)
-
-    def summary(mp):
+    def print_summary(mp, now):
         """Print a summary of the database."""
-        print('{}, num_remaining = {}'.format(mp.status.upper(), mp.num_remaining))
-        print([p.status for p in mp.pointings])
-        print([(b.block_num, b.valid_time, b.wait_time, b.current) for b in mp.time_blocks], '\n')
+        print(now, f'Mpointing is {mp.status.upper()} ({mp.num_remaining} remaining)')
+        print('                    Pointings:', [p.status_at_time(now) for p in mp.pointings])
+        # print('                    Time blocks:')
+        # for block in mp.time_blocks:
+        #     print('                    \t', (block.block_num, block.valid_time, block.wait_time,
+        #                                      block.current))
 
-    # check that scheduling worked the way we expected
     mp = db.get_mpointing_by_id(s, 1)
-    summary(mp)
+    print(mp)
 
-    # now lets pretend we're observing the Mpointing and check the triggers
+    # lets pretend we're observing the Mpointing and check the triggers
+    now = Time(mp.start_time)
+    print_summary(mp, now)
+    print()
+
     while True:
-        print('marking job as running')
-        mp.pointings[-1].status = 'running'
-        s.commit()
-        time.sleep(1)
-        summary(mp)
-
-        print('marking as completed')
-        mp.pointings[-1].status = 'completed'
-        s.commit()
-        time.sleep(1)
-        summary(mp)
-
-        # schedule next
+        # schedule next pointing
         next_pointing = mp.get_next_pointing()
-        if next_pointing:
-            s.add(next_pointing)
-        else:
+        if next_pointing is None:
             break
+
+        print(now, 'Creating Pointing')
+        s.add(next_pointing)
         s.commit()
+
         time.sleep(1)
-        summary(mp)
+        print()
+
+        # skip ahead until the pointing is pending
+        now = Time(next_pointing.start_time) + 30 * u.s
+
+        print(now, f'Marking Pointing {next_pointing.db_id} as running')
+        next_pointing.mark_running(time=now)
+        s.commit()
+        print_summary(mp, now)
+        time.sleep(1)
+        print()
+
+        # skip ahead by some exposure time
+        now = now + 120 * u.s
+
+        print(now, f'Marking Pointing {next_pointing.db_id} as completed')
+        next_pointing.mark_finished(completed=True, time=now)
+        s.commit()
+        print_summary(mp, now)
+        time.sleep(1)
+        print()
 
     # check the list of mps to schedule is empty
     mps_to_schedule = db.get_mpointings(s, status='unscheduled')

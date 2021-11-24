@@ -25,6 +25,18 @@ pymysql.converters.conversions = pymysql.converters.encoders.copy()
 pymysql.converters.conversions.update(pymysql.converters.decoders)
 
 
+def get_engine(url=params.DATABASE_URL, db_name=params.DATABASE_NAME,
+               echo=params.DATABASE_ECHO, *args, **kwargs):
+    """Create the database engine."""
+    if db_name:
+        url = os.path.join(url, db_name)
+    engine = create_engine(f'mysql+pymysql://{url}?charset=utf8',
+                           echo=echo,
+                           pool_pre_ping=params.DATABASE_PRE_PING,
+                           *args, *kwargs)
+    return engine
+
+
 def create_database(overwrite=False, verbose=False):
     """Create the blank database.
 
@@ -64,18 +76,6 @@ def fill_database(verbose=False):
     for trigger in TRIGGERS:
         with engine.connect() as conn:
             conn.execute(trigger)
-
-
-def get_engine(url=params.DATABASE_URL, db_name=params.DATABASE_NAME,
-               echo=params.DATABASE_ECHO, *args, **kwargs):
-    """Create the database engine."""
-    if db_name:
-        url = os.path.join(url, db_name)
-    engine = create_engine(f'mysql+pymysql://{url}?charset=utf8',
-                           echo=echo,
-                           pool_pre_ping=params.DATABASE_PRE_PING,
-                           *args, *kwargs)
-    return engine
 
 
 @contextmanager

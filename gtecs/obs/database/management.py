@@ -1,4 +1,4 @@
-"""Session management functions."""
+"""Database management functions."""
 
 import os
 from contextlib import contextmanager
@@ -8,11 +8,14 @@ import numpy as np
 import pymysql
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
+from .models import Base, TRIGGERS
 from .. import params
 
-__all__ = ['get_engine', 'open_session', 'load_session']
+__all__ = ['create_database', 'fill_database',
+           'get_engine', 'open_session', 'load_session']
 
 
 # Encode Numpy floats
@@ -20,6 +23,47 @@ __all__ = ['get_engine', 'open_session', 'load_session']
 pymysql.converters.encoders[np.float64] = pymysql.converters.escape_float
 pymysql.converters.conversions = pymysql.converters.encoders.copy()
 pymysql.converters.conversions.update(pymysql.converters.decoders)
+
+
+def create_database(overwrite=False, verbose=False):
+    """Create the blank database.
+
+    The name of the database is 'goto_obs' by default, it can be changed in
+    `gtecs.obs.params.DATABASE_NAME`.
+
+    Parameters
+    ----------
+    overwrite : bool, default=False
+        If True and the database already exists then drop it before creating the new one.
+        If False and the database already exists then an error is raised.
+
+    verbose : bool, default=False
+        If True, echo SQL output.
+
+    """
+    db_name = params.DATABASE_NAME
+    engine = get_engine(db_name=None, echo=verbose)
+    with engine.connect() as conn:
+        if not overwrite:
+            try:
+                conn.execute(f'CREATE DATABASE `{db_name}`')  # will raise if it exists
+            except ProgrammingError as err:
+                raise ValueError(f'WARNING: Database "{db_name}" already exists!') from err
+        else:
+            conn.execute(f'DROP DATABASE IF EXISTS `{db_name}`')
+            conn.execute(f'CREATE DATABASE `{db_name}`')
+
+
+def fill_database(verbose=False):
+    """Fill a blank database with the ObsDB metadata."""
+    # Create the schema from the base
+    engine = get_engine(echo=verbose)
+    Base.metadata.create_all(engine)
+
+    # Create triggers
+    for trigger in TRIGGERS:
+        with engine.connect() as conn:
+            conn.execute(trigger)
 
 
 def get_engine(url=params.DATABASE_URL, db_name=params.DATABASE_NAME,

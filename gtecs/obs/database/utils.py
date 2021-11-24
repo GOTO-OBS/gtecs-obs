@@ -7,15 +7,12 @@ from astropy.coordinates import Longitude
 from astropy.time import Time
 
 from sqlalchemy import or_
-from sqlalchemy.exc import ProgrammingError
 
-from .engine import get_engine, open_session
-from .models import Base, Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, TRIGGERS, User
-from .. import params
+from .management import open_session
+from .models import Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, User
 
 
-__all__ = ['create_database', 'fill_database',
-           'get_user', 'validate_user',
+__all__ = ['get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
@@ -27,47 +24,6 @@ __all__ = ['create_database', 'fill_database',
            'update_pointing_status', 'bulk_update_status',
            'mark_completed', 'mark_aborted', 'mark_interrupted', 'mark_running',
            ]
-
-
-def create_database(overwrite=False, verbose=False):
-    """Create the blank database.
-
-    The name of the database is 'goto_obs' by default, it can be changed in
-    `gtecs.obs.params.DATABASE_NAME`.
-
-    Parameters
-    ----------
-    overwrite : bool, default=False
-        If True and the database already exists then drop it before creating the new one.
-        If False and the database already exists then an error is raised.
-
-    verbose : bool, default=False
-        If True, echo SQL output.
-
-    """
-    db_name = params.DATABASE_NAME
-    engine = get_engine(db_name=None, echo=verbose)
-    with engine.connect() as conn:
-        if not overwrite:
-            try:
-                conn.execute(f'CREATE DATABASE `{db_name}`')  # will raise if it exists
-            except ProgrammingError as err:
-                raise ValueError(f'WARNING: Database "{db_name}" already exists!') from err
-        else:
-            conn.execute(f'DROP DATABASE IF EXISTS `{db_name}`')
-            conn.execute(f'CREATE DATABASE `{db_name}`')
-
-
-def fill_database(verbose=False):
-    """Fill a blank database with the ObsDB metadata."""
-    # Create the schema from the base
-    engine = get_engine(echo=verbose)
-    Base.metadata.create_all(engine)
-
-    # Create triggers
-    for trigger in TRIGGERS:
-        with engine.connect() as conn:
-            conn.execute(trigger)
 
 
 def get_user(session, username):

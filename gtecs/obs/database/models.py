@@ -731,15 +731,13 @@ class Pointing(Base):
             tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
             self.tel_mask = tel_mask
 
-    def mark_running(self, telescope_id=None, telescope=None, time=None):
+    def mark_running(self, telescope=None, time=None):
         """Mark this Pointing as running on the given telescope."""
         if time is None:
             time = Time.now()
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
-        if isinstance(telescope, Telescope) and telescope_id is None:
-            telescope_id = telescope.db_id
-        if telescope_id is None:
+        if telescope is None:
             raise ValueError('Pointings must be linked to a Telescope when marked running')
 
         if self.status_at_time(time) == 'deleted':
@@ -756,11 +754,15 @@ class Pointing(Base):
         if self.telescope is not None or self.telescope_id is not None:
             raise ValueError(f'Pointing is already linked to a Telescope: {self.telescope}')
 
-        self.running_time = time
-        if self.valid_telescopes and telescope_id not in self.valid_telescopes:
-            raise ValueError(f'Telescope ID ({telescope_id}) not in '
+        if self.valid_telescopes and telescope.db_id not in self.valid_telescopes:
+            raise ValueError(f'Telescope ID ({telescope.db_id}) not in '
                              f'list of valid telescopes ({self.valid_telescopes})')
-        self.telescope_id = telescope_id
+        if telescope.current_pointing is not None:
+            pointing_id = telescope.current_pointing.db_id
+            raise ValueError(f'Telescope is already observing Pointing ID {pointing_id}')
+
+        self.running_time = time
+        self.telescope = telescope
 
     def mark_finished(self, completed=True, time=None):
         """Mark this Pointing as stopped, either completed (True) or interrupted (False)."""
@@ -1834,8 +1836,11 @@ class Telescope(Base):
     site = relationship('Site', back_populates='telescopes')
     grid = relationship('Grid', back_populates='telescopes')
     pointings = relationship('Pointing', back_populates='telescope')
+    current_pointing = relationship('Pointing', viewonly=True, uselist=False,
+                                    primaryjoin='and_(Telescope.db_id==Pointing.telescope_id,'
+                                                'Pointing.status=="running")')
 
-    def __init__(self, name=None, tel=None):
+    def __init__(self, name=None):
         self.name = name
 
     def __repr__(self):
@@ -1848,27 +1853,16 @@ class Telescope(Base):
         return 'Telescope({})'.format(', '.join(strings))
 
     @hybrid_property
-    def observing(self):
-        """Return True if currently linked to running Pointing."""
-        return any(p.status == 'running' for p in self.pointings)
-
-    @observing.expression
-    def observing(self):
-        return exists().where(and_(Pointing.mpointing_id == self.db_id,
-                                   Pointing.status == 'running',
-                                   ))
-
-    @hybrid_property
     def status(self):
         """Return a string giving the current status."""
-        if self.observing:
+        if self.current_pointing is not None:
             return 'observing'
         else:
             return 'idle'
 
     @status.expression
     def status(self):
-        return case([(self.observing.is_(True), 'observing')],
+        return case([(self.current_pointing.isnot(None), 'observing')],
                     else_='idle')
 
     @property

@@ -29,8 +29,8 @@ with db.open_session() as session:
     si = db.Site.from_name('LaPalma')
 
     # and two telescopes at that site
-    t1 = db.Telescope(name='North Telescope', tel=1)
-    t2 = db.Telescope(name='South Telescope', tel=2)
+    t1 = db.Telescope(name='North Telescope')
+    t2 = db.Telescope(name='South Telescope')
     t1.site = si
     t2.site = si
 
@@ -161,7 +161,8 @@ with db.open_session() as s:
     mp = db.get_mpointing_by_id(s, 1)
     print(mp)
 
-    # lets pretend we're observing the Mpointing and check the triggers
+    # lets pretend we're observing with a telescope to check the triggers
+    t = db.get_telescope_by_id(s, 1)
     now = Time(mp.start_time)
     print_summary(mp, now)
     print()
@@ -188,7 +189,7 @@ with db.open_session() as s:
             print()
 
         print(now, f'Marking Pointing {next_pointing.db_id} as running')
-        next_pointing.mark_running(telescope_id=1, time=now)
+        next_pointing.mark_running(telescope=t, time=now)
         s.commit()
         print_summary(mp, now)
         time.sleep(1)

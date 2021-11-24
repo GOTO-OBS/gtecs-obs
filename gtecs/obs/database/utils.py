@@ -9,7 +9,7 @@ from astropy.time import Time
 from sqlalchemy import or_
 
 from .management import open_session
-from .models import Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, User
+from .models import Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, Telescope, User
 
 
 __all__ = ['get_user', 'validate_user',
@@ -17,6 +17,7 @@ __all__ = ['get_user', 'validate_user',
            'get_pointings', 'get_pointing_by_id',
            'get_mpointings', 'get_mpointing_by_id',
            'get_exposure_set_by_id',
+           'get_telescope_by_id',
            'get_current_grid', 'get_grid_tile_by_name',
            'get_events', 'delete_event_pointings',
            'get_expired_pointings', 'get_expired_mpointings',
@@ -361,6 +362,32 @@ def get_exposure_set_by_id(session, expset_id):
     if not exposure_set:
         raise ValueError('No matching Exposure Set found')
     return exposure_set
+
+
+def get_telescope_by_id(session, telescope_id):
+    """Get a single Telescope, filtered by ID.
+
+    Parameters
+    ----------
+    session : `sqlalchemy.Session.session`
+        a session object - see `load_session` or `open_session` for details
+    telescope_id : int
+        the id number of the telescope
+
+    Returns
+    -------
+    telescope : `Telescope`
+        the matching Telescope
+
+    Raises
+    ------
+    ValueError : if no matching Telescope is found in the database
+
+    """
+    telescope = session.query(Telescope).filter(Telescope.db_id == telescope_id).one_or_none()
+    if not telescope:
+        raise ValueError('No matching Telescope found')
+    return telescope
 
 
 def get_current_grid(session):

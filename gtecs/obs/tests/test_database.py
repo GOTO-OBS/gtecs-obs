@@ -138,11 +138,9 @@ with db.open_session() as session:
     # now check how many we have
     n_points = len(db.get_pointings(session))
     current, pending = db.get_queue(session)
-    expired = db.get_expired_pointings(session)
     n_queue = len(pending)
     print('{} points in database'.format(n_points))
     print('{} points in queue'.format(n_queue))
-    print('{} expired pointings\n'.format(len(expired)))
 
 time.sleep(5)
 print('-------')
@@ -211,11 +209,9 @@ with db.open_session() as s:
 
     n_points = len(db.get_pointings(s))
     current, pending = db.get_queue(s)
-    expired = db.get_expired_pointings(s)
     marked = db.get_pointings(s, status='expired')
     n_queue = len(pending)
 
     print('{} points in database'.format(n_points))
     print('{} points in queue'.format(n_queue))
-    print('{} unmarked expired pointings'.format(len(expired)))
     print('{} marked expired pointings\n'.format(len(marked)))

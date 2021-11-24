@@ -20,10 +20,8 @@ __all__ = ['get_user', 'validate_user',
            'get_telescope_by_id',
            'get_current_grid', 'get_grid_tile_by_name',
            'get_events', 'delete_event_pointings',
-           'get_expired_pointings', 'get_expired_mpointings',
            'insert_items',
-           'update_pointing_status', 'bulk_update_status',
-           'mark_completed', 'mark_aborted', 'mark_interrupted', 'mark_running',
+           'mark_completed', 'mark_interrupted', 'mark_running',
            ]
 
 
@@ -476,60 +474,6 @@ def delete_event_pointings(session, event):
             mpointing.pointings[-1].status = 'deleted'
 
 
-def get_expired_pointings(session, time=None):
-    """Find all the pointings still pending whose valid period has expired.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
-    time : `~astropy.time.Time`
-        If given, the time to evaluate time period at.
-        Defaults to the current time.
-
-    Returns
-    -------
-    pointings : list
-        a list of all matching Pointings
-
-    """
-    if time is None:
-        now = Time.now().iso
-    else:
-        now = time.iso
-
-    pointings = session.query(Pointing).filter(Pointing.status == 'pending',
-                                               Pointing.stop_time < now).all()
-    return pointings
-
-
-def get_expired_mpointings(session, time=None):
-    """Find all the mpointings still unscheduled whose valid period has expired.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
-    time : `~astropy.time.Time`
-        If given, the time to evaluate time period at.
-        Defaults to the current time.
-
-    Returns
-    -------
-    mpointings : list
-        a list of all matching Mpointings
-
-    """
-    if time is None:
-        now = Time.now().iso
-    else:
-        now = time.iso
-
-    mpointings = session.query(Mpointing).filter(Mpointing.status == 'unscheduled',
-                                                 Mpointing.stop_time < now).all()
-    return mpointings
-
-
 def insert_items(session, items):
     """Insert one or more items into the database.
 
@@ -551,48 +495,6 @@ def insert_items(session, items):
             session.flush()
 
 
-def update_pointing_status(session, pointing_id, status):
-    """Set the status of the given pointing.
-
-    For large numbers of pointings use `bulk_update_pointing_status`.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        the session object
-    pointing_id : int
-        the id number of the pointing
-    status : string
-        status to set pointing to
-
-    """
-    pointing = get_pointing_by_id(session, pointing_id)
-    pointing.status = status
-
-
-def bulk_update_status(session, items, status):
-    """Set the status of a large number of Pointings or Mpointings.
-
-    For large numbers of items this routine is most efficient.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        the session object
-    items : list
-        a list of `Pointing`s or `Mpointing`s to update
-    status : string
-        status to set pointings to
-
-    """
-    # Make sure they're all the same type
-    if not all(isinstance(item, type(items[0])) for item in items):
-        raise ValueError('Items must be all the same type (`Pointing` or `Mpointing`)')
-
-    mappings = [{'db_id': item.db_id, 'status': status} for item in items]
-    session.bulk_update_mappings(type(items[0]), mappings)
-
-
 def mark_completed(pointing_id):
     """Update the given pointing's status to 'completed'.
 
@@ -605,22 +507,8 @@ def mark_completed(pointing_id):
 
     """
     with open_session() as s:
-        update_pointing_status(s, pointing_id, 'completed')
-
-
-def mark_aborted(pointing_id):
-    """Update the given pointing's status to 'aborted'.
-
-    A utility function that creates its own session.
-
-    Parameters
-    ----------
-    pointing_id : int
-        the id number of the pointing
-
-    """
-    with open_session() as s:
-        update_pointing_status(s, pointing_id, 'aborted')
+        pointing = get_pointing_by_id(s, pointing_id)
+        pointing.mark_finished(completed=True)
 
 
 def mark_interrupted(pointing_id):
@@ -635,10 +523,11 @@ def mark_interrupted(pointing_id):
 
     """
     with open_session() as s:
-        update_pointing_status(s, pointing_id, 'interrupted')
+        pointing = get_pointing_by_id(s, pointing_id)
+        pointing.mark_finished(completed=False)
 
 
-def mark_running(pointing_id):
+def mark_running(pointing_id, telescope_id):
     """Update the given pointing's status to 'running'.
 
     A utility function that creates its own session.
@@ -647,7 +536,11 @@ def mark_running(pointing_id):
     ----------
     pointing_id : int
         the id number of the pointing
+    telescope_id : int
+        the id number of the telescope the pointing is running on
 
     """
     with open_session() as s:
-        update_pointing_status(s, pointing_id, 'running')
+        pointing = get_pointing_by_id(s, pointing_id)
+        telescope = get_telescope_by_id(s, telescope_id)
+        pointing.mark_running(telescope)

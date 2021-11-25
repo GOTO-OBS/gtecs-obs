@@ -635,15 +635,6 @@ class Pointing(Base):
     @hybrid_method
     def status_at_time(self, time):
         """Return a string giving the status at the given time (for testing and simulations)."""
-        # This is very useful for running through simulations.
-        # Really we also need Mpointing.status_at_time(), but that's a lot more complicated.
-        # All the properties will need versions, e.g. num_completed_at_time().
-        # Then how do you deal with Pointings which didn't exist at that time but were created
-        # afterwards? Do we need a Pointing.creation_time? We could have it set on creation,
-        # but for simulations we need to fake that time.
-        # How could you schedule a Pointing in the past or future?
-        # It's just not worth thinking about. When simulating the queue the scheduler can just get
-        # Pointings which will be pending at the given time.
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
@@ -1271,6 +1262,21 @@ class Mpointing(Base):
                                        )
                                    ))
 
+    @hybrid_method
+    def scheduled_at_time(self, time):
+        """Return True if linked to a pending or running Pointing at the given time."""
+        return any(p.status_at_time(time) in ['upcoming', 'pending', 'running']
+                   for p in self.pointings)
+
+    @scheduled_at_time.expression
+    def scheduled_at_time(self, time):
+        return exists().where(and_(Pointing.mpointing_id == self.db_id,
+                                   or_(Pointing.status_at_time(time) == 'upcoming',
+                                       Pointing.status_at_time(time) == 'pending',
+                                       Pointing.status_at_time(time) == 'running',
+                                       )
+                                   ))
+
     @hybrid_property
     def infinite(self):
         """Return if the Mpointing is infinite."""
@@ -1288,6 +1294,18 @@ class Mpointing(Base):
                        Pointing.status == 'completed',
                        )).scalar_subquery()
 
+    @hybrid_method
+    def num_completed_at_time(self, time):
+        """Return the number of Pointings successfully completed at the given time."""
+        return sum(p.status_at_time(time) == 'completed' for p in self.pointings)
+
+    @num_completed_at_time.expression
+    def num_completed_at_time(self, time):
+        return select([func.count(Pointing.db_id)]).\
+            where(and_(Pointing.mpointing_id == self.db_id,
+                       Pointing.status_at_time(time) == 'completed',
+                       ))
+
     @hybrid_property
     def num_remaining(self):
         """Return the number of observations remaining (num_todo - num_completed).
@@ -1303,6 +1321,19 @@ class Mpointing(Base):
     def num_remaining(self):
         return case([(self.infinite, -1)],
                     else_=self.num_todo - self.num_completed)
+
+    @hybrid_method
+    def num_remaining_at_time(self, time):
+        """Return the number of observations remaining at the given time."""
+        if self.infinite:
+            return -1
+        else:
+            return self.num_todo - self.num_completed_at_time(time)
+
+    @num_remaining_at_time.expression
+    def num_remaining_at_time(self, time):
+        return case([(self.infinite, -1)],
+                    else_=self.num_todo - self.num_completed_at_time(time))
 
     @hybrid_property
     def status(self):
@@ -1358,17 +1389,65 @@ class Mpointing(Base):
                      ],
                     else_='scheduled')
 
+    @hybrid_method
+    def status_at_time(self, time):
+        """Return a string giving the status at the given time (for testing and simulations)."""
+        # This is very useful for running through simulations.
+        # Then how do you deal with Pointings which didn't exist at that time but were created
+        # afterwards? Do we need a Pointing.creation_time? We could have it set on creation,
+        # but for simulations we need to fake that time.
+        if isinstance(time, (str, datetime.datetime)):
+            time = Time(time)
+
+        if (self.deleted_time is not None and time >= Time(self.deleted_time)):
+            return 'deleted'
+        elif self.num_remaining_at_time(time) == 0:
+            return 'completed'
+        elif self.start_time is not None and time < Time(self.start_time):
+            return 'upcoming'
+        elif self.stop_time is not None and time >= Time(self.stop_time):
+            return 'expired'
+        elif not self.scheduled_at_time(time):
+            return 'unscheduled'
+        else:
+            return 'scheduled'
+
+    @status_at_time.expression
+    def status_at_time(self, time):
+        if isinstance(time, str):
+            time = Time(time)
+        if isinstance(time, Time):
+            time = time.datetime
+
+        c = case([(and_(self.deleted_time.isnot(None), time >= self.deleted_time),
+                   'deleted'),
+                  (self.num_remaining_at_time(time) == 0,
+                   'completed'),
+                  (and_(self.start_time.isnot(None), time < self.start_time),
+                   'upcoming'),
+                  (and_(self.stop_time.isnot(None), time >= self.stop_time),
+                   'expired'),
+                  (self.scheduled_at_time(time).is_(False),
+                   'unscheduled'),
+                  ],
+                 else_='scheduled')
+        return c
+
     def mark_deleted(self, time=None):
         """Mark this Mpointing (and any pending Pointings) as deleted."""
-        if self.status == 'deleted':
-            raise ValueError(f'Mpointing is already deleted (at={self.deleted_time})')
-        if self.status == 'expired':
-            raise ValueError(f'Mpointing is already expired (at {self.stop_time})')
-        if self.status == 'completed':
-            raise ValueError('Mpointing is already completed')
-
         if time is None:
             time = Time.now()
+        if isinstance(time, (str, datetime.datetime)):
+            time = Time(time)
+
+        if self.status_at_time(time) == 'deleted':
+            raise ValueError(f'Mpointing is already deleted (at={self.deleted_time})')
+        if self.status_at_time(time) == 'expired':
+            raise ValueError(f'Mpointing is already expired (at {self.stop_time})')
+        if self.status_at_time(time) == 'completed':
+            raise ValueError('Mpointing is already completed')
+
+        # Pointings can use finished_time, but we need an explicit deleted_time
         self.deleted_time = time
 
         for pointing in self.pointings:
@@ -1399,6 +1478,11 @@ class Mpointing(Base):
     def current_rank(self):
         """Calculate current rank as the starting rank + 10 * the number of completed Pointings."""
         return self.start_rank + 10 * self.num_completed
+
+    @hybrid_method
+    def current_rank_at_time(self, time):
+        """Calculate current rank as the starting rank + 10 * the number of completed Pointings."""
+        return self.start_rank + 10 * self.num_completed_at_time(time)
 
     def get_current_block(self):
         """Return the current time block.

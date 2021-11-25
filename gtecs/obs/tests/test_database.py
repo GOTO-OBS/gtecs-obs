@@ -167,7 +167,7 @@ with db.open_session() as s:
 
     while True:
         # schedule next pointing
-        next_pointing = mp.get_next_pointing()
+        next_pointing = mp.get_next_pointing(time=now)
         if next_pointing is None:
             break
 
@@ -202,6 +202,9 @@ with db.open_session() as s:
         print_summary(mp, now)
         time.sleep(1)
         print()
+
+        # skip ahead by a small amount
+        now = now + 30 * u.s
 
     # check the list of mps to schedule is empty
     mps_to_schedule = db.get_mpointings(s, status='unscheduled')

@@ -452,9 +452,12 @@ class Pointing(Base):
     min_moonsep = Column(Float, nullable=False, default=30)
     too = Column(Boolean, nullable=False, default=False)
     tel_mask = Column(Integer, default=None)
-    start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow())
+    start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow(),
+                        server_default=text('CURRENT_TIMESTAMP'))
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
     # # Status
+    creation_time = Column(DateTime, nullable=False, default=datetime.datetime.utcnow(),
+                           server_default=text('CURRENT_TIMESTAMP'))
     running_time = Column(DateTime, nullable=True, default=None)
     finished_time = Column(DateTime, nullable=True, default=None)
     completed = Column(Boolean, nullable=False, default=False)
@@ -535,14 +538,14 @@ class Pointing(Base):
                    ]
         return 'Pointing({})'.format(', '.join(strings))
 
-    @validates('start_time', 'stop_time', 'running_time', 'finished_time')
+    @validates('start_time', 'stop_time', 'creation_time', 'running_time', 'finished_time')
     def validate_times(self, key, field):
         """Use validators to allow various types of input for times.
 
         Also enforce stop_time > start_time and finished_time > running_time.
         """
-        if key != 'start_time' and field is None:
-            # start_time is not nullable, the others are
+        if key not in ['start_time', 'creation_time'] and field is None:
+            # start_time and creation_time are not nullable, the others are
             return None
 
         if isinstance(field, datetime.datetime):
@@ -638,6 +641,11 @@ class Pointing(Base):
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
+        if time < Time(self.creation_time):
+            # This shouldn't usually happen, unless we are doing simulations and set it manually,
+            # then it's worth knowing if this entry wouldn't have been created yet..
+            return None
+
         if (self.running_time is None and self.finished_time is not None and
                 time >= Time(self.finished_time)):
             return 'deleted'
@@ -664,7 +672,9 @@ class Pointing(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        c = case([(and_(self.running_time.is_(None), self.finished_time.isnot(None),
+        c = case([(time < self.creation_time,
+                   None),
+                  (and_(self.running_time.is_(None), self.finished_time.isnot(None),
                         time >= self.finished_time),
                    'deleted'),
                   (and_(self.running_time.isnot(None), time >= self.running_time,
@@ -1073,6 +1083,8 @@ class Mpointing(Base):
                         server_default=text('CURRENT_TIMESTAMP'))
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
     # # Status
+    creation_time = Column(DateTime, nullable=False, default=datetime.datetime.utcnow(),
+                           server_default=text('CURRENT_TIMESTAMP'))
     deleted_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
@@ -1219,14 +1231,14 @@ class Mpointing(Base):
                    ]
         return 'Mpointing({})'.format(', '.join(strings))
 
-    @validates('start_time', 'stop_time', 'deleted_time')
+    @validates('start_time', 'stop_time', 'creation_time', 'deleted_time')
     def validate_times(self, key, field):
         """Use validators to allow various types of input for times.
 
         Also enforce stop_time > start_time.
         """
-        if key != 'start_time' and field is None:
-            # start_time is not nullable, the others are
+        if key not in ['start_time', 'creation_time'] and field is None:
+            # start_time and creation_time are not nullable, the others are
             return None
 
         if isinstance(field, datetime.datetime):
@@ -1399,6 +1411,11 @@ class Mpointing(Base):
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
+        if time < Time(self.creation_time):
+            # This shouldn't usually happen, unless we are doing simulations and set it manually,
+            # then it's worth knowing if this entry wouldn't have been created yet..
+            return None
+
         if (self.deleted_time is not None and time >= Time(self.deleted_time)):
             return 'deleted'
         elif self.num_remaining_at_time(time) == 0:
@@ -1419,7 +1436,9 @@ class Mpointing(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        c = case([(and_(self.deleted_time.isnot(None), time >= self.deleted_time),
+        c = case([(time < self.creation_time,
+                   None),
+                  (and_(self.deleted_time.isnot(None), time >= self.deleted_time),
                    'deleted'),
                   (self.num_remaining_at_time(time) == 0,
                    'completed'),
@@ -1564,7 +1583,7 @@ class Mpointing(Base):
                       if block.block_num == next_num][0]
         return next_block
 
-    def get_next_pointing(self):
+    def get_next_pointing(self, time=None):
         """Retrieve the next pointing which needs to be scheduled.
 
         The start and stop times of the pointing are determined from
@@ -1572,9 +1591,12 @@ class Mpointing(Base):
 
         Assumes this object is still associated with an active session.
 
+        Any time given is set as the creation time, it should only be used for simulations
+        (just like status_at_time() etc).
+
         Returns
         -------
-        pointing : `Pointing`
+        pointing : `Pointing` or None
             the next pointing that should be sent to the database. Is None
             if there is no suitable pointing remaining, or if there is
             a pointing from this Mpointing already scheduled
@@ -1676,6 +1698,10 @@ class Mpointing(Base):
                      )
         # add the exposures
         p.exposure_sets = self.exposure_sets
+        # set the creation time (for simulations)
+        if time is not None:
+            p.creation_time = time
+
         return p
 
 

@@ -129,10 +129,16 @@ class User(Base):
     pointings = relationship('Pointing', back_populates='user')
     mpointings = relationship('Mpointing', back_populates='user')
 
-    def __init__(self, username=None, password=None, full_name=None):
+    def __init__(self, username=None, password=None, full_name=None, **kwargs):
         self.username = username
         self.password_hash = hashlib.sha512(password.encode()).hexdigest()
         self.full_name = full_name
+
+        # Since we're overwriting the __init__ we have to add relationships here
+        if 'pointings' in kwargs:
+            self.pointings = kwargs['pointings']
+        if 'mpointings' in kwargs:
+            self.mpointings = kwargs['mpointings']
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1185,6 +1191,7 @@ class Mpointing(Base):
             if len(self.time_blocks):
                 self.time_blocks[0].current = True
 
+        # Since we're overwriting the __init__ we have to add relationships here
         if 'user' in kwargs:
             self.user = kwargs['user']
         if 'user_id' in kwargs:
@@ -1841,12 +1848,6 @@ class Site(Base):
     # Foreign relationships
     telescopes = relationship('Telescope', back_populates='site')
 
-    def __init__(self, name=None, latitude=None, longitude=None, height=None):
-        self.name = name
-        self.latitude = latitude
-        self.longitude = longitude
-        self.height = height
-
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
                    'name="{}"'.format(self.name),
@@ -1949,9 +1950,6 @@ class Telescope(Base):
     current_pointing = relationship('Pointing', viewonly=True, uselist=False,
                                     primaryjoin='and_(Telescope.db_id==Pointing.telescope_id,'
                                                 'Pointing.status=="running")')
-
-    def __init__(self, name=None):
-        self.name = name
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2331,11 +2329,6 @@ class SurveyTile(Base):
     grid_tile = relationship('GridTile', back_populates='survey_tiles')
     pointings = relationship('Pointing', back_populates='survey_tile')
     mpointings = relationship('Mpointing', back_populates='survey_tile')
-
-    def __init__(self, weight=None, survey_id=None, grid_tile_id=None):
-        self.weight = weight
-        self.survey_id = survey_id
-        self.grid_tile_id = grid_tile_id
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),

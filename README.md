@@ -30,7 +30,7 @@ Several scripts from the `scripts` folder should also be added to your path.
 
 Make sure MariaDB is installed and configured (recommended over MySQL).
 
-Then run the `setup_obs.db` script to create a blank database with all the required tables.
+Then run the `setup_obsdb` script to create a blank database with all the required tables. Note you can use the `-d/--add-defaults` option to add in definitions for the basic GOTO telescopes, otherwise the database will be entirely empty.
 
 ### Configuration
 

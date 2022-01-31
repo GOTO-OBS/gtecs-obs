@@ -1100,6 +1100,7 @@ class Mpointing(Base):
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
+    # (remember to add to __init__)
     user = relationship('User', lazy='joined', back_populates='mpointings')
     pointings = relationship('Pointing', lazy='joined', back_populates='mpointing')
     exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='mpointing')
@@ -1196,10 +1197,16 @@ class Mpointing(Base):
             self.user = kwargs['user']
         if 'user_id' in kwargs:
             self.user_id = kwargs['user_id']
-        if 'grid_tile_id' in kwargs:
-            self.grid_tile_id = kwargs['grid_tile_id']
+        if 'pointings' in kwargs:
+            self.pointings = kwargs['pointings']
+        if 'exposure_sets' in kwargs:
+            self.exposure_sets = kwargs['exposure_sets']
+        # if 'time_blocks' in kwargs:  # We don't include TimeBlocks, since they are auto-generated
+        #     self.time_blocks = kwargs['time_blocks']
         if 'grid_tile' in kwargs:
             self.grid_tile = kwargs['grid_tile']
+        if 'grid_tile_id' in kwargs:
+            self.grid_tile_id = kwargs['grid_tile_id']
         if 'survey_tile' in kwargs:
             self.survey_tile = kwargs['survey_tile']
         if 'survey_tile_id' in kwargs:
@@ -1208,6 +1215,14 @@ class Mpointing(Base):
             self.event = kwargs['event']
         if 'event_id' in kwargs:
             self.event_id = kwargs['event_id']
+        if 'grid' in kwargs:
+            self.grid = kwargs['grid']
+        if 'grid_id' in kwargs:
+            self.grid_id = kwargs['grid_id']
+        if 'survey' in kwargs:
+            self.survey = kwargs['survey']
+        if 'survey_id' in kwargs:
+            self.survey_id = kwargs['survey_id']
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),

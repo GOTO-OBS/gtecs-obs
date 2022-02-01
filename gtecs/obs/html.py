@@ -84,19 +84,19 @@ def write_flag_file(pointing, time, all_constraint_names, pointing_info):
         if debug == 1:
             f.write('Debug info:<br>\n')
             f.write('now = ' + str(time) + '<br>\n')
-            start = Time(pointing.start_time)
+            start = Time(pointing.mpointing.start_time)
             start.format = 'iso'
             start.precision = 0
             f.write('start_time = ' + str(start) + '<br>\n')
-            if pointing.stop_time:
-                stop = Time(pointing.stop_time)
+            if pointing.mpointing.stop_time:
+                stop = Time(pointing.mpointing.stop_time)
                 stop.format = 'iso'
                 stop.precision = 0
             else:
                 stop = 'None'
             f.write('stop_time = ' + str(stop) + '<br>\n')
 
-            target = ICRS(pointing.ra * u.deg, pointing.dec * u.deg)
+            target = ICRS(pointing.mpointing.ra * u.deg, pointing.mpointing.dec * u.deg)
             ra = target.ra.to_string(sep=':', precision=2, unit=u.hour)
             dec = target.dec.to_string(sep=':', precision=2)
             f.write('ra = ' + ra + '<br>\n')
@@ -241,8 +241,8 @@ def write_queue_page(observer):
             # find database info
             session = db.load_session()
             pointing = db.get_pointing_by_id(session, db_id)
-            if pointing.exposure_sets is not None:
-                exposure_sets = pointing.exposure_sets
+            if pointing.mpointing.exposure_sets is not None:
+                exposure_sets = pointing.mpointing.exposure_sets
             username = pointing.user.username
             session.close()
 
@@ -255,10 +255,10 @@ def write_queue_page(observer):
             write_exp_file(db_id, exposure_sets)
             exp_link = 'ID_{}_exp.html'.format(db_id)
             exp_str = ('<a href=' + exp_link + ' rel=\"#overlay\">' +
-                       str(pointing.object_name) + '</a>' + popup_str)
+                       str(pointing.mpointing.object_name) + '</a>' + popup_str)
 
             # find ra/dec
-            target = ICRS(pointing.ra * u.deg, pointing.dec * u.deg)
+            target = ICRS(pointing.mpointing.ra * u.deg, pointing.mpointing.dec * u.deg)
             ra = target.ra.to_string(sep=':', precision=2, unit=u.hour)
             dec = target.dec.to_string(sep=':', precision=2)
 
@@ -267,11 +267,11 @@ def write_queue_page(observer):
             f.write('<td>' + exp_str + '</td>' +
                     '<td>' + ra + '</td>' +
                     '<td>' + dec + '</td>' +
-                    '<td>' + str(pointing.min_time) + '</td>' +
-                    '<td>' + str(pointing.min_alt) + '</td>' +
-                    '<td>' + str(pointing.max_sunalt) + '</td>' +
-                    '<td>' + str(pointing.max_moon) + '</td>' +
-                    '<td>' + str(pointing.min_moonsep) + '</td>' +
+                    '<td>' + str(pointing.mpointing.min_time) + '</td>' +
+                    '<td>' + str(pointing.mpointing.min_alt) + '</td>' +
+                    '<td>' + str(pointing.mpointing.max_sunalt) + '</td>' +
+                    '<td>' + str(pointing.mpointing.max_moon) + '</td>' +
+                    '<td>' + str(pointing.mpointing.min_moonsep) + '</td>' +
                     '<td>' + str(username) + '</td>' +
                     '<td>' + str(pointing.start_time) + '</td>' +
                     '<td>' + str(pointing.stop_time) + '</td>' +

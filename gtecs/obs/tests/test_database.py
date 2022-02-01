@@ -14,16 +14,17 @@ from gtecs.obs import database as db
 # add a user
 with db.open_session() as session:
     # create a test user
-    user = db.User(username='goto_test', password='password', full_name='GOTO Test Observer')
+    user = db.User(username='test_user', password='password', full_name='GOTO Test Observer')
     print(user)
     session.add(user)
     session.commit()
     print(user, end='\n\n')
 
     # check the password was stored correctly
-    if not db.validate_user(session, username='goto_test', password='password'):
+    if not db.validate_user(session, username='test_user', password='password'):
         raise ValueError('Failed to validate user')
 
+print('-------')
 with db.open_session() as session:
     # create a site
     si = db.Site.from_name('LaPalma')
@@ -81,26 +82,11 @@ with db.open_session() as session:
     print(st2, end='\n\n')
 time.sleep(2)
 
-
+print('-------')
 with db.open_session() as session:
-    # let's make a Pointing
-    user = db.get_user(session, username='goto_test')
-    p = db.Pointing(object_name='IP Peg',
-                    ra=350.785625,
-                    dec=18.416472,
-                    rank=9,
-                    min_time=3600,
-                    start_time=Time.now(),
-                    stop_time=Time.now() + 3 * u.day,
-                    user=user,
-                    )
-    e = db.ExposureSet(num_exp=20, exptime=20, filt='G')
-    p.exposure_sets.append(e)
-    session.add(p)
-    session.commit()
-    print(p, end='\n\n')
+    user = db.get_user(session, username='test_user')
 
-    # create an Mpointing
+    # let's make an Mpointing
     mp = db.Mpointing(object_name='M31',
                       ra=10.685,
                       dec=41.2875,
@@ -120,32 +106,39 @@ with db.open_session() as session:
     session.add(mp)
     session.commit()
     print(mp, end='\n\n')
+    print(mp.pointings, end='\n\n')
+    print(mp.time_blocks, end='\n\n')
     print(L)
     print(R)
     print(G)
     print(B, end='\n\n')
 
-# new session, add random pointings
+print('-------')
 with db.open_session() as session:
-    user = db.get_user(session, username='goto_test')
+    user = db.get_user(session, username='test_user')
 
-    pointings = [db.make_random_pointing(user) for i in range(10)]
-    db.insert_items(session, pointings)
+    # new session, add random mpointings
+    mpointings = [db.make_random_mpointing(user) for i in range(10)]
+    db.insert_items(session, mpointings)
+    for mp in mpointings:
+        print(mp, mp.pointings)
 
-    more_pointings = [db.make_random_pointing(user) for i in range(10)]
-    db.insert_items(session, more_pointings)
+    more_mpointings = [db.make_random_mpointing(user) for i in range(10)]
+    db.insert_items(session, more_mpointings)
+    for mp in more_mpointings:
+        print(mp, mp.pointings)
 
-    # now check how many we have
-    n_points = len(db.get_pointings(session))
+    # now check how many pointings we have (should be 1 for each mpointing)
+    n_pointings = len(db.get_pointings(session))
+    print('{} pointings in database'.format(n_pointings))
+
+    # get the queue and see how many are pending
     current, pending = db.get_queue(session)
     n_queue = len(pending)
-    print('{} points in database'.format(n_points))
-    print('{} points in queue'.format(n_queue))
+    print('{} pointings in queue'.format(n_queue))
+time.sleep(2)
 
-time.sleep(5)
 print('-------')
-
-# now let's go through a caretaker step
 with db.open_session() as s:
     def print_summary(mp, now):
         """Print a summary of the database."""
@@ -158,6 +151,8 @@ with db.open_session() as s:
 
     mp = db.get_mpointing_by_id(s, 1)
     print(mp)
+    print(mp.pointings)
+    print(mp.time_blocks, end='\n\n')
 
     # lets pretend we're observing with a telescope to check the triggers
     t = db.get_telescope_by_id(s, 1)
@@ -166,18 +161,7 @@ with db.open_session() as s:
     print()
 
     while True:
-        # schedule next pointing
-        next_pointing = mp.get_next_pointing(time=now)
-        if next_pointing is None:
-            break
-
-        print(now, 'Creating Pointing')
-        s.add(next_pointing)
-        s.commit()
-        print_summary(mp, now)
-        time.sleep(1)
-        print()
-
+        next_pointing = mp.pointings[-1]
         if next_pointing.status == 'upcoming':
             # skip ahead until the pointing is pending
             print(now, 'Skipping ahead to Pointing start time')
@@ -203,6 +187,18 @@ with db.open_session() as s:
         time.sleep(1)
         print()
 
+        # create next pointing
+        next_pointing = mp.get_next_pointing(time=now)
+        if next_pointing is None:
+            break
+
+        print(now, 'Creating new Pointing')
+        s.add(next_pointing)
+        s.commit()
+        print_summary(mp, now)
+        time.sleep(1)
+        print()
+
         # skip ahead by a small amount
         now = now + 30 * u.s
 
@@ -210,11 +206,8 @@ with db.open_session() as s:
     mps_to_schedule = db.get_mpointings(s, status='unscheduled')
     print('There are {} Mpointings to schedule'.format(len(mps_to_schedule)))
 
-    n_points = len(db.get_pointings(s))
-    current, pending = db.get_queue(s)
-    marked = db.get_pointings(s, status='expired')
+    n_pointings = len(db.get_pointings(session))
+    print('{} pointings in database'.format(n_pointings))
+    current, pending = db.get_queue(session)
     n_queue = len(pending)
-
-    print('{} points in database'.format(n_points))
-    print('{} points in queue'.format(n_queue))
-    print('{} marked expired pointings\n'.format(len(marked)))
+    print('{} pointings in queue'.format(n_queue))

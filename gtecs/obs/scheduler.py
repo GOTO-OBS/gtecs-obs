@@ -129,13 +129,6 @@ class Pointing(object):
     @classmethod
     def from_database(cls, db_pointing):
         """Import a pointing from the database."""
-        # num_obs will be stored on the Mpointing, if it has one
-        # If not then it's a one-off, so num_obs=0
-        if db_pointing.mpointing:
-            num_obs = db_pointing.mpointing.num_completed
-        else:
-            num_obs = 0
-
         # weight is stored on the Survey Tile, if it has one
         # If not it effectively contains 100% of the target, so weight=1
         if db_pointing.survey_tile:
@@ -143,26 +136,23 @@ class Pointing(object):
         else:
             weight = 1
 
-        # The current pointing has running status
-        current = bool(db_pointing.status == 'running')
-
         # Create pointing object
         pointing = cls(db_id=db_pointing.db_id,
-                       name=db_pointing.object_name,
-                       ra=db_pointing.ra,
-                       dec=db_pointing.dec,
+                       name=db_pointing.mpointing.object_name,
+                       ra=db_pointing.mpointing.ra,
+                       dec=db_pointing.mpointing.dec,
                        rank=db_pointing.rank,
                        weight=weight,
-                       num_obs=num_obs,
-                       too=db_pointing.too,
-                       maxsunalt=db_pointing.max_sunalt,
-                       minalt=db_pointing.min_alt,
-                       mintime=db_pointing.min_time,
-                       maxmoon=db_pointing.max_moon,
-                       minmoonsep=db_pointing.min_moonsep,
+                       num_obs=db_pointing.mpointing.num_completed,
+                       too=db_pointing.mpointing.too,
+                       maxsunalt=db_pointing.mpointing.max_sunalt,
+                       minalt=db_pointing.mpointing.min_alt,
+                       mintime=db_pointing.mpointing.min_time,
+                       maxmoon=db_pointing.mpointing.max_moon,
+                       minmoonsep=db_pointing.mpointing.min_moonsep,
                        start=db_pointing.start_time,
                        stop=db_pointing.stop_time,
-                       current=current)
+                       current=db_pointing.status == 'running')
         return pointing
 
 

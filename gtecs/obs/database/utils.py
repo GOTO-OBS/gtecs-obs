@@ -148,9 +148,6 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     # only get pending pointings
     queue = queue.filter(Pointing.status == 'pending')
 
-    # only get pointings with exposure sets, we've seen some odd ones without any
-    queue = queue.filter(Pointing.num_expsets > 0)
-
     if time is None:
         time = Time.now()
     now = time.iso
@@ -160,23 +157,23 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     # are we before the stop time (if any)?
     queue = queue.filter(or_(Pointing.stop_time > now, Pointing.stop_time == None))  # noqa: E711
 
-    # now limit by RA and Dec
+    # now limit by RA and Dec (note use of .has() for Mpointing properties)
     if location is not None:
         # local sidereal time, units of degrees
         lst = time.sidereal_time('mean', location.lon)
         lo_lim = Longitude(lst - hourangle_limit * u.hourangle).deg
         up_lim = Longitude(lst + hourangle_limit * u.hourangle).deg
         if up_lim > lo_lim:
-            queue = queue.filter(Pointing.ra < up_lim,
-                                 Pointing.ra > lo_lim)
+            queue = queue.filter(Pointing.mpointing.has(Mpointing.ra < up_lim),
+                                 Pointing.mpointing.has(Mpointing.ra > lo_lim))
         else:
-            queue = queue.filter(or_(Pointing.ra < up_lim,
-                                     Pointing.ra > lo_lim))
+            queue = queue.filter(or_(Pointing.mpointing.has(Mpointing.ra < up_lim),
+                                     Pointing.mpointing.has(Mpointing.ra > lo_lim)))
 
         # is latitude ever greater than limit?
         lat = location.lat.deg
-        queue = queue.filter(Pointing.dec > lat - 90 + altitude_limit,
-                             Pointing.dec < lat + 90 - altitude_limit)
+        queue = queue.filter(Pointing.mpointing.has(Mpointing.dec > lat - 90 + altitude_limit),
+                             Pointing.mpointing.has(Mpointing.dec < lat + 90 - altitude_limit))
 
     queue = queue.order_by('rank')
 
@@ -509,6 +506,7 @@ def mark_completed(pointing_id):
     with open_session() as s:
         pointing = get_pointing_by_id(s, pointing_id)
         pointing.mark_finished(completed=True)
+        # Could we schedule the next pointing at this point??
 
 
 def mark_interrupted(pointing_id):
@@ -525,6 +523,7 @@ def mark_interrupted(pointing_id):
     with open_session() as s:
         pointing = get_pointing_by_id(s, pointing_id)
         pointing.mark_finished(completed=False)
+        # Could we schedule the next pointing at this point??
 
 
 def mark_running(pointing_id, telescope_id):

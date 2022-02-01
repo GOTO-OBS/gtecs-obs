@@ -54,9 +54,17 @@ class User(Base):
         a short user name
     password : string
         password for authentication
-        the password is stored as a hash in the database, so the unhashed string isn't stored
+        the password is stored as a hash in the database, this unhashed string isn't stored
     full_name : string
         the user's full name.
+
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    -------------
+    mpointings : list of `Mpointing`, optional
+        the Mpointings created by this User, if any
 
     Attributes
     ----------
@@ -65,52 +73,6 @@ class User(Base):
         only populated when the instance is added to the database
     password_hash : str
         the hashed password as stored in the database
-
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
-
-    Relationships
-    -------------
-    mpointings : list of `Mpointing`, optional
-        the Mpointings associated with this User, if any
-    pointings : list of `Pointing`, optional
-        the Pointings associated with this User, if any
-
-    Examples
-    --------
-    Create a new User:
-    >>> bob = User(username='bob', password='1234', full_name='Bob Marley')
-
-    Add the User to the session:
-    >>> session = load_session()
-    >>> session.add(bob)
-
-    Note the db_id will still be None until the changes are committed:
-    >>> bob
-    User(db_id=None, username=bob, full_name=Bob Marley)
-    >>> session.commit()
-    >>> bob
-    User(db_id=1, username=bob, full_name=Bob Marley)
-
-    Make a random pointing assigned to Bob:
-    >>> pointing = make_random_pointing(user=bob)
-
-    Bob has no Pointings until the pointing is committed:
-    >>> bob.pointings
-    []
-    >>> session.add(pointing)
-    >>> session.commit()
-    >>> bob.pointings
-    [Pointing(db_id=1, status=pending, object_name=random_object, ra=28.2859, dec=60.8787, rank=62,
-    ... min_alt=30.0, max_sunalt=-15.0, min_time=184.365, max_moon=G, min_moonsep=30.0, too=False,
-    ... start_time=2019-02-18 16:53:38, stop_time=2019-02-24 16:53:38, running_time=None,
-    ... finished_time=None, user_id=1, mpointing_id=None, time_block_id=None, grid_tile_id=None,
-    ... survey_tile_id=None, event_id=None)]
-
-    Note the Pointing has Bob's user_id=1.
-
-    Remember to close the session:
-    >>> session.close()
 
     """
 
@@ -126,19 +88,14 @@ class User(Base):
     full_name = Column(Text, nullable=False)
 
     # Foreign relationships
-    pointings = relationship('Pointing', back_populates='user')
     mpointings = relationship('Mpointing', back_populates='user')
 
-    def __init__(self, username=None, password=None, full_name=None, **kwargs):
-        self.username = username
-        self.password_hash = hashlib.sha512(password.encode()).hexdigest()
-        self.full_name = full_name
+    def __init__(self, **kwargs):
+        # Use hashed password instead of plain
+        kwargs['password_hash'] = hashlib.sha512(kwargs.pop('password').encode()).hexdigest()
 
-        # Since we're overwriting the __init__ we have to add relationships here
-        if 'pointings' in kwargs:
-            self.pointings = kwargs['pointings']
-        if 'mpointings' in kwargs:
-            self.mpointings = kwargs['mpointings']
+        # Init base class
+        super().__init__(**kwargs)
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -152,8 +109,8 @@ class ExposureSet(Base):
     """A class to represent an Exposure Set.
 
     An Exposure Set is a set of repeated identical exposures, with the same
-    exposure time, filter, binning factor etc. Each Pointing should have one or more
-    Exposure Sets.
+    exposure time, filter, binning factor etc. Each Mpointing should have one or more
+    Exposure Sets defined, to be observed when its Pointings are selected by the scheduler.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -191,23 +148,28 @@ class ExposureSet(Base):
         if not set, no offset will be made
         default = 0
 
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    mpointing : `Mpointing`, optional
+        the Mpointing this Exposure Set is linked to, if any
+        can also be added with the mpointing_id parameter
+
     Attributes
     ----------
     db_id : int
         primary database key
         only populated when the instance is added to the database
 
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
+    The following secondary relationships are not settable directly,
+    but are populated through the primary relationships and are available as attributes:
 
-    Relationships
+    Secondary relationships
     -------------
-    pointing : `Pointing`, optional
-        the Pointing associated with this Exposure Set, if any
-        can also be added with the pointing_id parameter
-    mpointing : `Mpointing`, optional
-        the Mpointing associated with this Exposure Set, if any
-        can also be added with the mpointing_id parameter
+    pointings : list of `Pointing`
+        the Pointings associated with the Mpointing this Exposure Set is linked to, if any
 
     """
 
@@ -230,12 +192,21 @@ class ExposureSet(Base):
     dec_offset = Column(Float, nullable=False, default=0)
 
     # Foreign keys
-    pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=True)
     mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=True)
 
     # Foreign relationships
-    pointing = relationship('Pointing', back_populates='exposure_sets')
     mpointing = relationship('Mpointing', back_populates='exposure_sets')
+    image_logs = relationship('ImageLog', lazy='joined', back_populates='exposure_set')
+
+    # Secondary relationships
+    pointings = relationship('Pointing',
+                             secondary='mpointings',
+                             primaryjoin='ExposureSet.mpointing_id == Mpointing.db_id',
+                             secondaryjoin='Pointing.mpointing_id == Mpointing.db_id',
+                             back_populates='exposure_sets',
+                             viewonly=True,
+                             uselist=True,
+                             )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -247,7 +218,6 @@ class ExposureSet(Base):
                    'ut_mask={}'.format(self.ut_mask),
                    'ra_offset={}'.format(self.ra_offset),
                    'dec_offset={}'.format(self.dec_offset),
-                   'pointing_id={}'.format(self.pointing_id),
                    'mpointing_id={}'.format(self.mpointing_id),
                    ]
         return 'ExposureSet({})'.format(', '.join(strings))
@@ -256,9 +226,13 @@ class ExposureSet(Base):
 class Pointing(Base):
     """A class to represent an Pointing.
 
-    Pointings are the primary table of the Observation Database.
-    When deciding what to observe all the Pointings are processed
-    based on their status and constraints.
+    Pointings are the primary table of the Observation Database, and are usually generated
+    automatically by Mpointings. When deciding what to observe the scheduler processes a queue
+    made of Pointings based on their status and constraints.
+
+    NB: you shouldn't ever have to manually create Pointings, instead you should generate them
+    from an Mpointing using its get_next_pointing() method. The first Pointing is also created when
+    the Mpointing is.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -268,42 +242,9 @@ class Pointing(Base):
 
     Parameters
     ----------
-    object_name : str
-        object name
-    ra : float
-        J2000 right ascension in decimal degrees
-        if ra is not given and this Pointing is linked to a GridTile
-        then the ra will be extracted from the GridTile
-    dec : float
-        J2000 declination in decimal degrees
-        if dec is not given and this Pointing is linked to a GridTile
-        then the dec will be extracted from the GridTile
     rank : Integer
-        rank to use for pointing
-    min_time : float
-        minimum time needed to schedule pointing
+        rank to use when scheduling (should be the current_rank of the linked mpointing)
 
-    too : bool, optional
-        indicates if this is a Target of Opportunity (ToO)
-        default = False
-    tel_mask : int, optional
-        if set, this is a binary mask which will determine which telescopes
-        can carry out the observation.
-        A value of 4 (binary (0100) means only observable by Telescope 3, a value of
-        5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
-        default = None (no restriction)
-    min_alt : float, optional
-        minimum altitude to observe at
-        default = 30
-    max_sunalt : float, optional
-        altitude constraint on Sun
-        default = -15
-    max_moon : string, optional
-        Moon constraint. one of 'D', 'G', 'B'
-        default = 'B'
-    min_moonsep : float, optional
-        distance constraint from the Moon, degrees
-        default = 30
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which pointing is considered valid and can be started
         default = Time.now()
@@ -312,6 +253,38 @@ class Pointing(Base):
         can be None, if so the pointing will stay in the queue indefinitely
         (it can't be marked as expired) and will only leave when observed
         default = None
+    creation_time : string, `astropy.time.Time` or datetime.datetime, optional
+        the time the pointing was created
+        this should usually be set automatically, unless doing simulations
+        default = Time.now()
+    running_time : string, `astropy.time.Time` or datetime.datetime, or None, optional
+        the time the pointing was marked as running (i.e. started being observed)
+        this should usually be set automatically when the pointing status is set
+        default = None
+    finished_time : string, `astropy.time.Time` or datetime.datetime, or None, optional
+        the time the pointing was marked as finished (i.e. completed or interupted)
+        this should usually be set automatically when the pointing status is set
+        default = None
+    completed : bool or None, optional
+        if the pointing was successfully completed (True) or interupted (False), or just
+        hasn't started yet (None)
+        default = None
+
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    mpointing : `Mpointing`
+        the Mpointing associated with this Pointing
+        can also be added with the mpointing_id parameter
+
+    time_block : `TimeBlock`, optional
+        the TimeBlock this Pointing as generated from, if any
+        can also be added with the time_block_id parameter
+    telescope : `Telescope`, optional
+        the Telescope this Pointing was observed by, if any
+        can also be added with the telescope_id parameter
 
     Attributes
     ----------
@@ -320,121 +293,34 @@ class Pointing(Base):
         only populated when the instance is added to the database
     status : string
         status of the pointing
-    num_expsets : int
-        the number of exposure sets linked to this pointing
-        should be the same as len(self.exposure_sets), but much faster
-    running_time : datetime.datetime, or None
-        if the pointing has started (been marked running)
-        this will give the time it was updated
-    finished_time : datetime.datetime, or None
-        if the pointing has finished (either completed or cancelled for
-        some reason) this will give the time it was updated
-
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
-
-    Relationships
-    -------------
-    user : `User`
-        the User associated with this Pointing
-        required before addition to the database
-        can also be added with the user_id parameter
-
-    exposure_sets : list of `ExposureSet`, optional
-        the Exposure Sets associated with this Pointing, if any
-    mpointing : `Mpointing`, optional
-        the Mpointing associated with this Pointing, if any
-        can also be added with the mpointing_id parameter
-    telescope : `Telescope`, optional
-        the Telescope associated with this Pointing, if any
-        can also be added with the telescope_id parameter
-    grid_tile : `GridTile`, optional
-        the GridTile associated with this Pointing, if any
-        can also be added with the grid_tile_id parameter
-    survey_tile : `SurveyTile`, optional
-        the SurveyTile associated with this Pointing, if any
-        can also be added with the survey_tile_id parameter
-    event : `Event`, optional
-        the Event associated with this Pointing, if any
-        can also be added with the event_id parameter
 
     The following secondary relationships are not settable directly,
-    but are populated through the above tables if given:
+    but are populated through the primary relationships and are available as attributes:
 
     Secondary relationships
     -----------------------
-    grid : `Grid`
-        the Grid that the GridTile associated with this Mpointing,
-        if any, is associated with
-    survey : `Survey`
-        the Survey that the SurveyTile associated with this Mpointing,
-        if any, is associated with
+    exposure_sets : list of `ExposureSet`
+        the ExposureSets linked to the Mpointing this Pointing was generated from
+    grid_tile : `GridTile`
+        the GridTile the Mpointing this Pointing was generated from covers, if any
+    survey_tile : `SurveyTile`
+        the SurveyTile the Mpointing this Pointing was generated from covers, if any
+    event : `Event`
+        the Event the Mpointing this Pointing was generated from was part of, if any
 
-    Examples
-    --------
-    >>> from gtecs.obs.database import *
-    >>> from astropy import units as u
-    >>> from astropy.time import Time
-    >>> session = load_session()
-
-    Create a new pointing:
-    >>> p = Pointing(object_name='IP Peg', ra=350.785625, dec=18.416472, rank=9, min_time=3600,
-    ... start_time=Time.now(), stop_time=Time.now()+3*u.day)
-    >>> p
-    Pointing(db_id=None, status=None, object_name=IP Peg, ra=350.785625, dec=18.416472, rank=9,
-    min_alt=30, max_sunalt=-15, min_time=3600, max_moon=G, min_moonsep=30, too=False,
-    start_time=2019-02-25 10:40:50, stop_time=2019-02-28 10:40:50, running_time=None,
-    finished_time=None, user_id=None, mpointing_id=None, time_block_id=None, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-
-    However it can't be insterted into the database until it is assigned to a User:
-    >>> session.add(p)
-    >>> session.commit()
-    IntegrityError: (1048, "Column 'user_id' cannot be null")
-
-    Try again, but this time get a User to assign it to:
-    >>> session.rollback()
-    >>> bob = get_user(session, username='bob')
-    >>> p.user = bob
-    >>> session.add(p)
-    >>> session.commit()
-    >>> p
-    Pointing(db_id=1, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=G, min_moonsep=30.0, too=False,
-    start_time=2019-02-25 10:48:02, stop_time=2019-02-28 10:48:02, running_time=None,
-    finished_time=None, user_id=1, mpointing_id=None, time_block_id=None, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-
-    Note the changes to above are db_id=1, status=pending and user_id=1.
-
-    At the moment this Pointing has no Exposure Sets, so it's fairly useless.
-
-    We can either add these to the Pointing's exposure_sets list attribute directly:
-    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L')
-    >>> p.exposure_sets.append(e1)
-    >>> session.add(e1)
-    >>> session.commit()
-    >>> p.exposure_sets
-    [ExposureSet(db_id=1, num_exp=3, exptime=30.0, filt=L, binning=1, imgtype=SCIENCE,
-    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None)]
-
-    or create ExposureSets and assign the pointing to them:
-    >>> e2 = ExposureSet(num_exp=3, exptime=30, filt='R', pointing=p)
-    >>> e3 = ExposureSet(num_exp=3, exptime=30, filt='G', pointing=p)
-    >>> e4 = ExposureSet(num_exp=3, exptime=30, filt='B', pointing=p)
-    >>> insert_items(session, [e2, e3, e4])
-    >>> session.commit()
-    >>> p.exposure_sets
-    [ExposureSet(db_id=1, num_exp=3, exptime=30.0, filt=L, binning=1, imgtype=SCIENCE,
-    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None),
-    ExposureSet(db_id=2, num_exp=3, exptime=30.0, filt=R, binning=1, imgtype=SCIENCE,
-    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None),
-    ExposureSet(db_id=3, num_exp=3, exptime=30.0, filt=G, binning=1, imgtype=SCIENCE,
-    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None),
-    ExposureSet(db_id=4, num_exp=3, exptime=30.0, filt=B, binning=1, imgtype=SCIENCE,
-    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=None)]
-
-    >>> session.close()
+    Methods
+    -------
+    status_at_time(time) : str
+        status of the pointing at the given time
+    mark_deleted(time=None)
+        mark the pointing as deleted
+        if no time is given, default to Time.now()
+    mark_running(self, telescope=None, time=None)
+        mark the pointing as running on the given telescope
+        if no time is given, default to Time.now()
+    mark_finished(self, completed=True, time=None)
+        mark the pointing as finished, either completed (True) or interupted (False)
+        if no time is given, default to Time.now()
 
     """
 
@@ -446,24 +332,12 @@ class Pointing(Base):
 
     # Columns
     # # Basic properties
-    object_name = Column('object', Text, nullable=False)  # object is a built in class in Python
-    ra = Column(Float, nullable=False)
-    dec = Column(Float, nullable=False)
     rank = Column(Integer, nullable=False)
     # # Constraints
-    min_alt = Column(Float, nullable=False, default=30)
-    max_sunalt = Column(Float, nullable=False, default=-15)
-    min_time = Column(Float, nullable=False)
-    max_moon = Column(String(1), nullable=False, default='B')
-    min_moonsep = Column(Float, nullable=False, default=30)
-    too = Column(Boolean, nullable=False, default=False)
-    tel_mask = Column(Integer, default=None)
-    start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow(),
-                        server_default=text('CURRENT_TIMESTAMP'))
+    start_time = Column(DateTime, nullable=False, index=True, server_default=func.now())
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
     # # Status
-    creation_time = Column(DateTime, nullable=False, default=datetime.datetime.utcnow(),
-                           server_default=text('CURRENT_TIMESTAMP'))
+    creation_time = Column(DateTime, nullable=False, server_default=func.now())
     running_time = Column(DateTime, nullable=True, default=None)
     finished_time = Column(DateTime, nullable=True, default=None)
     completed = Column(Boolean, nullable=False, default=False)
@@ -472,75 +346,76 @@ class Pointing(Base):
                 server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign keys
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=True)
-    time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=True)
+    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=False)
+    time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=False)
     telescope_id = Column(Integer, ForeignKey('telescopes.id'), nullable=True)
-    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True)
-    survey_tile_id = Column(Integer, ForeignKey('survey_tiles.id'), nullable=True)
-    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
-    user = relationship('User', lazy='joined', back_populates='pointings')
-    exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='pointing')
     mpointing = relationship('Mpointing', lazy='joined', back_populates='pointings')
     time_block = relationship('TimeBlock', lazy='joined', back_populates='pointings')
     telescope = relationship('Telescope', lazy='joined', back_populates='pointings')
-    grid_tile = relationship('GridTile', lazy='joined', back_populates='pointings')
-    survey_tile = relationship('SurveyTile', lazy='joined', back_populates='pointings')
-    event = relationship('Event', lazy='joined', back_populates='pointings')
+    image_logs = relationship('ImageLog', lazy='joined', back_populates='pointing')
 
     # Secondary relationships
-    grid = relationship('Grid',
-                        lazy='joined',
-                        secondary='grid_tiles',
-                        primaryjoin='Pointing.grid_tile_id == GridTile.db_id',
-                        secondaryjoin='Grid.db_id == GridTile.grid_id',
-                        back_populates='pointings',
-                        viewonly=True,
-                        uselist=False,
-                        )
-    survey = relationship('Survey',
-                          lazy='joined',
-                          secondary='survey_tiles',
-                          primaryjoin='Pointing.survey_tile_id == SurveyTile.db_id',
-                          secondaryjoin='Survey.db_id == SurveyTile.survey_id',
-                          back_populates='pointings',
-                          viewonly=True,
-                          uselist=False,
-                          )
-    # Column properties
-    num_expsets = column_property(select([func.count(ExposureSet.db_id)])
-                                  .where(ExposureSet.pointing_id == db_id)
-                                  .correlate_except(ExposureSet)
-                                  .scalar_subquery()
-                                  )
+    exposure_sets = relationship('ExposureSet',
+                                 secondary='mpointings',
+                                 primaryjoin='Pointing.mpointing_id == Mpointing.db_id',
+                                 secondaryjoin='ExposureSet.mpointing_id == Mpointing.db_id',
+                                 back_populates='pointings',
+                                 viewonly=True,
+                                 uselist=True,
+                                 )
+    grid_tile = relationship('GridTile',
+                             lazy='joined',
+                             secondary='mpointings',
+                             primaryjoin='Pointing.mpointing_id == Mpointing.db_id',
+                             secondaryjoin='GridTile.db_id == Mpointing.grid_tile_id',
+                             back_populates='pointings',
+                             viewonly=True,
+                             uselist=False,
+                             )
+    survey_tile = relationship('SurveyTile',
+                               lazy='joined',
+                               secondary='mpointings',
+                               primaryjoin='Pointing.mpointing_id == Mpointing.db_id',
+                               secondaryjoin='SurveyTile.db_id == Mpointing.survey_tile_id',
+                               back_populates='pointings',
+                               viewonly=True,
+                               uselist=False,
+                               )
+    event = relationship('Event',
+                         lazy='joined',
+                         secondary='mpointings',
+                         primaryjoin='Pointing.mpointing_id == Mpointing.db_id',
+                         secondaryjoin='Event.db_id == Mpointing.event_id',
+                         back_populates='pointings',
+                         viewonly=True,
+                         uselist=False,
+                         )
+
+    def __init__(self, **kwargs):
+        # Set default times
+        if 'creation_time' not in kwargs or kwargs['creation_time'] is None:
+            kwargs['creation_time'] = Time.now()
+        if 'start_time' not in kwargs or kwargs['start_time'] is None:
+            kwargs['start_time'] = kwargs['creation_time']
+
+        # Init base class
+        super().__init__(**kwargs)
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
                    'status={}'.format(self.status),
-                   'object_name={}'.format(self.object_name),
-                   'ra={}'.format(self.ra),
-                   'dec={}'.format(self.dec),
                    'rank={}'.format(self.rank),
-                   'min_alt={}'.format(self.min_alt),
-                   'max_sunalt={}'.format(self.max_sunalt),
-                   'min_time={}'.format(self.min_time),
-                   'max_moon={}'.format(self.max_moon),
-                   'min_moonsep={}'.format(self.min_moonsep),
-                   'too={}'.format(self.too),
-                   'tel_mask={}'.format(self.tel_mask),
                    'start_time={}'.format(self.start_time),
                    'stop_time={}'.format(self.stop_time),
+                   'creation_time={}'.format(self.creation_time),
                    'running_time={}'.format(self.running_time),
                    'finished_time={}'.format(self.finished_time),
-                   'user_id={}'.format(self.user_id),
+                   'completed={}'.format(self.completed),
                    'mpointing_id={}'.format(self.mpointing_id),
                    'time_block_id={}'.format(self.time_block_id),
                    'telescope_id={}'.format(self.telescope_id),
-                   'grid_tile_id={}'.format(self.grid_tile_id),
-                   'survey_tile_id={}'.format(self.survey_tile_id),
-                   'event_id={}'.format(self.event_id),
                    ]
         return 'Pointing({})'.format(', '.join(strings))
 
@@ -718,26 +593,6 @@ class Pointing(Base):
 
         self.finished_time = time
 
-    @property
-    def valid_telescopes(self):
-        """Get a list of valid Telescope IDs, if any, based on the tel_mask."""
-        if self.tel_mask is None:
-            return None
-        tel_mask_str = str(bin(self.tel_mask))[2:]
-        valid_dict = {i + 1: bool(int(d)) for i, d in enumerate(tel_mask_str[::-1])}
-        return [tel for tel in valid_dict if valid_dict[tel] is True]
-
-    @valid_telescopes.setter
-    def valid_telescopes(self, telescope_ids):
-        if telescope_ids is None:
-            self.tel_mask = None
-        else:
-            if not isinstance(telescope_ids, (list, tuple)):
-                telescope_ids = [telescope_ids]
-            telescope_ids = {int(t) for t in telescope_ids}
-            tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
-            self.tel_mask = tel_mask
-
     def mark_running(self, telescope=None, time=None):
         """Mark this Pointing as running on the given telescope."""
         if time is None:
@@ -761,9 +616,10 @@ class Pointing(Base):
         if self.telescope is not None or self.telescope_id is not None:
             raise ValueError(f'Pointing is already linked to a Telescope: {self.telescope}')
 
-        if self.valid_telescopes and telescope.db_id not in self.valid_telescopes:
+        if (self.mpointing.valid_telescopes is not None and
+                telescope.db_id not in self.mpointing.valid_telescopes):
             raise ValueError(f'Telescope ID ({telescope.db_id}) not in '
-                             f'list of valid telescopes ({self.valid_telescopes})')
+                             f'list of valid telescopes ({self.mpointing.valid_telescopes})')
         if telescope.current_pointing is not None:
             pointing_id = telescope.current_pointing.db_id
             raise ValueError(f'Telescope is already observing Pointing ID {pointing_id}')
@@ -795,8 +651,7 @@ class Pointing(Base):
 class Mpointing(Base):
     """A class to represent an Mpointing.
 
-    Mpointings are generation engines for Pointings. Most of the parameters
-    are passed directly on to the generated Pointings. Mpointings allow the
+    Mpointings are generation engines for Pointings, and allow the
     database to regenerate Pointings at given time intervals.
 
     Like all SQLAlchemy model classes, this object links to the
@@ -822,31 +677,7 @@ class Mpointing(Base):
     num_todo : int
         number of (successful) observations required.
         less than zero means repeat infinitely.
-    min_time : float
-        minimum time needed to schedule pointing
 
-    too : bool, optional
-        indicates if this is a Target of Opportunity (ToO)
-        default = False
-    tel_mask : int, optional
-        if set, this is a binary mask which will determine which telescopes
-        can carry out the observation.
-        A value of 4 (binary (0100) means only observable by Telescope 3, a value of
-        5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
-        default = None (no restriction)
-    min_alt : float, optional
-        minimum altitude to observe at, degrees
-        default = 30
-    max_sunalt : float, optional
-        altitude constraint on Sun, degrees
-        default = -15
-    max_moon : string, optional
-        Moon constraint
-        one of 'D', 'G', 'B'
-        default = 'B'
-    min_moonsep : float, optional
-        distance constraint from the Moon, degrees
-        default = 30
     wait_time : float or list of float, optional
         time to wait between pointings in minutes.
         if num_todo is greater than times given the list will be looped.
@@ -856,6 +687,32 @@ class Mpointing(Base):
         if num_todo is greater than times given the list will be looped.
         less than zero means valid indefinitely
         default = -1 (indefinitely valid)
+
+    min_alt : float, optional
+        minimum altitude to observe at, degrees
+        default = 30
+    max_sunalt : float, optional
+        altitude constraint on Sun, degrees
+        default = -15
+    min_time : float, optional
+        minimum time needed to schedule pointing
+        default = None
+    max_moon : string, optional
+        Moon constraint
+        one of 'D', 'G', 'B'
+        default = 'B'
+    min_moonsep : float, optional
+        distance constraint from the Moon, degrees
+        default = 30
+    too : bool, optional
+        indicates if this is a Target of Opportunity (ToO)
+        default = False
+    tel_mask : int, optional
+        if set, this is a binary mask which will determine which telescopes
+        can carry out the observation.
+        A value of 4 (binary (0100) means only observable by Telescope 3, a value of
+        5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
+        default = None (no restriction)
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which Mpointing is considered valid and can be started
         if not given then set to now, so the Mpointing will start immediately
@@ -865,6 +722,40 @@ class Mpointing(Base):
         if not given the Mpointing will continue creating pointings until
         it is completed
         default = None
+    creation_time : string, `astropy.time.Time` or datetime.datetime, optional
+        the time the Mpointing was created
+        this should usually be set automatically, unless doing simulations
+        default = Time.now()
+    deleted_time : string, `astropy.time.Time` or datetime.datetime, or None, optional
+        the time the pointing was marked as deleted
+        this should usually be set automatically when the pointing status is set
+        default = None
+
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    user : `User`
+        the User associated with this Mpointing
+        required before addition to the database
+        can also be added with the user_id parameter
+
+    exposure_sets : list of `ExposureSet`, optional
+        the Exposure Sets associated with this Mpointing, if any
+    pointings : list of `Pointing`, optional
+        the Pointings generated by this Mpointing, if any
+    time_blocks : list of `TimeBlock`, optional
+        the TimeBlocks generated by this Mpointing, if any
+    grid_tile : `GridTile`, optional
+        the GridTile this Mpointing covers, if any
+        can also be added with the grid_tile_id parameter
+    survey_tile : `SurveyTile`, optional
+        the SurveyTile this Mpointing covers, if any
+        can also be added with the survey_tile_id parameter
+    event : `Event`, optional
+        the Event this Mpointing is part of, if any
+        can also be added with the event_id parameter
 
     Attributes
     ----------
@@ -873,194 +764,58 @@ class Mpointing(Base):
         only populated when the instance is added to the database
     status : string
         status of the mpointing
+    scheduled : bool
+        returns True if the Mpointing is scheduled (has a pending Pointing)
     current_rank : int
         rank for next pointing to be scheduled (it will increase as pointings are observed)
+    valid_telescopes : list of int
+        a list of valid Telescope IDs, if any, based on the tel_mask
+
     num_completed : int
         number of successfully completed pointings
     num_remaining : int
         number of pointings still to do (same as num_todo - num_completed)
     infinite : bool
         if the Mpointing will continue infnitely (set if num_todo is < 0)
-
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
-
-    Relationships
-    -------------
-    user : `User`
-        the User associated with this Mpointing
-        required before addition to the database
-        can also be added with the user_id parameter
-
-    pointings : list of `Pointing`, optional
-        the Pointings associated with this Mpointing, if any
-    exposure_sets : list of `ExposureSet`, optional
-        the Exposure Sets associated with this Mpointing, if any
-    time_blocks : list of `TimeBlock`, optional
-        the Time Blocks associated with this Mpointing, if any
-    grid_tile : `GridTile`, optional
-        the GridTile associated with this Mpointing, if any
-        can also be added with the grid_tile_id parameter
-    survey_tile : `SurveyTile`, optional
-        the SurveyTile associated with this Mpointing, if any
-        can also be added with the survey_tile_id parameter
-    event : `Event`, optional
-        the Event associated with this Mpointing, if any
-        can also be added with the event_id parameter
+    last_observed : `astropy.time.Time`
+        the most recent time of completion of any Pointing linked to this Mpointing, if any
 
     The following secondary relationships are not settable directly,
-    but are populated through the above tables if given:
+    but are populated through the primary relationships and are available as attributes:
 
     Secondary relationships
     -----------------------
     grid : `Grid`
-        the Grid that the GridTile associated with this Mpointing,
-        if any, is associated with
+        the Grid that the GridTile this Mpointing covers, if any, is part of
     survey : `Survey`
-        the Survey that the SurveyTile associated with this Mpointing,
-        if any, is associated with
+        the Survey that the SurveyTile this Mpointing covers, if any, is part of
 
-    Examples
-    --------
-    >>> from gtecs.obs.database import *
-    >>> from astropy.time import Time
-    >>> bob = get_user(session, username='bob')
-
-    Make an Mpointing.
-    Note we set the start_time to midnight, num_todo to 5 and valid_time & wait_time to 10 mins.
-    >>> mp = Mpointing(object_name='IP Peg', ra=350.785625, dec=18.416472, start_rank=9,
-    ... num_todo=5, min_time=3600, start_time=Time('2018-01-01 00:00:00'), valid_time=10,
-    ... wait_time=10, user=bob)
-    >>> session.add(mp)
-    >>> session.commit()
-    >>> mp
-    Mpointing(db_id=1, status=unscheduled, num_todo=5, num_completed=0, num_remaining=5,
-    infinite=False, object_name=IP Peg, ra=350.785, dec=18.4165, current_rank=9, start_rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-
-    Take a look at the Time Blocks, you can see that we only need one:
-    >>> mp.time_blocks
-    [TimeBlock(db_id=1, block_num=1, valid_time=10.0, wait_time=10.0, current=True, mpointing_id=1)]
-
-    For a more complicated example, give a list to wait_time to have the intervals between
-    pointings increase: from 10 minutes, to 20 then 30:
-    >>> mp = Mpointing(object_name='IP Peg', ra=350.785625, dec=18.416472, start_rank=9,
-    ... num_todo=5, min_time=3600, start_time=Time('2018-01-01 00:00:00'),valid_time=10,
-    ... wait_time=[10,20,30], user=bob)
-    >>> session.add(mp)
-    >>> session.commit()
-    >>> mp
-    Mpointing(db_id=2, status=unscheduled, num_todo=5, num_completed=0, num_remaining=5,
-    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, start_rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-
-    Note this Mpointing looks exactly the same as the previous (aside from db_id=2).
-    The difference is in the Time Blocks:
-    >>> mp.time_blocks
-    [TimeBlock(db_id=2, block_num=1, valid_time=10.0, wait_time=10.0, current=True, mpointing_id=2),
-    TimeBlock(db_id=3, block_num=2, valid_time=10.0, wait_time=20.0, current=False, mpointing_id=2),
-    TimeBlock(db_id=4, block_num=3, valid_time=10.0, wait_time=30.0, current=False, mpointing_id=2)]
-
-    Since num_todo=5, a total of 5 Pointings will be generated for the Mpointing.
-    Each will use a Time Block, looping through the list.
-    In this case the sequence will look like this:
-    Pointing 1: start_time=00:00, stop_time=00:10 (valid for 10 minutes, then wait for 10)
-    Pointing 2: start_time=00:20, stop_time=00:30 (valid for 10 minutes, then wait for 20)
-    Pointing 3: start_time=00:50, stop_time=01:00 (valid for 10 minutes, then wait for 30)
-    Pointing 4: start_time=01:30, stop_time=01:40 (valid for 10 minutes, then wait for 10)*
-    Pointing 5: start_time=01:50, stop_time=02:00 (valid for 10 minutes, then wait for 20)
-    *Since there were 5 to do but only 3 blocks we looped back to the start.
-
-    Like a Pointing, an Mpointing is only useful if it has at least one Exposure Set:
-    >>> e1 = ExposureSet(num_exp=3, exptime=30, filt='L')
-    >>> mp.exposure_sets.append(e1)
-    >>> session.add(e1)
-    >>> session.commit()
-    >>> mp.exposure_sets
-    [ExposureSet(db_id=1, num_exp=3, exptime=30.0, filt=L, binning=1, imgtype=SCIENCE,
-    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=None, mpointing_id=1)]
-
-    These will be passed onto its Pointings when they are created.
-    This is done using the get_next_function() method:
-    >>> p = mp.get_next_pointing()
-    >>> p
-    Pointing(db_id=None, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00, running_time=None,
-    finished_time=None, user_id=None, mpointing_id=None, time_block_id=None, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-
-    Once it's added to the database you will see the times and IDs set:
-    >>> session.add(p)
-    >>> session.commit()
-    >>> p
-    Pointing(db_id=1, status=pending, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00, running_time=None,
-    finished_time=None, user_id=1, mpointing_id=1, time_block_id=1, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-
-    Check the Exposure Sets:
-    >>> p.exposure_sets
-    [ExposureSet(db_id=1, num_exp=3, exptime=30.0, filt=L, binning=1, imgtype=SCIENCE,
-    ut_mask=None, ra_offset=0.0, dec_offset=0.0, pointing_id=1, mpointing_id=1)]
-
-    As it has a pending Pointing associated with it the Mpointing status is now 'scheduled':
-    >>> mp
-    Mpointing(db_id=1, status=scheduled, num_todo=5, num_completed=0, num_remaining=5,
-    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, start_rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-
-    We can simulate an observation by marking the Pointing as running and then completed:
-    >>> p.status = 'running'
-    >>> s.commit()
-    >>> p
-    Pointing(db_id=1, status=running, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00,
-    running_time=2019-02-25 11:45:51, finished_time=None, user_id=1, mpointing_id=1,
-    time_block_id=1, grid_tile_id=None, survey_tile_id=None, event_id=None)
-    >>> mp
-    Mpointing(db_id=1, status=scheduled, num_todo=5, num_completed=0, num_remaining=5,
-    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=9, start_rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-    >>> p.status = 'completed'
-    >>> s.commit()
-    >>> p
-    Pointing(db_id=1, status=completed, object_name=IP Peg, ra=350.786, dec=18.4165, rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=2018-01-01 00:10:00,
-    running_time=2019-02-25 11:50:52, finished_time=2019-02-25 11:52:09, user_id=1, mpointing_id=1,
-    time_block_id=1, grid_tile_id=None, survey_tile_id=None, event_id=None)
-    >>> mp
-    Mpointing(db_id=1, status=unscheduled, num_todo=5, num_completed=1, num_remaining=4,
-    infinite=False, object_name=IP Peg, ra=350.786, dec=18.4165, current_rank=19, start_rank=9,
-    min_alt=30.0, max_sunalt=-15.0, min_time=3600.0, max_moon=B, min_moonsep=30.0, too=False,
-    start_time=2018-01-01 00:00:00, stop_time=None, user_id=1, grid_tile_id=None,
-    survey_tile_id=None, event_id=None)
-    >>> session.close()
-
-    Things to note: after marking the Pointing as running the Pointing's running_time was filled,
-    but nothing else changed. After marking it as completed the finished_time was filled, but the
-    Mpointing was also reset to unscheduled and the num_completed went up by one (and num_remaining
-    went down by 1).
-
-    You can repeat this process using mp.get_next_pointing(), adding it, marking it as running and
-    then completed. Once it reaches num_completed=5 (num_remaining=0) it will stop, and
-    mp.get_next_pointing() will return None.
-
-    Note if the pointing was marked aborted not completed then the next one would still be
-    generated, but the num_completed in the Mpointing wouldn't increase.
-
-    >>> session.close()
+    Methods
+    -------
+    status_at_time(time) : str
+        status of the pointing at the given time
+    scheduled_at_time(time) : bool
+        returns True if the Mpointing was scheduled (has a pending Pointing) at the given time
+    num_completed_at_time(time) : int
+        number of successfully completed pointings at the given time
+    num_remaining_at_time(time) : int
+        number of pointings still to do at the given time
+    current_rank_at_time(time) : int
+        rank for next pointing to be scheduled at the given time
+    mark_deleted(time=None)
+        mark the pointing as deleted
+        if no time is given, default to Time.now()
+    get_current_block() : TimeBlock, or None
+        get the current TimeBlock
+    get_last_block() : TimeBlock, or None
+        get the previous TimeBlock
+    get_next_block() : TimeBlock, or None
+        get the upcoming TimeBlock
+    get_next_pointing(time=None) : Pointing, or None
+        generate the next Pointing for this Mpointing
+        returns None if a Pointing is already scheduled, or if the Mpointing is completed
+        the time is set as the Pointing creation time, and should usually be set automatically
+        unless doing simulations
 
     """
 
@@ -1085,12 +840,10 @@ class Mpointing(Base):
     min_moonsep = Column(Float, nullable=False, default=30)
     too = Column(Boolean, nullable=False, default=False)
     tel_mask = Column(Integer, default=None)
-    start_time = Column(DateTime, nullable=False, index=True, default=datetime.datetime.utcnow(),
-                        server_default=text('CURRENT_TIMESTAMP'))
+    start_time = Column(DateTime, nullable=False, index=True, server_default=func.now())
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
     # # Status
-    creation_time = Column(DateTime, nullable=False, default=datetime.datetime.utcnow(),
-                           server_default=text('CURRENT_TIMESTAMP'))
+    creation_time = Column(DateTime, nullable=False, server_default=func.now())
     deleted_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
@@ -1141,88 +894,43 @@ class Mpointing(Base):
                                     .scalar_subquery()
                                     )
 
-    def __init__(self, object_name=None, ra=None, dec=None,
-                 start_rank=None, min_alt=None, min_time=None,
-                 max_moon=None, min_moonsep=None, max_sunalt=None, too=None, tel_mask=None,
-                 start_time=None, stop_time=None, num_todo=None, valid_time=-1, wait_time=0,
-                 **kwargs):
-        self.ra = ra
-        self.dec = dec
-        self.object_name = object_name
-        self.start_rank = start_rank
-        self.max_moon = max_moon
-        self.min_moonsep = min_moonsep
-        self.min_alt = min_alt
-        self.min_time = min_time
-        self.max_sunalt = max_sunalt
-        self.too = too
-        self.tel_mask = tel_mask
-        self.start_time = start_time if start_time is not None else datetime.datetime.utcnow()
-        self.stop_time = stop_time
-        self.num_todo = num_todo
+    def __init__(self, **kwargs):
+        # Get extra arguments (need to remove from kwargs before super init)
+        valid_times = kwargs.pop('valid_time') if 'valid_time' in kwargs else -1
+        if not isinstance(valid_times, list):
+            valid_times = [valid_times]
+        wait_times = kwargs.pop('wait_time') if 'wait_time' in kwargs else 0
+        if not isinstance(wait_times, list):
+            wait_times = [wait_times]
 
-        # now add time blocks
-        if valid_time is not None and wait_time is not None:
+        # Set default times
+        if 'creation_time' not in kwargs or kwargs['creation_time'] is None:
+            kwargs['creation_time'] = Time.now()
+        if 'start_time' not in kwargs or kwargs['start_time'] is None:
+            kwargs['start_time'] = kwargs['creation_time']
 
-            # first convert to lists
-            if not isinstance(valid_time, list):
-                valid_times = [valid_time]
-            else:
-                valid_times = valid_time
-            if not isinstance(wait_time, list):
-                wait_times = [wait_time]
-            else:
-                wait_times = wait_time
+        # Init base class
+        super().__init__(**kwargs)
 
-            if num_todo < 0:
-                # defined as infinite
-                self.num_todo = -1
+        # Create TimeBlocks
+        for i in range(max(len(valid_times), len(wait_times))):
+            valid = valid_times[i % len(valid_times)]
+            wait = wait_times[i % len(wait_times)]
+            # check if non-expiring
+            if valid < 0:
+                valid = -1
+            block = TimeBlock(block_num=i + 1, valid_time=valid, wait_time=wait)
+            self.time_blocks.append(block)
+        if len(self.time_blocks):
+            self.time_blocks[0].current = True
 
-            # create TimeBlock objects
-            for i in range(max(len(valid_times), len(wait_times))):
-                valid = valid_times[i % len(valid_times)]
-                wait = wait_times[i % len(wait_times)]
-
-                # check if non-expiring
-                if valid < 0:
-                    valid = -1
-
-                block = TimeBlock(block_num=i + 1, valid_time=valid, wait_time=wait)
-                self.time_blocks.append(block)
-            if len(self.time_blocks):
-                self.time_blocks[0].current = True
-
-        # Since we're overwriting the __init__ we have to add relationships here
-        if 'user' in kwargs:
-            self.user = kwargs['user']
-        if 'user_id' in kwargs:
-            self.user_id = kwargs['user_id']
-        if 'pointings' in kwargs:
-            self.pointings = kwargs['pointings']
-        if 'exposure_sets' in kwargs:
-            self.exposure_sets = kwargs['exposure_sets']
-        # if 'time_blocks' in kwargs:  # We don't include TimeBlocks, since they are auto-generated
-        #     self.time_blocks = kwargs['time_blocks']
-        if 'grid_tile' in kwargs:
-            self.grid_tile = kwargs['grid_tile']
-        if 'grid_tile_id' in kwargs:
-            self.grid_tile_id = kwargs['grid_tile_id']
-        if 'survey_tile' in kwargs:
-            self.survey_tile = kwargs['survey_tile']
-        if 'survey_tile_id' in kwargs:
-            self.survey_tile_id = kwargs['survey_tile_id']
-        if 'event' in kwargs:
-            self.event = kwargs['event']
-        if 'event_id' in kwargs:
-            self.event_id = kwargs['event_id']
-        if 'grid' in kwargs:
-            self.grid = kwargs['grid']
-        if 'grid_id' in kwargs:
-            self.grid_id = kwargs['grid_id']
-        if 'survey' in kwargs:
-            self.survey = kwargs['survey']
-        if 'survey_id' in kwargs:
-            self.survey_id = kwargs['survey_id']
+        # Now create the first Pointing
+        # It's unlikely that it returns None, but in theory you could create an Mpointing with
+        # num_todo=0. Also note get_next_pointing() allows creating Pointings if the Mpointing
+        # status is 'upcoming', so we can create it now even if it's not valid yet.
+        pointing = self.get_next_pointing(time=self.creation_time)
+        if pointing is not None:
+            self.pointings.append(pointing)
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1245,6 +953,7 @@ class Mpointing(Base):
                    'tel_mask={}'.format(self.tel_mask),
                    'start_time={}'.format(self.start_time),
                    'stop_time={}'.format(self.stop_time),
+                   'creation_time={}'.format(self.creation_time),
                    'deleted_time={}'.format(self.deleted_time),
                    'user_id={}'.format(self.user_id),
                    'grid_tile_id={}'.format(self.grid_tile_id),
@@ -1625,7 +1334,7 @@ class Mpointing(Base):
 
         """
         # already scheduled or finished, return None
-        if self.status != 'unscheduled':
+        if self.status not in ['upcoming', 'unscheduled']:
             return None
 
         # As a safety check, see if the mpointing has any other pointings that
@@ -1698,25 +1407,11 @@ class Mpointing(Base):
         next_block.current = True
 
         # now create a pointing
-        p = Pointing(object_name=self.object_name,
-                     ra=self.ra,
-                     dec=self.dec,
-                     rank=self.current_rank,
-                     min_alt=self.min_alt,
-                     max_sunalt=self.max_sunalt,
-                     min_time=self.min_time,
-                     max_moon=self.max_moon,
-                     min_moonsep=self.min_moonsep,
-                     too=self.too,
-                     tel_mask=self.tel_mask,
+        p = Pointing(rank=self.current_rank,
                      start_time=start_time,
                      stop_time=stop_time,
                      mpointing=self,
-                     user=self.user,
                      time_block=next_block,
-                     grid_tile=self.grid_tile,
-                     survey_tile=self.survey_tile,
-                     event=self.event,
                      )
         # add the exposures
         p.exposure_sets = self.exposure_sets
@@ -1757,17 +1452,11 @@ class TimeBlock(Base):
         True if this Time Block is the one that is currently linked to
         a Pointing in the queue
 
-    Attributes
-    ----------
-    db_id : int
-        primary database key
-        only populated when the instance is added to the database
-
-    When created the instance can be linked to the following other tables,
+    When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
 
-    Relationships
-    -------------
+    Primary relationships
+    ---------------------
     mpointing : `Mpointing`
         the Mpointing associated with this Time Block
         required before addition to the database
@@ -1775,6 +1464,12 @@ class TimeBlock(Base):
 
     pointings : list of `Pointing`, optional
         the Pointings associated with this Time Block, if any
+
+    Attributes
+    ----------
+    db_id : int
+        primary database key
+        only populated when the instance is added to the database
 
     """
 
@@ -1830,6 +1525,14 @@ class Site(Base):
     height : float
         height of this site, in metres above sea level
 
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    telescopes : list of `Telescope`, optional
+        the Telescopes located at this Site, if any
+
     Attributes
     ----------
     db_id : int
@@ -1837,14 +1540,15 @@ class Site(Base):
         only populated when the instance is added to the database
     location : `astropy.cooridnates.EarthLocation`
         Astropy EarthLocation class for this Site
+    tel_mask : int
+        the binary telescope mask for the telescopes at this site
 
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
-
-    Relationships
+    Class methods
     -------------
-    telescopes : list of `Telescope`, optional
-        the Telescopes associated with this Site, if any
+    from_location(`Astropy.coordinates.EarthLocation`) : Site
+        create a Site from an Astropy EarthLocation
+    from_name(string) : Site
+        class method to create a Site from any name recognised by `EarthLocation.of_site()`
 
     """
 
@@ -1921,28 +1625,34 @@ class Telescope(Base):
     name : str
         name of this telescope (must be unique)
 
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    site : `Site`
+        the Site this Telescope is located at
+        required before addition to the database
+        can also be added with the site_id parameter
+
+    grid : `Grid`, optional
+        the Grid this Telescope uses to observe, if any
+        can also be added with the grid_id parameter
+    pointings : list of `Pointing`, optional
+        the Pointings observed by this Telescope, if any
+
     Attributes
     ----------
     db_id : int
         primary database key
         only populated when the instance is added to the database
-
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
-
-    Relationships
-    -------------
-    site : `Site`
-        the Site associated with this Telescope
-        required before addition to the database
-        can also be added with the site_id parameter
-
-    grid : `Grid`, optional
-        the Grid associated with this Telescope, if any
-        can also be added with the grid_id parameter
-    pointings : list of `Pointing`, optional
-        the Pointings associated with this Telescope, if any
-
+    status : string
+        the status of this telescope (either 'observing' or 'idle')
+    current_pointing : `Pointing`
+        the Pointing currently being observed by this Telescope, if any
+    tel_mask : int
+        the binary telescope mask for this Telescope, based on the db_id
+        only populated when the instance is added to the database
     """
 
     # Set corresponding SQL table name
@@ -2023,35 +1733,31 @@ class Grid(Base):
     algorithm : string
         the gridding algorithm used to generate the grid
 
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    grid_tiles : list of `GridTile`, optional
+        the Grid Tiles that are part of this Grid, if any
+    surveys : list of `Survey`, optional
+        the Surveys observed using this Grid, if any
+    telescopes : list of `Telescope`, optional
+        the Telescopes which observe using this Grid, if any
+
     Attributes
     ----------
     db_id : int
         primary database key
         only populated when the instance is added to the database
 
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
-
-    Relationships
-    -------------
-    grid_tiles : list of `GridTile`, optional
-        the Grid Tiles associated with this Grid, if any
-    surveys : list of `Survey`, optional
-        the Surveys associated with this Grid, if any
-    telescopes : list of `Telescope`, optional
-        the Telescopes associated with this Grid, if any
-
     The following secondary relationships are not settable directly,
-    but are populated through the above tables if given:
+    but are populated through the primary relationships and are available as attributes:
 
     Secondary relationships
     -----------------------
-    pointings : list of `Pointing`
-        the Pointings that the GridTiles associated with this Grid,
-        if any, are associated with
     mpointings : list of `Mpointing`
-        the Mpointings that the GridTiles associated with this Grid,
-        if any, are associated with
+        the Mpointings which cover any of this Grid's GridTiles, if any
 
     """
 
@@ -2075,14 +1781,6 @@ class Grid(Base):
     telescopes = relationship('Telescope', back_populates='grid')
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary='grid_tiles',
-                             primaryjoin='Grid.db_id == GridTile.grid_id',
-                             secondaryjoin='Pointing.grid_tile_id == GridTile.db_id',
-                             back_populates='grid',
-                             viewonly=True,
-                             uselist=True,
-                             )
     mpointings = relationship('Mpointing',
                               secondary='grid_tiles',
                               primaryjoin='Grid.db_id == GridTile.grid_id',
@@ -2132,28 +1830,34 @@ class GridTile(Base):
     dec : float
         J2000 declination in decimal degrees
 
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    grid : `Grid`
+        the Grid this GridTile is part of
+        required before addition to the database
+        can also be added with the grid_id parameter
+
+    mpointings : list of `Mpointing`, optional
+        the Mpointings that cover this GridTile, if any
+    survey_tiles : list of `SurveyTile`, optional
+        the SurveyTiles that cover this GridTile, if any
+
     Attributes
     ----------
     db_id : int
         primary database key
         only populated when the instance is added to the database
 
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
+    The following secondary relationships are not settable directly,
+    but are populated through the primary relationships and are available as attributes:
 
-    Relationships
-    -------------
-    grid : `Grid`
-        the Grid associated with this GridTile
-        required before addition to the database
-        can also be added with the grid_id parameter
-
-    pointings : list of `Pointing`, optional
-        the Pointings associated with this GridTile, if any
-    mpointings : list of `Mpointing`, optional
-        the Mpointing associated with this GridTile, if any
-    survey_tiles : list of `SurveyTile`, optional
-        the Survey Tiles associated with this GridTile, if any
+    Secondary relationships
+    -----------------------
+    pointings : list of `Pointing`
+        the Pointings that cover this GridTile, if any
 
     """
 
@@ -2175,7 +1879,16 @@ class GridTile(Base):
     grid = relationship('Grid', back_populates='grid_tiles')
     survey_tiles = relationship('SurveyTile', back_populates='grid_tile')
     mpointings = relationship('Mpointing', back_populates='grid_tile')
-    pointings = relationship('Pointing', back_populates='grid_tile')
+
+    # Secondary relationships
+    pointings = relationship('Pointing',
+                             secondary='mpointings',
+                             primaryjoin='GridTile.db_id == Mpointing.grid_tile_id',
+                             secondaryjoin='Pointing.mpointing_id == Mpointing.db_id',
+                             back_populates='grid_tile',
+                             viewonly=True,
+                             uselist=True,
+                             )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2205,36 +1918,35 @@ class Survey(Base):
     name : string
         a human-readable identifier for the survey
 
-    Attributes
-    ----------
-    db_id : int
-        primary database key
-        only populated when the instance is added to the database
-
-    When created the instance can be linked to the following other tables,
+    When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
 
-    Relationships
-    -------------
+    Primary relationships
+    ---------------------
     grid : `Grid`
         the Grid associated with this Survey
         required before addition to the database
         can also be added with the grid_id parameter
 
     survey_tiles : list of `SurveyTile`, optional
-        the Survey Tiles associated with this Survey, if any
+        the Survey Tiles that are part of this Survey, if any
     event : `Event`, optional
-        the Event associated with this Survey, if any
+        the Event this Survey is part of, if any
         can also be added with the event_id parameter
+
+    Attributes
+    ----------
+    db_id : int
+        primary database key
+        only populated when the instance is added to the database
+
+    The following secondary relationships are not settable directly,
+    but are populated through the primary relationships and are available as attributes:
 
     Secondary relationships
     -----------------------
-    pointings : list of `Pointing`
-        the Pointings that the SurveyTiles associated with this Survey,
-        if any, are associated with
     mpointings : list of `Mpointing`
-        the Mpointings that the SurveyTiles associated with this Survey,
-        if any, are associated with
+        the Mpointings which cover any of this Survey's SurveyTiles, if any
 
     """
 
@@ -2257,14 +1969,6 @@ class Survey(Base):
     event = relationship('Event', back_populates='surveys')
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary='survey_tiles',
-                             primaryjoin='Survey.db_id == SurveyTile.survey_id',
-                             secondaryjoin='Pointing.survey_tile_id == SurveyTile.db_id',
-                             back_populates='survey',
-                             viewonly=True,
-                             uselist=True,
-                             )
     mpointings = relationship('Mpointing',
                               secondary='survey_tiles',
                               primaryjoin='Survey.db_id == SurveyTile.survey_id',
@@ -2299,30 +2003,34 @@ class SurveyTile(Base):
     weight : float
         weighting for this tile (between 0 and 1)
 
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    Survey : `Survey`
+        the Survey this SurveyTile is part of
+        required before addition to the database
+        can also be added with the survey_id parameter
+
+    mpointings : list of `Mpointing`, optional
+        the Mpointings that cover this SurveyTile, if any
+    grid_tiles : list of `GridTile`, optional
+        the GridTiles that cover this SurveyTile, if any
+
     Attributes
     ----------
     db_id : int
         primary database key
         only populated when the instance is added to the database
 
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
+    The following secondary relationships are not settable directly,
+    but are populated through the primary relationships and are available as attributes:
 
-    Relationships
-    -------------
-    survey : `Survey`
-        the Survey associated with this SurveyTile
-        required before addition to the database
-        can also be added with the survey_id parameter
-    grid_tile : `GridTile`
-        the GridTile associated with this SurveyTile
-        required before addition to the database
-        can also be added with the grid_tile_id parameter
-
-    pointings : list of `Pointing`, optional
-        the Pointings associated with this SurveyTile, if any
-    mpointings : list of `Mpointing`, optional
-        the Mpointing associated with this SurveyTile, if any
+    Secondary relationships
+    -----------------------
+    pointings : list of `Pointing`
+        the Pointings that cover this SurveyTile, if any
 
     """
 
@@ -2342,8 +2050,17 @@ class SurveyTile(Base):
     # Foreign relationships
     survey = relationship('Survey', back_populates='survey_tiles')
     grid_tile = relationship('GridTile', back_populates='survey_tiles')
-    pointings = relationship('Pointing', back_populates='survey_tile')
     mpointings = relationship('Mpointing', back_populates='survey_tile')
+
+    # Secondary relationships
+    pointings = relationship('Pointing',
+                             secondary='mpointings',
+                             primaryjoin='SurveyTile.db_id == Mpointing.survey_tile_id',
+                             secondaryjoin='Pointing.mpointing_id == Mpointing.db_id',
+                             back_populates='survey_tile',
+                             viewonly=True,
+                             uselist=True,
+                             )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2381,23 +2098,29 @@ class Event(Base):
     skymap : string, optional
         the location of the source skymap file
 
+    When created the instance can be linked to the following other tables as parameters,
+    otherwise they are populated when it is added to the database:
+
+    Primary relationships
+    ---------------------
+    surveys : list of `Survey`, optional
+        the Surveys created for this Event, if any
+    mpointings : list of `Mpointing`, optional
+        the Mpointings which are part of this Event, if any
+
     Attributes
     ----------
     db_id : int
         primary database key
         only populated when the instance is added to the database
 
-    When created the instance can be linked to the following other tables,
-    otherwise they are populated when it is added to the database:
+    The following secondary relationships are not settable directly,
+    but are populated through the primary relationships and are available as attributes:
 
-    Relationships
-    -------------
-    surveys : list of `Survey`, optional
-        the Surveys associated with this Event, if any
-    pointings : list of `Pointing`, optional
-        the Pointings associated with this Event, if any
-    mpointings : list of `Mpointing`, optional
-        the Mpointings associated with this Event, if any
+    Secondary relationships
+    -----------------------
+    pointings : list of `Pointing`
+        the Pointings which are part of this Event, if any
 
     """
 
@@ -2418,8 +2141,17 @@ class Event(Base):
 
     # Foreign relationships
     surveys = relationship('Survey', back_populates='event')
-    pointings = relationship('Pointing', back_populates='event')
     mpointings = relationship('Mpointing', back_populates='event')
+
+    # Secondary relationships
+    pointings = relationship('Pointing',
+                             secondary='mpointings',
+                             primaryjoin='Event.db_id == Mpointing.event_id',
+                             secondaryjoin='Pointing.mpointing_id == Mpointing.db_id',
+                             back_populates='event',
+                             viewonly=True,
+                             uselist=True,
+                             )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2482,26 +2214,23 @@ class ImageLog(Base):
         total number of exposures in this set, if any
         if not given, it will default to 1
 
-    Attributes
-    ----------
-    db_id : int
-        primary database key
-        only populated when the instance is added to the database
-
-    When created the instance can be linked to the following other tables,
+    When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
 
-    Relationships
-    -------------
+    Primary relationships
+    ---------------------
     exposure_set : `ExposureSet`, optional
         the Exposure Set associated with this ImageLog, if any
         can also be added with the exposure_set_id parameter
     pointing : `Pointing`, optional
         the Pointing associated with this ImageLog, if any
         can also be added with the pointing_id parameter
-    mpointing : `Mpointing`, optional
-        the Mpointing associated with this ImageLog, if any
-        can also be added with the mpointing_id parameter
+
+    Attributes
+    ----------
+    db_id : int
+        primary database key
+        only populated when the instance is added to the database
 
     """
 
@@ -2524,12 +2253,10 @@ class ImageLog(Base):
     # Foreign keys
     exposure_set_id = Column(Integer, ForeignKey('exposure_sets.id'), nullable=True)
     pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=True)
-    mpointing_id = Column(Integer, ForeignKey('mpointings.id'), nullable=True)
 
     # Foreign relationships
-    exposure_set = relationship('ExposureSet', backref='image_logs')
-    pointing = relationship('Pointing', backref='image_logs')
-    mpointing = relationship('Mpointing', backref='image_logs')
+    exposure_set = relationship('ExposureSet', back_populates='image_logs')
+    pointing = relationship('Pointing', back_populates='image_logs')
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2581,18 +2308,6 @@ TRIGGERS = [
                         WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
         SET NEW.`dec` = (SELECT `dec` FROM `grid_tiles`
                             WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
-    END IF;
-    END
-    """,
-    # Pointing trigger before insert
-    # If no coordinates are given but it's linked to a grid tile then use its coordinates.
-    """CREATE TRIGGER `pointings_BEFORE_INSERT` BEFORE INSERT ON `pointings` FOR EACH ROW
-    BEGIN
-    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`dec` is NULL)) THEN
-        SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles`
-                        WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
-        SET NEW.`dec` = (SELECT `dec` FROM `grid_tiles`
-                          WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
     END IF;
     END
     """,

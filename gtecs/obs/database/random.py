@@ -2,13 +2,13 @@
 
 from astropy.time import Time
 
-from .models import ExposureSet, Mpointing
+from .models import ExposureSet, Target
 
-__all__ = ['make_random_mpointing']
+__all__ = ['make_random_target']
 
 
-def make_random_mpointing(user, num_expsets=None, time=None):
-    """Make a random mpointing for testing.
+def make_random_target(user, num_expsets=None, time=None):
+    """Make a random target for testing.
 
     It should be observable from La Palma at the time of creation.
     However not all pointings will be valid in the queue immediately due to
@@ -17,10 +17,10 @@ def make_random_mpointing(user, num_expsets=None, time=None):
     Parameters
     ----------
     user : `User`
-        the User to associate the Mpointing with
+        the User to associate the Target with
 
     num_expsets : int, optional
-        the number of Exposure Sets attached to the Mpointing
+        the number of Exposure Sets attached to the Target
         if None, a random number of exposure_sets between 1 and 5 will be added
     time : `~astropy.time.Time`, optional
         the time to centre the pointings around
@@ -28,8 +28,8 @@ def make_random_mpointing(user, num_expsets=None, time=None):
 
     Returns
     -------
-    mpointing : `Mpointing`
-        the new mpointing
+    target : `Target`
+        the new target
 
     """
     import numpy as np
@@ -43,18 +43,18 @@ def make_random_mpointing(user, num_expsets=None, time=None):
     lst = time.sidereal_time('mean', longitude=lapalma.lon).deg
     t1 = time + np.random.randint(-2, 2) * u.day
     t2 = t1 + np.random.randint(2, 6) * u.day
-    p = Mpointing(object_name='random_object',
-                  ra=np.random.uniform(lst - 3, lst + 3),
-                  dec=np.random.uniform(10, 89),
-                  start_rank=np.random.randint(1, 100),
-                  min_time=np.random.uniform(100, 3600),
-                  max_moon=np.random.choice(['D', 'G', 'B']),
-                  num_todo=np.random.randint(1, 5),
-                  too=np.random.randint(0, 2),
-                  start_time=t1,
-                  stop_time=t2,
-                  user=user,
-                  )
+    p = Target(object_name='random_object',
+               ra=np.random.uniform(lst - 3, lst + 3),
+               dec=np.random.uniform(10, 89),
+               start_rank=np.random.randint(1, 100),
+               min_time=np.random.uniform(100, 3600),
+               max_moon=np.random.choice(['D', 'G', 'B']),
+               num_todo=np.random.randint(1, 5),
+               too=np.random.randint(0, 2),
+               start_time=t1,
+               stop_time=t2,
+               user=user,
+               )
 
     if num_expsets is None:
         num_expsets = np.random.randint(1, 6)

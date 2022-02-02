@@ -9,13 +9,13 @@ from astropy.time import Time
 from sqlalchemy import or_
 
 from .management import open_session
-from .models import Event, ExposureSet, Grid, GridTile, Mpointing, Pointing, Telescope, User
+from .models import Event, ExposureSet, Grid, GridTile, Pointing, Target, Telescope, User
 
 
 __all__ = ['get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
-           'get_mpointings', 'get_mpointing_by_id',
+           'get_targets', 'get_target_by_id',
            'get_exposure_set_by_id',
            'get_telescope_by_id',
            'get_current_grid', 'get_grid_tile_by_name',
@@ -157,23 +157,23 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     # are we before the stop time (if any)?
     queue = queue.filter(or_(Pointing.stop_time > now, Pointing.stop_time == None))  # noqa: E711
 
-    # now limit by RA and Dec (note use of .has() for Mpointing properties)
+    # now limit by RA and Dec (note use of .has() for Target properties)
     if location is not None:
         # local sidereal time, units of degrees
         lst = time.sidereal_time('mean', location.lon)
         lo_lim = Longitude(lst - hourangle_limit * u.hourangle).deg
         up_lim = Longitude(lst + hourangle_limit * u.hourangle).deg
         if up_lim > lo_lim:
-            queue = queue.filter(Pointing.mpointing.has(Mpointing.ra < up_lim),
-                                 Pointing.mpointing.has(Mpointing.ra > lo_lim))
+            queue = queue.filter(Pointing.target.has(Target.ra < up_lim),
+                                 Pointing.target.has(Target.ra > lo_lim))
         else:
-            queue = queue.filter(or_(Pointing.mpointing.has(Mpointing.ra < up_lim),
-                                     Pointing.mpointing.has(Mpointing.ra > lo_lim)))
+            queue = queue.filter(or_(Pointing.target.has(Target.ra < up_lim),
+                                     Pointing.target.has(Target.ra > lo_lim)))
 
         # is latitude ever greater than limit?
         lat = location.lat.deg
-        queue = queue.filter(Pointing.mpointing.has(Mpointing.dec > lat - 90 + altitude_limit),
-                             Pointing.mpointing.has(Mpointing.dec < lat + 90 - altitude_limit))
+        queue = queue.filter(Pointing.target.has(Target.dec > lat - 90 + altitude_limit),
+                             Pointing.target.has(Target.dec < lat + 90 - altitude_limit))
 
     queue = queue.order_by('rank')
 
@@ -278,59 +278,59 @@ def get_pointing_by_id(session, pointing_id):
     return pointing
 
 
-def get_mpointings(session, mpointing_ids=None, status=None):
-    """Get mpointings, filtered by ID or status.
+def get_targets(session, target_ids=None, status=None):
+    """Get targets, filtered by ID or status.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    mpointing_ids : int or list
+    target_ids : int or list
         supply a ID or list of IDs to filter results
     status : string or list
         supply a status or list of statuses to filter by status
 
     Returns
     -------
-    mpointings : list
-        a list of all matching Mpointings
+    targets : list
+        a list of all matching Targets
 
     """
-    query = session.query(Mpointing)
-    if mpointing_ids is not None:
-        query = query.filter(Mpointing.db_id.in_(list(mpointing_ids)))
+    query = session.query(Target)
+    if target_ids is not None:
+        query = query.filter(Target.db_id.in_(list(target_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
-        query = query.filter(Mpointing.status.in_(status))
-    mpointings = query.all()
-    return mpointings
+        query = query.filter(Target.status.in_(status))
+    targets = query.all()
+    return targets
 
 
-def get_mpointing_by_id(session, mpointing_id):
-    """Get a single Mpointing, filtered by ID.
+def get_target_by_id(session, target_id):
+    """Get a single Target, filtered by ID.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    mpointing_id : int
-        the id number of the Mpointing
+    target_id : int
+        the id number of the Target
 
     Returns
     -------
-    mpointing : `Mpointing`
-        the matching Mpointing
+    target : `Target`
+        the matching Target
 
     Raises
     ------
-    ValueError : if no matching Mpointing is found in the database
+    ValueError : if no matching Target is found in the database
 
     """
-    mpointing = session.query(Mpointing).filter(Mpointing.db_id == mpointing_id).one_or_none()
-    if not mpointing:
-        raise ValueError('No matching Mpointing found')
-    return mpointing
+    target = session.query(Target).filter(Target.db_id == target_id).one_or_none()
+    if not target:
+        raise ValueError('No matching Target found')
+    return target
 
 
 def get_exposure_set_by_id(session, expset_id):
@@ -460,15 +460,15 @@ def get_events(session, event_type=None, source=None):
 
 
 def delete_event_pointings(session, event):
-    """Set all the Mpointings and Pointings associated with the given Event to deleted.
+    """Set all the Targets and Pointings associated with the given Event to deleted.
 
     Note this doesn't physically delete the rows from the database tables,
     it just sets the statuses to 'deleted'.
     """
-    for mpointing in event.mpointings:
-        mpointing.status = 'deleted'
-        if mpointing.pointings[-1].status == 'pending':
-            mpointing.pointings[-1].status = 'deleted'
+    for target in event.targets:
+        target.status = 'deleted'
+        if target.pointings[-1].status == 'pending':
+            target.pointings[-1].status = 'deleted'
 
 
 def insert_items(session, items):

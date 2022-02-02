@@ -1,82 +1,40 @@
 #!/usr/bin/env python3
 """A script to fill G-TeCS database using GOTO-tile."""
 
-import argparse
 import time
-
-import astropy.units as u
-
-from gototile.grid import SkyGrid
 
 from gtecs.obs import database as db
 
 
-MP_SETTINGS = {'start_rank': 999,
-               'num_todo': -1,
-               'wait_time': 4320,
-               'min_time': (60 + 30) * 3,
-               'max_sunalt': -12,
-               }
+TARGET_PARAMS = {'start_rank': 999,
+                 'num_todo': -1,
+                 'wait_time': 4320,
+                 'min_time': (60 + 30) * 3,
+                 'max_sunalt': -12,
+                 }
 
-EXP_SETTINGS = {'num_exp': 3,
-                'exptime': 60,
-                'filt': 'L',
-                }
+EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]
 
 
-def run(fov, overlap):
-    """Create the mpointings and add them to the database."""
-    # Create an all-sky grid with GOTO-tile
-    skygrid = SkyGrid(fov, overlap)
-    tile_coords = skygrid.coords
-    tile_names = skygrid.tilenames
-
-    # Add to the database
+def run():
+    """Create the targets and add them to the database."""
     with db.open_session() as session:
-        # get default User
-        user = db.get_user(session, username='goto')
+        # Get default User
+        user = db.get_user(session, username='default')
 
-        # create a Grid
-        print('Creating grid...')
-        grid = db.Grid(name=skygrid.name,
-                       ra_fov=skygrid.fov['ra'].value,
-                       dec_fov=skygrid.fov['dec'].value,
-                       ra_overlap=skygrid.overlap['ra'],
-                       dec_overlap=skygrid.overlap['dec'],
-                       algorithm=skygrid.algorithm,
-                       )
-        session.add(grid)
+        # Get the current grid
+        grid = db.get_current_grid(session)
 
-        # create GridTiles
-        grid_tiles = []
-        start = time.time()
-        for coord, name in zip(tile_coords, tile_names):
-            ra = coord.ra.value
-            dec = coord.dec.value
-            if abs(dec) < 0.00001:  # GOTO-tile rounding errors
-                dec = 0
-            grid_tile = db.GridTile(name=str(name),
-                                    ra=float(ra),
-                                    dec=float(dec))
-            grid_tile.grid = grid
-            grid_tiles.append(grid_tile)
-        print('  took {:.2f} secs'.format(time.time() - start))
-
-        print('Adding {} grid tiles to database...'.format(len(grid_tiles)))
-        start = time.time()
-        db.insert_items(session, grid_tiles)
-        print('  took {:.2f} secs'.format(time.time() - start))
-
-        # create a Survey
+        # Create a Survey
         print('Creating all-sky survey...')
-        survey = db.Survey(name=skygrid.name)
+        survey = db.Survey(name='Allsky_survey')
         survey.grid = grid
         session.add(survey)
 
-        # create SurveyTiles, one for each GridTile
+        # Create SurveyTiles, one for each GridTile
         survey_tiles = []
         start = time.time()
-        for grid_tile in grid_tiles:
+        for grid_tile in grid.grid_tiles:
             survey_tile = db.SurveyTile(weight=1)  # Equal weights
             survey_tile.survey = survey
             survey_tile.grid_tile = grid_tile
@@ -88,48 +46,33 @@ def run(fov, overlap):
         db.insert_items(session, survey_tiles)
         print('  took {:.2f} secs'.format(time.time() - start))
 
-        # create Mpointings
-        mpointings = []
-        print('Creating mpointings...')
+        # Create Targets
+        targets = []
+        print('Creating targets...')
         start = time.time()
         for survey_tile in survey_tiles:
-            name = survey_tile.grid_tile.name
-            mp = db.Mpointing(object_name=survey.name + '_' + name,
-                              **MP_SETTINGS,
-                              user=user,
-                              )
-            mp.grid_tile = survey_tile.grid_tile
-            mp.survey_tile = survey_tile
-            mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
+            target_params = TARGET_PARAMS.copy()
+            target_params['object_name'] = survey.name + '_' + survey_tile.grid_tile.name
 
-            # Create the first Pointing (i.e. preempt the caretaker)
-            p = mp.get_next_pointing()
-            mp.pointings.append(p)
+            target = db.Target(**target_params,
+                               user=user,
+                               grid_tile=survey_tile.grid_tile,
+                               survey_tile=survey_tile,
+                               )
+            for exps_params in EXPS_PARAMS:
+                target.exposure_sets.append(db.ExposureSet(**exps_params))
 
-            mpointings.append(mp)
+            targets.append(target)
         print('  took {:.2f} secs'.format(time.time() - start))
 
-        print('Adding {} mpointings to database...'.format(len(mpointings)))
+        # Add to database
+        print('Adding {} targets to database...'.format(len(targets)))
         start = time.time()
-        db.insert_items(session, mpointings)
+        db.insert_items(session, targets)
         print('  took {:.2f} secs'.format(time.time() - start))
+
     print('Done')
 
 
 if __name__ == '__main__':
-    description = """Fill the GOTO observation database with survey tiles."""
-
-    parser = argparse.ArgumentParser(description=description,
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    parser.add_argument('ra_fov', help="FoV in RA", type=float, default=5.6)
-    parser.add_argument('dec_fov', help="FoV in Dec", type=float, default=2.5)
-    parser.add_argument('ra_overlap', help="Overlap in RA", type=float, default=0.1)
-    parser.add_argument('dec_overlap', help="Overlap in Dec", type=float, default=0.5)
-
-    args = parser.parse_args()
-
-    fov = {'ra': args.ra_fov * u.deg, 'dec': args.dec_fov * u.deg}
-    overlap = {'ra': args.ra_overlap, 'dec': args.dec_overlap}
-
-    run(fov, overlap)
+    run()

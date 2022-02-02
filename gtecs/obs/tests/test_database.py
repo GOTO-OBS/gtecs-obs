@@ -86,28 +86,28 @@ print('-------')
 with db.open_session() as session:
     user = db.get_user(session, username='test_user')
 
-    # let's make an Mpointing
-    mp = db.Mpointing(object_name='M31',
-                      ra=10.685,
-                      dec=41.2875,
-                      start_rank=9,
-                      min_time=3600,
-                      num_todo=5,
-                      valid_time=[60, 120],
-                      wait_time=60,
-                      user=user,
-                      )
+    # let's make an Target
+    target = db.Target(object_name='M31',
+                       ra=10.685,
+                       dec=41.2875,
+                       start_rank=9,
+                       min_time=3600,
+                       num_todo=5,
+                       valid_time=[60, 120],
+                       wait_time=60,
+                       user=user,
+                       )
     # and add RGBL exposure set
     L = db.ExposureSet(num_exp=3, exptime=120, filt='L')
     R = db.ExposureSet(num_exp=3, exptime=120, filt='R')
     G = db.ExposureSet(num_exp=3, exptime=120, filt='G')
     B = db.ExposureSet(num_exp=3, exptime=120, filt='B')
-    mp.exposure_sets = [L, R, G, B]
-    session.add(mp)
+    target.exposure_sets = [L, R, G, B]
+    session.add(target)
     session.commit()
-    print(mp, end='\n\n')
-    print(mp.pointings, end='\n\n')
-    print(mp.time_blocks, end='\n\n')
+    print(target, end='\n\n')
+    print(target.pointings, end='\n\n')
+    print(target.time_blocks, end='\n\n')
     print(L)
     print(R)
     print(G)
@@ -117,18 +117,18 @@ print('-------')
 with db.open_session() as session:
     user = db.get_user(session, username='test_user')
 
-    # new session, add random mpointings
-    mpointings = [db.make_random_mpointing(user) for i in range(10)]
-    db.insert_items(session, mpointings)
-    for mp in mpointings:
-        print(mp, mp.pointings)
+    # new session, add random targets
+    targets = [db.make_random_target(user) for i in range(10)]
+    db.insert_items(session, targets)
+    for target in targets:
+        print(target, target.pointings)
 
-    more_mpointings = [db.make_random_mpointing(user) for i in range(10)]
-    db.insert_items(session, more_mpointings)
-    for mp in more_mpointings:
-        print(mp, mp.pointings)
+    more_targets = [db.make_random_target(user) for i in range(10)]
+    db.insert_items(session, more_targets)
+    for target in more_targets:
+        print(target, target.pointings)
 
-    # now check how many pointings we have (should be 1 for each mpointing)
+    # now check how many pointings we have (should be 1 for each target)
     n_pointings = len(db.get_pointings(session))
     print('{} pointings in database'.format(n_pointings))
 
@@ -140,40 +140,40 @@ time.sleep(2)
 
 print('-------')
 with db.open_session() as s:
-    def print_summary(mp, now):
+    def print_summary(target, now):
         """Print a summary of the database."""
-        print(now, f'Mpointing is {mp.status.upper()} ({mp.num_remaining} remaining)')
-        print('                    Pointings:', [p.status_at_time(now) for p in mp.pointings])
+        print(now, f'Target is {target.status.upper()} ({target.num_remaining} remaining)')
+        print('                    Pointings:', [p.status_at_time(now) for p in target.pointings])
         # print('                    Time blocks:')
-        # for block in mp.time_blocks:
+        # for block in target.time_blocks:
         #     print('                    \t', (block.block_num, block.valid_time, block.wait_time,
         #                                      block.current))
 
-    mp = db.get_mpointing_by_id(s, 1)
-    print(mp)
-    print(mp.pointings)
-    print(mp.time_blocks, end='\n\n')
+    target = db.get_target_by_id(s, 1)
+    print(target)
+    print(target.pointings)
+    print(target.time_blocks, end='\n\n')
 
     # lets pretend we're observing with a telescope to check the triggers
     t = db.get_telescope_by_id(s, 1)
-    now = Time(mp.start_time)
-    print_summary(mp, now)
+    now = Time(target.start_time)
+    print_summary(target, now)
     print()
 
     while True:
-        next_pointing = mp.pointings[-1]
+        next_pointing = target.pointings[-1]
         if next_pointing.status == 'upcoming':
             # skip ahead until the pointing is pending
             print(now, 'Skipping ahead to Pointing start time')
             now = Time(next_pointing.start_time) + 30 * u.s
-            print_summary(mp, now)
+            print_summary(target, now)
             time.sleep(1)
             print()
 
         print(now, f'Marking Pointing {next_pointing.db_id} as running')
         next_pointing.mark_running(telescope=t, time=now)
         s.commit()
-        print_summary(mp, now)
+        print_summary(target, now)
         time.sleep(1)
         print()
 
@@ -183,28 +183,28 @@ with db.open_session() as s:
         print(now, f'Marking Pointing {next_pointing.db_id} as completed')
         next_pointing.mark_finished(completed=True, time=now)
         s.commit()
-        print_summary(mp, now)
+        print_summary(target, now)
         time.sleep(1)
         print()
 
         # create next pointing
-        next_pointing = mp.get_next_pointing(time=now)
+        next_pointing = target.get_next_pointing(time=now)
         if next_pointing is None:
             break
 
         print(now, 'Creating new Pointing')
         s.add(next_pointing)
         s.commit()
-        print_summary(mp, now)
+        print_summary(target, now)
         time.sleep(1)
         print()
 
         # skip ahead by a small amount
         now = now + 30 * u.s
 
-    # check the list of mps to schedule is empty
-    mps_to_schedule = db.get_mpointings(s, status='unscheduled')
-    print('There are {} Mpointings to schedule'.format(len(mps_to_schedule)))
+    # check the list of target to schedule is empty
+    targets_to_schedule = db.get_targets(s, status='unscheduled')
+    print('There are {} Targets to schedule'.format(len(targets_to_schedule)))
 
     n_pointings = len(db.get_pointings(session))
     print('{} pointings in database'.format(n_pointings))

@@ -17,79 +17,72 @@ from gototile.skymap import SkyMap
 from gtecs.obs import database as db
 
 
-# Constant Pointing values
-MP_SETTINGS = {'start_rank': 2,
-               'num_todo': 5,
-               'wait_time': 1440,
-               'min_time': (60 + 30) * 3,
-               'max_sunalt': -18,
-               }
+TARGET_PARAMS = {'start_rank': 2,
+                 'num_todo': 5,
+                 'wait_time': 1440,
+                 'min_time': (60 + 30) * 3,
+                 'max_sunalt': -18,
+                 }
 
-# Constant ExposureSet values
-EXP_SETTINGS = {'num_exp': 3,
-                'exptime': 60,
-                'filt': 'L',
-                }
+EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]
 
 
-def add_to_database(db_grid, pointings, event_time, event_name, filename):
+def add_to_database(session, db_grid, tiles, event_time, event_name, filename):
     """Add an event and its tiles to the GOTO database."""
-    with db.open_session() as session:
-        # Get default User
-        user = db.get_user(session, username='goto')
+    # Get default User
+    user = db.get_user(session, username='default')
 
-        # Create Event
-        event = db.Event(name=event_name,
-                         ivorn=str(event_time),  # no official IVORN yet
-                         source='LVC',
-                         event_type='GW',
-                         time=Time.now(),
-                         skymap=filename)
-        session.add(event)
+    # Create Event
+    event = db.Event(name=event_name,
+                     ivorn=str(event_time),  # no official IVORN yet
+                     source='LVC',
+                     event_type='GW',
+                     time=Time.now(),
+                     skymap=filename,
+                     )
 
-        # Create Survey
-        survey = db.Survey(name=event_name)
-        survey.grid = db_grid
-        survey.event = event
-        session.add(survey)
+    # Create Survey
+    survey = db.Survey(name=event_name,
+                       grid=db_grid,
+                       event=event,
+                       )
 
-        # Go through the pointings to create survey tiles
-        for pointing in pointings:
-            # Get pointing infomation
-            tilename = str(pointing['tilename'])
-            prob = float(pointing['prob'])
+    # Create SurveyTiles and Targets
+    targets = []
+    for tile in tiles:
+        # Get tile infomation
+        tilename = str(tile['tilename'])
+        prob = float(tile['prob'])
 
-            # Find the matched Grid tile
-            grid_tile = db.get_grid_tile_by_name(session, db_grid.name, tilename)
+        # Find the matched Grid tile
+        grid_tile = db.get_grid_tile_by_name(session, db_grid.name, tilename)
 
-            # Create an SurveyTile and add to the database
-            survey_tile = db.SurveyTile(weight=prob)
-            survey_tile.survey = survey
-            survey_tile.grid_tile = grid_tile
-            session.add(survey_tile)
+        # Create SurveyTile
+        survey_tile = db.SurveyTile(weight=prob)
+        survey_tile.survey = survey
+        survey_tile.grid_tile = grid_tile
 
-            # Create Mpointing and add to the database
-            object_name = '{}_{}'.format(event_name, tilename)
+        # Create Target
+        target_params = TARGET_PARAMS.copy()
+        target_params['object_name'] = '{}_{}'.format(event_name, tilename)
 
-            mpointing = db.Mpointing(object_name=object_name,
-                                     **MP_SETTINGS,
-                                     user=user,
-                                     )
-            mpointing.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
+        target = db.Target(**target_params,
+                           user=user,
+                           grid_tile=grid_tile,
+                           survey_tile=survey_tile,
+                           event=event,
+                           )
+        for exps_params in EXPS_PARAMS:
+            target.exposure_sets.append(db.ExposureSet(**exps_params))
 
-            mpointing.grid_tile = grid_tile
-            mpointing.survey_tile = survey_tile
-            mpointing.event = event
+        targets.append(target)
 
-            # Create the first Pointing (i.e. preempt the caretaker)
-            pointing = mpointing.get_next_pointing()
-            mpointing.pointings.append(pointing)
-
-            session.add(mpointing)
+    # Add to database
+    db.insert_items(session, targets)
 
 
 def run(filename, hp_lim=0.001, n_lim=20):
-    """Create the mpointings and add them to the database."""
+    """Create the targets and add them to the database."""
     with db.open_session() as session:
         # Get the current grid
         db_grid = db.get_current_grid(session)
@@ -97,56 +90,54 @@ def run(filename, hp_lim=0.001, n_lim=20):
         # Create a SkyGrid from the database Grid
         grid = db_grid.skygrid
 
-    # open skymap and get event details
-    print('Loading skymap...')
-    skymap = SkyMap.from_fits(filename)
-    event_time = skymap.date_det
-    event_name = skymap.objid
-    print('  loaded event {}'.format(event_name))
+        # Open skymap and get event details
+        print('Loading skymap...')
+        skymap = SkyMap.from_fits(filename)
+        event_time = skymap.date_det
+        event_name = skymap.objid
+        print('  loaded event {}'.format(event_name))
 
-    # apply the skymap to the grid
-    print('Getting skymap tile pointings')
-    grid.apply_skymap(skymap)
-    pointings = grid.get_table()
-    pointings.sort('prob')
-    pointings.reverse()
-    print('  loaded {} pointings'.format(len(pointings)))
+        # Apply the skymap to the grid
+        print('Getting skymap tiles')
+        grid.apply_skymap(skymap)
+        tiles = grid.get_table()
+        tiles.sort('prob')
+        tiles.reverse()
+        print('  loaded {} tiles'.format(len(tiles)))
 
-    # filter out low-priority pointings
-    print('Filtering to tiles that contain more than {}%'.format(hp_lim * 100))
-    hp_mask = pointings['prob'] > hp_lim
-    selected_pointings = pointings[hp_mask]
-    print('  found {} tiles that cover {:.1f}% of the skymap'.format(
-        len(selected_pointings),
-        sum(selected_pointings['prob']) / sum(pointings['prob']) * 100))
-
-    # make sure we always add a minimum number of tiles
-    if len(selected_pointings) < n_lim:
-        print('Adding {} extra tiles to reach a minimum of {}'.format(
-            n_lim - len(selected_pointings), n_lim))
-        selected_pointings = pointings[:n_lim]
+        # Filter out low-priority targets
+        print('Filtering to tiles that contain more than {}%'.format(hp_lim * 100))
+        hp_mask = tiles['prob'] > hp_lim
+        selected_tiles = tiles[hp_mask]
         print('  found {} tiles that cover {:.1f}% of the skymap'.format(
-            len(selected_pointings),
-            sum(selected_pointings['prob']) / sum(pointings['prob']) * 100))
+            len(selected_tiles),
+            sum(selected_tiles['prob']) / sum(tiles['prob']) * 100))
 
-    # add pointings to the database
-    print('Adding {} tiles to the database...'.format(len(selected_pointings)))
-    start = time.time()
-    add_to_database(db_grid, selected_pointings, event_time, event_name, filename)
-    print('  took {:.2f} secs'.format(time.time() - start))
+        # Make sure we always add a minimum number of tiles
+        if len(selected_tiles) < n_lim:
+            print('Adding {} extra tiles to reach a minimum of {}'.format(
+                n_lim - len(selected_tiles), n_lim))
+            selected_tiles = tiles[:n_lim]
+            print('  found {} tiles that cover {:.1f}% of the skymap'.format(
+                len(selected_tiles),
+                sum(selected_tiles['prob']) / sum(tiles['prob']) * 100))
+
+        # Insert into the database
+        print('Adding {} tiles to the database...'.format(len(selected_tiles)))
+        start = time.time()
+        add_to_database(session, db_grid, selected_tiles, event_time, event_name, filename)
+        print('  took {:.2f} secs'.format(time.time() - start))
 
 
 if __name__ == '__main__':
-    description = """Convert a GOTO-tile output file containing a list of tiles
-                     and priorities into observation files for the G-TeCS
-                     observation queue."""
+    description = """Add targets to the database from a skymap."""
 
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('filename', help="skymap file")
-    parser.add_argument('--priority', help="minimum priority", type=float, default=0.001)
-    parser.add_argument('--number', help="minimum number", type=int, default=20)
+    parser.add_argument('filename', help='skymap file')
+    parser.add_argument('--priority', help='minimum priority', type=float, default=0.001)
+    parser.add_argument('--number', help='minimum number', type=int, default=20)
 
     args = parser.parse_args()
 

@@ -25,7 +25,7 @@ def parse_ra(ra_str):
     if len(ra_list) == 1:
         try:
             ra_deg = float(ra_list[0])
-        except Exception as error:
+        except Exception:
             raise ValueError('Invalid value for RA in degrees')
         if not 0 <= ra_deg < 360:
             raise ValueError('RA in degrees must be between 0 and 360')
@@ -36,7 +36,7 @@ def parse_ra(ra_str):
             h = int(ra_list[0])
             m = int(ra_list[1])
             s = float(ra_list[2])
-        except Exception as error:
+        except Exception:
             raise ValueError('Invalid input for RA in h m s')
         if not 0 <= h < 24:
             raise ValueError('RA hours must be between 0 and 24')
@@ -74,7 +74,7 @@ def parse_dec(dec_str):
     if len(dec_list) == 1:
         try:
             dec_deg = float(dec_list[0])
-        except Exception as error:
+        except Exception:
             raise ValueError('Invalid value for Dec in degrees')
         if not -90 <= dec_deg <= 90:
             raise ValueError('Dec in degrees must be between 90 and -90')
@@ -88,7 +88,7 @@ def parse_dec(dec_str):
             d = int(dec_list[1])
             m = int(dec_list[2])
             s = float(dec_list[3])
-        except Exception as error:
+        except Exception:
             raise ValueError('Invalid input for Dec in d m s')
         if not -90 <= d <= 90:
             raise ValueError('Dec degrees must be between 90 and -90')
@@ -113,7 +113,7 @@ def parse_dec(dec_str):
             d = int(dec_list[0])
             m = int(dec_list[1])
             s = float(dec_list[2])
-        except Exception as error:
+        except Exception:
             raise ValueError('Invalid input for Dec in d m s')
         if not -90 <= d <= 90:
             raise ValueError('Dec degrees must be between 90 and -90')
@@ -135,13 +135,28 @@ def parse_dec(dec_str):
     return dec_deg
 
 
-def fill_mpointing(session, mpointing):
-    """Fill out an mpointing frame with user input."""
+def fill_target(session):
+    """Fill out a target frame with user input."""
+    target_params = {'object_name': None,
+                     'ra': None,
+                     'dec': None,
+                     'too': None,
+                     'start_rank': None,
+                     'num_todo': None,
+                     'valid_time': None,
+                     'wait_time': None,
+                     'min_alt': None,
+                     'max_sunalt': None,
+                     'max_moon': None,
+                     'min_moonsep': None,
+                     'min_time': None,
+                     }
+
     # On or off grid?
-    ongrid = None
-    while ongrid not in ['y', 'n', 'Y', 'N']:
-        ongrid = input('Observe constrained to the grid? [y/n]: ')
-    if ongrid in ['y', 'Y']:
+    on_grid = None
+    while on_grid not in ['y', 'n', 'Y', 'N']:
+        on_grid = input('Observe constrained to the grid? [y/n]: ')
+    if on_grid in ['y', 'Y']:
         # Get the current grid
         db_grid = db.get_current_grid(session)
 
@@ -169,13 +184,13 @@ def fill_mpointing(session, mpointing):
                 try:
                     target_ra = parse_ra(ra_str)
                 except Exception:
-                    pass
+                    print('Invalid input')
             while target_dec is None:
                 dec_str = input('Target Dec [d m s OR deg]: ')
                 try:
                     target_dec = parse_dec(dec_str)
                 except Exception:
-                    pass
+                    print('Invalid input')
 
             # Find which tile the given coordinates are in
             coord = SkyCoord(target_ra * u.deg, target_dec * u.deg)
@@ -193,28 +208,28 @@ def fill_mpointing(session, mpointing):
                                                                       db_grid_tile.ra,
                                                                       db_grid_tile.dec,
                                                                       ))
-        mpointing['ra'] = db_grid_tile.ra
-        mpointing['dec'] = db_grid_tile.dec
-        mpointing['grid_tile'] = db_grid_tile
+        target_params['ra'] = db_grid_tile.ra
+        target_params['dec'] = db_grid_tile.dec
+        target_params['grid_tile'] = db_grid_tile
 
         # Object name
         default_name = db_grid.name + '_' + db_grid_tile.name + '_' + 'EXTRA'
         name = input('Enter Target name (blank for "{}"): '.format(default_name))
         if not name:
             name = default_name
-        mpointing['object_name'] = name
+        target_params['object_name'] = name
 
     else:
         # We're off grid
-        mpointing['grid_tile'] = None
+        target_params['grid_tile'] = None
 
         # Object name
-        while mpointing['object_name'] is None:
-            mpointing['object_name'] = input('Enter Target name: ')
+        while target_params['object_name'] is None:
+            target_params['object_name'] = input('Enter Target name: ')
 
         # Try coord lookup
         try:
-            coord = SkyCoord.from_name(mpointing['object_name'])
+            coord = SkyCoord.from_name(target_params['object_name'])
         except Exception:
             coord = None
         if coord is not None:
@@ -224,216 +239,192 @@ def fill_mpointing(session, mpointing):
             while use_coords not in ['y', 'n', 'Y', 'N']:
                 use_coords = input('Use these coordinates? [y/n]: ')
             if use_coords in ['y', 'Y']:
-                mpointing['ra'] = coord.ra.value
-                mpointing['dec'] = coord.dec.value
+                target_params['ra'] = coord.ra.value
+                target_params['dec'] = coord.dec.value
 
         # Enter coords
-        while mpointing['ra'] is None:
+        while target_params['ra'] is None:
             ra_str = input('Target RA [h m s OR deg]: ')
             try:
-                mpointing['ra'] = parse_ra(ra_str)
+                target_params['ra'] = parse_ra(ra_str)
             except Exception:
-                pass
-        while mpointing['dec'] is None:
+                print('Invalid input')
+        while target_params['dec'] is None:
             dec_str = input('Target Dec [d m s OR deg]: ')
             try:
-                mpointing['dec'] = parse_dec(dec_str)
+                target_params['dec'] = parse_dec(dec_str)
             except Exception:
-                pass
+                print('Invalid input')
 
     # ToO & Rank
     too = None
     while too not in ['y', 'n', 'Y', 'N']:
         too = input('Is the target a ToO (can interupt)? [y/n]: ')
     if too in ['y', 'Y']:
-        mpointing['too'] = 1
+        target_params['too'] = 1
         rank_zero = 'None'
         while rank_zero not in ['y', 'n', 'Y', 'N']:
             rank_zero = input('Enter as Rank 0 (higher than GW targets - use with care)? [y/n]: ')
         if rank_zero in ['y', 'Y']:
-            mpointing['start_rank'] = 0
+            target_params['start_rank'] = 0
         else:
-            mpointing['start_rank'] = 506
+            target_params['start_rank'] = 506
     else:
-        mpointing['too'] = 0
+        target_params['too'] = 0
         rank_str = 'None'
         while rank_str.lower() not in ['low', 'medium', 'high', 'l', 'm', 'h']:
             rank_str = input('Enter rank [low/medium/high]: ')
 
         if rank_str.lower() in ['low', 'l']:
-            mpointing['start_rank'] = 508
+            target_params['start_rank'] = 508
         elif rank_str.lower() in ['medium', 'm']:
-            mpointing['start_rank'] = 507
+            target_params['start_rank'] = 507
         elif rank_str.lower() in ['high', 'h']:
-            mpointing['start_rank'] = 506
+            target_params['start_rank'] = 506
 
     # Valid time & wait time
     daily = None
     while daily not in ['y', 'n', 'Y', 'N']:
-        daily = input('Use default cadance (once a night)? [y/n]: ')
+        daily = input('Use default cadence (once a night)? [y/n]: ')
     if daily in ['y', 'Y']:
-        mpointing['valid_time'] = -1
-        mpointing['wait_time'] = 1000  # ensures once a night
+        target_params['valid_time'] = -1
+        target_params['wait_time'] = 1000  # ensures once a night
     else:
-        while mpointing['valid_time'] is None:
+        while target_params['valid_time'] is None:
             valid_time = input('Time for the pointing to be valid for (minutes, -1=infinite): ')
             try:
-                mpointing['valid_time'] = int(valid_time)
+                target_params['valid_time'] = int(valid_time)
             except Exception:
-                pass
+                print('Invalid input')
 
-        while mpointing['wait_time'] is None:
+        while target_params['wait_time'] is None:
             wait_time = input('Time between visits (minutes, can be array, 0=no wait): ')
             try:
-                mpointing['wait_time'] = [int(i) for i in wait_time.split(',')]
+                target_params['wait_time'] = [int(i) for i in wait_time.split(',')]
             except Exception:
-                pass
+                print('Invalid input')
 
     # Number to do
-    while mpointing['num_todo'] is None:
+    while target_params['num_todo'] is None:
         num_todo = input('Number of visits? (-1=infinite): ')
         try:
-            mpointing['num_todo'] = int(num_todo)
+            target_params['num_todo'] = int(num_todo)
         except Exception:
-            pass
+            print('Invalid input')
 
-    # Constraings
+    # Constraints
     default_cons = None
     while default_cons not in ['y', 'n', 'Y', 'N']:
         string = 'Use default constraints (alt>30, sunalt<-15, moon<B, moonsep>30)? [y/n]: '
         default_cons = input(string)
     if default_cons in ['y', 'Y']:
-        mpointing['min_alt'] = 30
-        mpointing['max_sunalt'] = -15
-        mpointing['max_moon'] = 'B'
-        mpointing['min_moonsep'] = 30
+        target_params['min_alt'] = 30
+        target_params['max_sunalt'] = -15
+        target_params['max_moon'] = 'B'
+        target_params['min_moonsep'] = 30
     else:
-        while mpointing['min_alt'] is None:
-            invalue = input('Minimum target altitude (degrees): ')
+        while target_params['min_alt'] is None:
+            min_alt = input('Minimum target altitude (degrees): ')
             try:
-                mpointing['min_alt'] = float(invalue)
+                target_params['min_alt'] = float(min_alt)
             except Exception:
-                pass
+                print('Invalid input')
 
-        while mpointing['max_sunalt'] is None:
-            invalue = input('Maximum Sun altitude (degrees): ')
+        while target_params['max_sunalt'] is None:
+            max_sunalt = input('Maximum Sun altitude (degrees): ')
             try:
-                mpointing['max_sunalt'] = float(invalue)
+                target_params['max_sunalt'] = float(max_sunalt)
             except Exception:
-                pass
+                print('Invalid input')
 
-        while mpointing['max_moon'] not in ['D', 'G', 'B']:
-            invalue = input('Maximum Moon brightness [D/G/B]: ')
+        while target_params['max_moon'] not in ['D', 'G', 'B']:
+            max_moon = input('Maximum Moon brightness [D/G/B]: ')
             try:
-                mpointing['max_moon'] = invalue.upper()
+                target_params['max_moon'] = max_moon.upper()
             except Exception:
-                pass
+                print('Invalid input')
 
-        while mpointing['min_moonsep'] is None:
-            invalue = input('Minimum seperation from the Moon (degrees): ')
+        while target_params['min_moonsep'] is None:
+            min_moonsep = input('Minimum seperation from the Moon (degrees): ')
             try:
-                mpointing['min_moonsep'] = float(invalue)
+                target_params['min_moonsep'] = float(min_moonsep)
             except Exception:
-                pass
+                print('Invalid input')
 
-    return mpointing
+    return target_params
 
 
-def fill_exposure_set(exposure_set):
+def fill_exposure_set():
     """Fill out an exposure set frame with user input."""
-    # Number of exposures
-    while exposure_set['num_exp'] is None:
+    exps_params = {'num_exp': None, 'exptime': None, 'filt': None}
+
+    while exps_params['num_exp'] is None:
         num_exp = input('Number of exposures: ')
         try:
-            exposure_set['num_exp'] = int(num_exp)
+            exps_params['num_exp'] = int(num_exp)
         except Exception:
-            pass
+            print('Invalid input')
 
-    # Exposure time
-    while exposure_set['exptime'] is None:
+    while exps_params['exptime'] is None:
         exptime = input('Exposure time: ')
         try:
-            exposure_set['exptime'] = int(exptime)
+            exps_params['exptime'] = int(exptime)
         except Exception:
-            pass
+            print('Invalid input')
 
-    # Filter
-    while exposure_set['filt'] not in ['L', 'R', 'G', 'B']:
+    while exps_params['filt'] not in ['L', 'R', 'G', 'B']:
         filt = input('Filter [L/R/G/B]: ')
         try:
-            exposure_set['filt'] = filt.upper()
+            exps_params['filt'] = filt.upper()
         except Exception:
-            pass
+            print('Invalid input')
 
-    return exposure_set
+    return exps_params
 
 
-if __name__ == '__main__':
+def run():
+    """Create the targets and add them to the database."""
+    print('** Insert pointing into GOTO queue database **')
 
-    default_mpointing = {'object_name': None,
-                         'ra': None,
-                         'dec': None,
-                         'too': None,
-                         'start_rank': None,
-                         'num_todo': None,
-                         'valid_time': None,
-                         'wait_time': None,
-                         'min_alt': None,
-                         'max_sunalt': None,
-                         'max_moon': None,
-                         'min_moonsep': None,
-                         # auto filled values
-                         'min_time': None,
-                         }
+    # Get Target params
+    with db.open_session() as session:
+        target_params = fill_target(session)
 
+    # Get Exposure Set params
     exposure_sets = []
+    total_exptime = 0
+    more_exposures = True
+    while more_exposures is True:
+        exps_params = fill_exposure_set()
+        total_exptime += (exps_params['exptime'] + 30) * exps_params['num_exp']
+        exposure_sets.append(exps_params)
 
-    default_exposure_set = {'num_exp': None,
-                            'exptime': None,
-                            'filt': None,
-                            }
+        add_more = None
+        while add_more not in ['y', 'Y', 'n', 'N']:
+            add_more = input('Add another exposure set? [y/n]: ')
 
-    print("** Insert pointing into GOTO queue database **")
+        if add_more not in ['y', 'Y']:
+            more_exposures = False
+
+    # Calculate mintime
+    target_params['min_time'] = total_exptime
+
+    # Add to the database
     with db.open_session() as session:
         # Get default User
-        user = db.get_user(session, username='goto')
+        user = db.get_user(session, username='default')
 
-        # Fill Mpointing infomation
-        mpointing = default_mpointing.copy()
-        mpointing = fill_mpointing(session, mpointing)
+        # Create Target
+        target = db.Target(**target_params,
+                           user=user,
+                           )
+        for exps_params in exposure_sets:
+            target.exposure_sets.append(db.ExposureSet(**exps_params))
 
-        # Fill Exposure Set infomation
-        exposure_sets = []
-
-        total_exptime = 0
-        more_exposures = True
-        while more_exposures is True:
-            exposure_set = fill_exposure_set(default_exposure_set.copy())
-
-            total_exptime += (exposure_set['exptime'] + 30) * exposure_set['num_exp']
-            exposure_sets.append(exposure_set)
-
-            add_more = None
-            while add_more not in ['y', 'Y', 'n', 'N']:
-                add_more = input('Add another exposure set? [y/n]: ')
-
-            if add_more not in ['y', 'Y']:
-                more_exposures = False
-
-        mpointing['min_time'] = total_exptime
-
-        mp = db.Mpointing(**mpointing, user=user)
-        for exposure_set in exposure_sets:
-            es = db.ExposureSet(**exposure_set)
-            mp.exposure_sets.append(es)
-
-        # Create the first Pointing (i.e. preempt the caretaker)
-        p = mp.get_next_pointing()
-        mp.pointings.append(p)
-
+        # Confirm before adding to database
         print('~~ Final check ~~')
-        print(mp)
-        for es in mp.exposure_sets:
+        print(target)
+        for es in target.exposure_sets:
             print(es)
 
         confirm = None
@@ -441,9 +432,14 @@ if __name__ == '__main__':
             confirm = input('Add to the database? [y/n]: ')
 
         if confirm in ['y', 'Y']:
-            db.insert_items(session, [mp])
+            db.insert_items(session, [target])
             print('    Inserted into observation database')
         else:
             session.rollback()
             print('    Not inserted')
-        print('Done')
+
+    print('Done')
+
+
+if __name__ == '__main__':
+    run()

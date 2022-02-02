@@ -7,25 +7,6 @@ import time
 from gtecs.obs import database as db
 
 
-MP_SETTINGS = {'wait_time': None,
-               'too': False,
-               'start_rank': None,
-               'num_todo': None,
-               'valid_time': -1,
-               'wait_time': None,
-               'min_alt': None,
-               'max_sunalt': -12,
-               'max_moon': None,
-               'min_moonsep': None,
-               'min_time': None,
-               }
-
-EXP_SETTINGS = {'num_exp': None,
-                'exptime': None,
-                'filt': None,
-                }
-
-
 def get_tiles_from_file(filename):
     """Define mini-survey tiles."""
     with open(filename, 'r') as file:
@@ -36,8 +17,99 @@ def get_tiles_from_file(filename):
     return tiles
 
 
+def fill_target():
+    """Fill out a target frame with user input."""
+    target_params = {'object_name': None,
+                     'ra': None,
+                     'dec': None,
+                     'wait_time': None,
+                     'too': False,
+                     'start_rank': None,
+                     'num_todo': None,
+                     'valid_time': -1,
+                     'wait_time': None,
+                     'min_alt': None,
+                     'max_sunalt': -12,
+                     'max_moon': None,
+                     'min_moonsep': None,
+                     'min_time': None,
+                     }
+
+    while target_params['wait_time'] is None:
+        wait_time = input('Delay between observations (in days): ')
+        try:
+            target_params['wait_time'] = float(wait_time) * 24 * 60  # in minutes
+        except Exception:
+            print('Invalid input')
+
+    while target_params['num_todo'] is None:
+        num_todo = input('Number of visits? (-1=infinite): ')
+        try:
+            target_params['num_todo'] = int(num_todo)
+        except Exception:
+            print('Invalid input')
+
+    while target_params['start_rank'] is None:
+        start_rank = input('Pointing initial rank: ')
+        try:
+            target_params['start_rank'] = int(start_rank)
+        except Exception:
+            print('Invalid input')
+
+    while target_params['min_alt'] is None:
+        min_alt = input('Minimum altitude limit (degrees): ')
+        try:
+            target_params['min_alt'] = int(min_alt)
+        except Exception:
+            print('Invalid input')
+
+    while target_params['max_moon'] not in ['D', 'G', 'B']:
+        max_moon = input('Maximum Moon brightness [D/G/B]: ')
+        try:
+            target_params['max_moon'] = max_moon.upper()
+        except Exception:
+            print('Invalid input')
+
+    while target_params['min_moonsep'] is None:
+        min_moonsep = input('Minimum seperation from the Moon (degrees): ')
+        try:
+            target_params['min_moonsep'] = int(min_moonsep)
+        except Exception:
+            print('Invalid input')
+
+    return target_params
+
+
+def fill_exposure_set():
+    """Fill out an exposure set frame with user input."""
+    exps_params = {'num_exp': None, 'exptime': None, 'filt': None}
+
+    while exps_params['num_exp'] is None:
+        num_exp = input('Number of exposures: ')
+        try:
+            exps_params['num_exp'] = int(num_exp)
+        except Exception:
+            print('Invalid input')
+
+    while exps_params['exptime'] is None:
+        exptime = input('Exposure time: ')
+        try:
+            exps_params['exptime'] = int(exptime)
+        except Exception:
+            print('Invalid input')
+
+    while exps_params['filt'] not in ['L', 'R', 'G', 'B']:
+        filt = input('Filter [L/R/G/B]: ')
+        try:
+            exps_params['filt'] = filt.upper()
+        except Exception:
+            print('Invalid input')
+
+    return exps_params
+
+
 def run(filename):
-    """Create the mpointings and add them to the database."""
+    """Create the targets and add them to the database."""
     # Read tile names from the file
     tiles = get_tiles_from_file(filename)
     print('Read in {} tiles'.format(len(tiles)))
@@ -45,78 +117,19 @@ def run(filename):
     # Get survey name
     survey_name = input('Survey name: ').replace(' ', '_')
 
-    # Get Mpointing params
-    while MP_SETTINGS['wait_time'] is None:
-        wait_time = input('Delay between observations (in days): ')
-        try:
-            MP_SETTINGS['wait_time'] = float(wait_time) * 24 * 60  # in minutes
-        except Exception:
-            pass
-
-    while MP_SETTINGS['num_todo'] is None:
-        num_todo = input('Number of visits? (-1=infinite): ')
-        try:
-            MP_SETTINGS['num_todo'] = int(num_todo)
-        except Exception:
-            pass
-
-    while MP_SETTINGS['start_rank'] is None:
-        start_rank = input('Pointing initial rank: ')
-        try:
-            MP_SETTINGS['start_rank'] = int(start_rank)
-        except Exception:
-            pass
-
-    while MP_SETTINGS['min_alt'] is None:
-        min_alt = input('Minimum altitude limit (degrees): ')
-        try:
-            MP_SETTINGS['min_alt'] = int(min_alt)
-        except Exception:
-            pass
-
-    while MP_SETTINGS['max_moon'] not in ['D', 'G', 'B']:
-        max_moon = input('Maximum Moon brightness [D/G/B]: ')
-        try:
-            MP_SETTINGS['max_moon'] = max_moon.upper()
-        except Exception:
-            pass
-
-    while MP_SETTINGS['min_moonsep'] is None:
-        min_moonsep = input('Minimum seperation from the Moon (degrees): ')
-        try:
-            MP_SETTINGS['min_moonsep'] = int(min_moonsep)
-        except Exception:
-            pass
+    # Get Target params
+    target_params = fill_target()
 
     # Get ExposureSet params
-    while EXP_SETTINGS['num_exp'] is None:
-        num_exp = input('Number of exposures: ')
-        try:
-            EXP_SETTINGS['num_exp'] = int(num_exp)
-        except Exception:
-            pass
-
-    while EXP_SETTINGS['exptime'] is None:
-        exptime = input('Exposure time: ')
-        try:
-            EXP_SETTINGS['exptime'] = int(exptime)
-        except Exception:
-            pass
-
-    while EXP_SETTINGS['filt'] not in ['L', 'R', 'G', 'B']:
-        filt = input('Filter [L/R/G/B]: ')
-        try:
-            EXP_SETTINGS['filt'] = filt.upper()
-        except Exception:
-            pass
+    exps_params = fill_exposure_set()
 
     # Calculate mintime
-    MP_SETTINGS['min_time'] = (EXP_SETTINGS['exptime'] + 30) * EXP_SETTINGS['num_exp']
+    target_params['min_time'] = (exps_params['exptime'] + 30) * exps_params['num_exp']
 
     # Add to the database
     with db.open_session() as session:
         # Get default User
-        user = db.get_user(session, username='goto')
+        user = db.get_user(session, username='default')
 
         # Create or fetch Survey
         survey = session.query(db.Survey).filter(db.Survey.name == survey_name).one_or_none()
@@ -153,28 +166,31 @@ def run(filename):
         db.insert_items(session, survey_tiles)
         print('  took {:.2f} secs'.format(time.time() - start))
 
-        # Create an Mpointing for each tile
-        mpointings = []
-        print('Creating mpointings...')
+        # Create Targets
+        targets = []
+        print('Creating targets...')
         start = time.time()
         for survey_tile in survey_tiles:
-            name = survey_tile.grid_tile.name
-            mp = db.Mpointing(object_name=survey.name + '_' + name,
-                              **MP_SETTINGS,
-                              user=user,
-                              )
-            mp.grid_tile = survey_tile.grid_tile
-            mp.survey_tile = survey_tile
-            mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
+            target_params['object_name'] = survey.name + '_' + survey_tile.grid_tile.name
 
-            # Create the first Pointing (i.e. preempt the caretaker)
-            p = mp.get_next_pointing()
-            mp.pointings.append(p)
+            target = db.Target(**target_params,
+                               user=user,
+                               grid_tile=survey_tile.grid_tile,
+                               survey_tile=survey_tile,
+                               )
+            target.exposure_sets.append(db.ExposureSet(**exps_params))
 
-            mpointings.append(mp)
+            targets.append(target)
 
-        db.insert_items(session, mpointings)
         print('  took {:.2f} secs'.format(time.time() - start))
+
+        # Add to database
+        print('Adding {} targets to database...'.format(len(targets)))
+        start = time.time()
+        db.insert_items(session, targets)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+    print('Done')
 
 
 if __name__ == '__main__':

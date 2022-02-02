@@ -7,23 +7,24 @@ import time
 from gtecs.obs import database as db
 
 
-MP_SETTINGS = {'num_todo': -1,
-               'wait_time': 4320,  # 3 days
-               'min_time': (60 + 5) * 3,
-               'max_sunalt': -12,
-               'min_moonsep': 50,
-               }
+TARGET_PARAMS = {'object_name': None,
+                 'ra': None,
+                 'dec': None,
+                 'start_rank': None,
+                 'num_todo': -1,
+                 'wait_time': 4320,  # 3 days
+                 'min_time': (60 + 5) * 3,
+                 'max_sunalt': -12,
+                 'min_moonsep': 50,
+                 }
 
-EXP_SETTINGS = {'num_exp': 3,
-                'exptime': 60,
-                'filt': 'L',
-                }
+EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]
 
 
 def get_coords_from_file(filename):
     """Define mini-survey tiles centres and ranks."""
-    allras = []
-    alldecs = []
+    all_ras = []
+    all_decs = []
     ranks = []
     names = []
     with open(filename) as file:
@@ -38,50 +39,51 @@ def get_coords_from_file(filename):
 
             print(name, ra, dec, rank)
 
-            allras.append(ra)
-            alldecs.append(dec)
+            all_ras.append(ra)
+            all_decs.append(dec)
             ranks.append(rank)
             names.append(name)
 
-    return allras, alldecs, ranks, names
+    return all_ras, all_decs, ranks, names
 
 
 def run(filename):
-    """Create the mpointings and add them to the database."""
+    """Create the targets and add them to the database."""
     # Create the tile centres
     ras, decs, ranks, names = get_coords_from_file(filename)
 
-    # Add to the database
-    mpointings = []
     with db.open_session() as session:
-        # get default User
-        user = db.get_user(session, username='goto')
+        # Get default User
+        user = db.get_user(session, username='default')
 
-        # create Mpointings
-        print('Creating mpointings...')
+        # Create Targets
+        print('Creating targets...')
         start = time.time()
+        targets = []
         for ra, dec, rank, name in zip(ras, decs, ranks, names):
-            mp = db.Mpointing(object_name=name,
-                              ra=float(ra),
-                              dec=float(dec),
-                              start_rank=rank,
-                              **MP_SETTINGS,
-                              user=user,
-                              )
+            target_params = TARGET_PARAMS.copy()
+            target_params['object_name'] = name
+            target_params['ra'] = float(ra)
+            target_params['dec'] = float(dec)
+            target_params['start_rank'] = rank
 
-            mp.exposure_sets.append(db.ExposureSet(**EXP_SETTINGS))
+            target = db.Target(**target_params,
+                               user=user,
+                               )
+            for exps_params in EXPS_PARAMS:
+                target.exposure_sets.append(db.ExposureSet(**exps_params))
 
-            # Create the first Pointing (i.e. preempt the caretaker)
-            p = mp.get_next_pointing()
-            mp.pointings.append(p)
+            targets.append(target)
 
-            mpointings.append(mp)
         print('  took {:.2f} secs'.format(time.time() - start))
 
-        print('Adding {} mpointings to database...'.format(len(mpointings)))
+        # Add to database
+        print('Adding {} targets to database...'.format(len(targets)))
         start = time.time()
-        db.insert_items(session, mpointings)
+        db.insert_items(session, targets)
         print('  took {:.2f} secs'.format(time.time() - start))
+
+    print('Done')
 
 
 if __name__ == '__main__':
@@ -90,7 +92,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('file', help="File with tiles", type=str)
+    parser.add_argument('file', help='File with tiles', type=str)
 
     args = parser.parse_args()
 

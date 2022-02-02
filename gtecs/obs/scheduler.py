@@ -83,7 +83,7 @@ class ArtificialHorizonConstraint(Constraint):
         return altaz.alt > alt_limit
 
 
-class Pointing(object):
+class Pointing:
     """A class to contain infomation on each pointing."""
 
     def __init__(self, db_id, name, ra, dec, rank, weight, num_obs, too,
@@ -113,7 +113,7 @@ class Pointing(object):
             return False
 
     def __ne__(self, other):
-        return not self == other
+        return self != other
 
     def __repr__(self):
         template = ('Pointing(db_id={}, name={}, ra={}, dec={}, rank={}, weight={}, ' +
@@ -138,25 +138,25 @@ class Pointing(object):
 
         # Create pointing object
         pointing = cls(db_id=db_pointing.db_id,
-                       name=db_pointing.mpointing.object_name,
-                       ra=db_pointing.mpointing.ra,
-                       dec=db_pointing.mpointing.dec,
+                       name=db_pointing.target.object_name,
+                       ra=db_pointing.target.ra,
+                       dec=db_pointing.target.dec,
                        rank=db_pointing.rank,
                        weight=weight,
-                       num_obs=db_pointing.mpointing.num_completed,
-                       too=db_pointing.mpointing.too,
-                       maxsunalt=db_pointing.mpointing.max_sunalt,
-                       minalt=db_pointing.mpointing.min_alt,
-                       mintime=db_pointing.mpointing.min_time,
-                       maxmoon=db_pointing.mpointing.max_moon,
-                       minmoonsep=db_pointing.mpointing.min_moonsep,
+                       num_obs=db_pointing.target.num_completed,
+                       too=db_pointing.target.too,
+                       maxsunalt=db_pointing.target.max_sunalt,
+                       minalt=db_pointing.target.min_alt,
+                       mintime=db_pointing.target.min_time,
+                       maxmoon=db_pointing.target.max_moon,
+                       minmoonsep=db_pointing.target.min_moonsep,
                        start=db_pointing.start_time,
                        stop=db_pointing.stop_time,
                        current=db_pointing.status == 'running')
         return pointing
 
 
-class PointingQueue(object):
+class PointingQueue:
     """A class to represent a queue of pointings."""
 
     def __init__(self, pointings=None):

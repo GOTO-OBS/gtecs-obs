@@ -4,22 +4,23 @@
 import argparse
 import time
 
-import numpy as np
-
 from gtecs.obs import database as db
 
+import numpy as np
 
-MP_SETTINGS = {'start_rank': 998,
-               'num_todo': -1,
-               'wait_time': 4320,  # 3 days
-               'min_time': (60 + 30) * 3,
-               'max_sunalt': -12,
-               }
 
-EXP_SETTINGS = {'num_exp': None,
-                'exptime': 60,
-                'filt': None,
-                }
+TARGET_PARAMS = {'start_rank': 998,
+                 'num_todo': -1,
+                 'wait_time': 4320,  # 3 days
+                 'min_time': (60 + 30) * 3,
+                 'max_sunalt': -12,
+                 }
+
+EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'},
+               {'num_exp': 1, 'exptime': 60, 'filt': 'R'},
+               {'num_exp': 1, 'exptime': 60, 'filt': 'G'},
+               {'num_exp': 1, 'exptime': 60, 'filt': 'B'},
+               ]
 
 
 def get_coords(fov, overlap, centre, area):
@@ -44,8 +45,8 @@ def get_coords(fov, overlap, centre, area):
                      centre['dec'] + step['dec'] * (sides + 1),
                      step['dec'])[:n_tiles['dec']]
 
-    allras = []
-    alldecs = []
+    all_ras = []
+    all_decs = []
     for dec in decs:
         sides = (n_tiles['ra'] - 1) / 2
         s = step['ra'] / np.cos(dec * np.pi / 180.)
@@ -56,57 +57,51 @@ def get_coords(fov, overlap, centre, area):
             if ras[i] < 0:
                 ras[i] = 360 + ras[i]
 
-        allras.append(ras)
-        alldecs.append([dec] * len(ras))
+        all_ras.append(ras)
+        all_decs.append([dec] * len(ras))
 
-    allras = np.concatenate(allras)
-    alldecs = np.concatenate(alldecs)
-    names = np.arange(len(alldecs)) + 1
+    all_ras = np.concatenate(all_ras)
+    all_decs = np.concatenate(all_decs)
+    names = np.arange(len(all_decs)) + 1
 
-    return allras, alldecs, names
+    return all_ras, all_decs, names
 
 
 def run(fov, overlap, centre, area, name):
-    """Create the mpointings and add them to the database."""
+    """Create the targets and add them to the database."""
     # Create the tile centres
     ras, decs, names = get_coords(fov, overlap, centre, area)
 
-    # Add to the database
-    mpointings = []
     with db.open_session() as session:
-        # get default User
-        user = db.get_user(session, username='goto')
+        # Get default User
+        user = db.get_user(session, username='default')
 
-        # create Mpointings
-        print('Creating mpointings...')
+        # Create Targets
+        targets = []
+        print('Creating targets...')
         start = time.time()
         for ra, dec, tile_num in zip(ras, decs, names):
-            mp = db.Mpointing(object_name='{}_survey_T{}'.format(name, tile_num),
-                              ra=float(ra),
-                              dec=float(dec),
-                              **MP_SETTINGS,
-                              user=user,
-                              )
-            for filt in ['L', 'R', 'G', 'B']:
-                if filt == 'L':
-                    num_exp = 3
-                else:
-                    num_exp = 1
-                mp.exposure_sets.append(db.ExposureSet(num_exp=num_exp,
-                                                       filt=filt,
-                                                       **EXP_SETTINGS))
+            target_params = TARGET_PARAMS.copy()
+            target_params['object_name'] = '{}_survey_T{}'.format(name, tile_num)
+            target_params['ra'] = float(ra)
+            target_params['dec'] = float(dec)
 
-                # Create the first Pointing (i.e. preempt the caretaker)
-                p = mp.get_next_pointing()
-                mp.pointings.append(p)
+            target = db.Target(**target_params,
+                               user=user,
+                               )
+            for exps_params in EXPS_PARAMS:
+                target.exposure_sets.append(db.ExposureSet(**exps_params))
 
-            mpointings.append(mp)
+            targets.append(target)
         print('  took {:.2f} secs'.format(time.time() - start))
 
-        print('Adding {} mpointings to database...'.format(len(mpointings)))
+        # Add to database
+        print('Adding {} targets to database...'.format(len(targets)))
         start = time.time()
-        db.insert_items(session, mpointings)
+        db.insert_items(session, targets)
         print('  took {:.2f} secs'.format(time.time() - start))
+
+    print('Done')
 
 
 if __name__ == '__main__':
@@ -115,14 +110,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('ra_fov', help="FoV in RA", type=float, default=5.6)
-    parser.add_argument('dec_fov', help="FoV in Dec", type=float, default=2.5)
-    parser.add_argument('ra_overlap', help="Overlap in RA", type=float, default=0.1)
-    parser.add_argument('dec_overlap', help="Overlap in Dec", type=float, default=0.5)
-    parser.add_argument('ra_centre', help="Survey centre in RA", type=float)
-    parser.add_argument('dec_centre', help="Survey centre in Dec", type=float)
-    parser.add_argument('area', help="Sq deg area for the survey to cover", type=float)
-    parser.add_argument('name', help="Survey name", type=str)
+    parser.add_argument('ra_fov', help='FoV in RA', type=float, default=5.6)
+    parser.add_argument('dec_fov', help='FoV in Dec', type=float, default=2.5)
+    parser.add_argument('ra_overlap', help='Overlap in RA', type=float, default=0.1)
+    parser.add_argument('dec_overlap', help='Overlap in Dec', type=float, default=0.5)
+    parser.add_argument('ra_centre', help='Survey centre in RA', type=float)
+    parser.add_argument('dec_centre', help='Survey centre in Dec', type=float)
+    parser.add_argument('area', help='Sq deg area for the survey to cover', type=float)
+    parser.add_argument('name', help='Survey name', type=str)
 
     args = parser.parse_args()
 

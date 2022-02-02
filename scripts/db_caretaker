@@ -18,27 +18,29 @@ def there_can_only_be_one():
         sys.exit()
 
 
-there_can_only_be_one()
+if __name__ == '__main__':
+    there_can_only_be_one()
 
+    print('~~~~~~~~~~~~~~~~~~~')
+    print(Time.now())
 
-print('~~~~~~~~~~~~~~~~~~~')
-print(Time.now())
+    # Schedule new Pointings for any unscheduled Targets
+    with db.open_session() as session:
+        print('Getting any unscheduled Targets...')
+        unscheduled_targets = db.get_targets(session, status='unscheduled')
 
-# schedule Pointings for unscheduled Mpointings
-with db.open_session() as session:
-    print('Getting any unscheduled Mpointings...')
-    unscheduled_mps = db.get_mpointings(session, status='unscheduled')
+        if len(unscheduled_targets) > 0:
+            print('> Found {} unscheduled Targets...'.format(len(unscheduled_targets)))
 
-    if len(unscheduled_mps) > 0:
-        print('> Creating {} new Pointings'.format(len(unscheduled_mps)))
-        start = time.time()
-        pointings = [mp.get_next_pointing() for mp in unscheduled_mps]
-        pointings = [p for p in pointings if p is not None]
-        print('>    took {:.2f} secs'.format(time.time() - start))
+            print('> Creating {} new Pointings'.format(len(unscheduled_targets)))
+            start = time.time()
+            pointings = [target.get_next_pointing() for target in unscheduled_targets]
+            pointings = [p for p in pointings if p is not None]
+            print('>    took {:.2f} secs'.format(time.time() - start))
 
-        print('> Inserting {} Pointings into DB'.format(len(pointings)))
-        start = time.time()
-        db.insert_items(session, pointings)
-        print('>    took {:.2f} secs'.format(time.time() - start))
-    else:
-        print('> None found')
+            print('> Inserting {} Pointings into DB'.format(len(pointings)))
+            start = time.time()
+            db.insert_items(session, pointings)
+            print('>    took {:.2f} secs'.format(time.time() - start))
+        else:
+            print('> None found')

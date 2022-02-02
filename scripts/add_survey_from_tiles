@@ -131,25 +131,22 @@ def run(filename):
         # Get default User
         user = db.get_user(session, username='default')
 
+        # Get the current grid from the database
+        grid = db.get_current_grid(session)
+        print('Using grid "{}"'.format(grid.name))
+
         # Create or fetch Survey
         survey = session.query(db.Survey).filter(db.Survey.name == survey_name).one_or_none()
         if survey is None:
-            # Get the current grid from the database
-            grid = db.get_current_grid(session)
-            print('Using grid "{}"'.format(grid.name))
-
             print('Creating survey database entry')
             survey = db.Survey(name=survey_name)
-            survey.grid = grid
-            session.add(survey)
         else:
             print('Linking to existing survey:', survey)
-            grid = survey.grid
 
-        # Create a SurveyTile for each tile
-        print('Creating survey tiles...')
+        # Create Targets
+        targets = []
+        print('Creating targets...')
         start = time.time()
-        survey_tiles = []
         for tile in tiles:
             grid_tile = session.query(db.GridTile).filter(db.GridTile.grid == grid,
                                                           db.GridTile.name == tile,
@@ -158,25 +155,12 @@ def run(filename):
                 print('Could not find tile entry for tile "{}"!'.format(grid_tile))
                 continue
 
-            survey_tile = db.SurveyTile(weight=1)  # Equal weights
-            survey_tile.survey = survey
-            survey_tile.grid_tile = grid_tile
-            survey_tiles.append(survey_tile)
-
-        db.insert_items(session, survey_tiles)
-        print('  took {:.2f} secs'.format(time.time() - start))
-
-        # Create Targets
-        targets = []
-        print('Creating targets...')
-        start = time.time()
-        for survey_tile in survey_tiles:
-            target_params['object_name'] = survey.name + '_' + survey_tile.grid_tile.name
+            target_params['object_name'] = survey.name + '_' + grid_tile.name
 
             target = db.Target(**target_params,
                                user=user,
-                               grid_tile=survey_tile.grid_tile,
-                               survey_tile=survey_tile,
+                               grid_tile=grid_tile,
+                               survey=survey,
                                )
             target.exposure_sets.append(db.ExposureSet(**exps_params))
 

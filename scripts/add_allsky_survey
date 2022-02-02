@@ -28,36 +28,19 @@ def run():
         # Create a Survey
         print('Creating all-sky survey...')
         survey = db.Survey(name='Allsky_survey')
-        survey.grid = grid
-        session.add(survey)
-
-        # Create SurveyTiles, one for each GridTile
-        survey_tiles = []
-        start = time.time()
-        for grid_tile in grid.grid_tiles:
-            survey_tile = db.SurveyTile(weight=1)  # Equal weights
-            survey_tile.survey = survey
-            survey_tile.grid_tile = grid_tile
-            survey_tiles.append(survey_tile)
-        print('  took {:.2f} secs'.format(time.time() - start))
-
-        print('Adding {} survey tiles to database...'.format(len(survey_tiles)))
-        start = time.time()
-        db.insert_items(session, survey_tiles)
-        print('  took {:.2f} secs'.format(time.time() - start))
 
         # Create Targets
         targets = []
         print('Creating targets...')
         start = time.time()
-        for survey_tile in survey_tiles:
+        for grid_tile in grid.grid_tiles:
             target_params = TARGET_PARAMS.copy()
-            target_params['object_name'] = survey.name + '_' + survey_tile.grid_tile.name
+            target_params['object_name'] = survey.name + '_' + grid_tile.name
 
             target = db.Target(**target_params,
                                user=user,
-                               grid_tile=survey_tile.grid_tile,
-                               survey_tile=survey_tile,
+                               grid_tile=grid_tile,
+                               survey=survey,
                                )
             for exps_params in EXPS_PARAMS:
                 target.exposure_sets.append(db.ExposureSet(**exps_params))

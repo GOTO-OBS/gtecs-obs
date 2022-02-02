@@ -47,7 +47,7 @@ def add_to_database(session, db_grid, tiles, event_time, event_name, filename):
                        event=event,
                        )
 
-    # Create SurveyTiles and Targets
+    # Create Targets
     targets = []
     for tile in tiles:
         # Get tile infomation
@@ -57,19 +57,15 @@ def add_to_database(session, db_grid, tiles, event_time, event_name, filename):
         # Find the matched Grid tile
         grid_tile = db.get_grid_tile_by_name(session, db_grid.name, tilename)
 
-        # Create SurveyTile
-        survey_tile = db.SurveyTile(weight=prob)
-        survey_tile.survey = survey
-        survey_tile.grid_tile = grid_tile
-
         # Create Target
         target_params = TARGET_PARAMS.copy()
         target_params['object_name'] = '{}_{}'.format(event_name, tilename)
+        target_params['weight'] = prob
 
         target = db.Target(**target_params,
                            user=user,
                            grid_tile=grid_tile,
-                           survey_tile=survey_tile,
+                           survey=survey,
                            event=event,
                            )
         for exps_params in EXPS_PARAMS:

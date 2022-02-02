@@ -30,9 +30,8 @@ with db.open_session() as session:
     si = db.Site.from_name('LaPalma')
 
     # and two telescopes at that site
-    t1 = db.Telescope(name='North Telescope')
-    t2 = db.Telescope(name='South Telescope')
-    t1.site = si
+    t1 = db.Telescope(name='North Telescope', site=si)
+    t2 = db.Telescope(name='South Telescope', site=si)
     t2.site = si
 
     # and create a grid
@@ -44,29 +43,19 @@ with db.open_session() as session:
     t2.grid = g
 
     # and a few grid tiles
-    gt1 = db.GridTile(name='T0001', ra=100, dec=20)
-    gt1.grid = g
-    gt2 = db.GridTile(name='T0002', ra=100, dec=40)
-    gt2.grid = g
+    gt1 = db.GridTile(name='T0001', ra=100, dec=20, grid=g)
+    gt2 = db.GridTile(name='T0002', ra=100, dec=40, grid=g)
 
     # create an event
     e = db.Event(name='event', ivorn='ivo://goto', source='made-up', event_type='FAKE')
 
     # and a survey
-    s = db.Survey(name='GOTO event survey')
+    s = db.Survey(name='GOTO event survey', event=e)
     s.event = e
     s.grid = g
 
-    # and some survey tiles
-    st1 = db.SurveyTile(weight=0.5)
-    st1.survey = s
-    st1.grid_tile = gt1
-    st2 = db.SurveyTile(weight=0.5)
-    st2.survey = s
-    st2.grid_tile = gt2
-
     # add them all
-    db.insert_items(session, [si, t1, t2, g, gt1, gt2, e, s, st1, st2])
+    db.insert_items(session, [si, t1, t2, g, gt1, gt2, e, s])
     session.commit()
 
     # print them to check __repr__
@@ -78,8 +67,6 @@ with db.open_session() as session:
     print(gt2, end='\n\n')
     print(e, end='\n\n')
     print(s, end='\n\n')
-    print(st1)
-    print(st2, end='\n\n')
 time.sleep(2)
 
 print('-------')

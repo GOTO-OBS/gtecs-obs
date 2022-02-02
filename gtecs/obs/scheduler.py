@@ -129,20 +129,13 @@ class Pointing:
     @classmethod
     def from_database(cls, db_pointing):
         """Import a pointing from the database."""
-        # weight is stored on the Survey Tile, if it has one
-        # If not it effectively contains 100% of the target, so weight=1
-        if db_pointing.survey_tile:
-            weight = db_pointing.survey_tile.weight
-        else:
-            weight = 1
-
         # Create pointing object
         pointing = cls(db_id=db_pointing.db_id,
                        name=db_pointing.target.object_name,
                        ra=db_pointing.target.ra,
                        dec=db_pointing.target.dec,
                        rank=db_pointing.rank,
-                       weight=weight,
+                       weight=db_pointing.target.weight,
                        num_obs=db_pointing.target.num_completed,
                        too=db_pointing.target.too,
                        maxsunalt=db_pointing.target.max_sunalt,

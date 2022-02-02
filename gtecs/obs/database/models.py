@@ -19,8 +19,8 @@ from sqlalchemy.sql import and_, case, or_
 
 
 __all__ = ['User', 'ExposureSet', 'Pointing', 'Target', 'TimeBlock',
-           'Site', 'Telescope',
-           'Grid', 'GridTile', 'Survey', 'SurveyTile', 'Event',
+           'Site', 'Telescope', 'Grid', 'GridTile',
+           'Survey', 'Event',
            'ImageLog',
            'TRIGGERS']
 
@@ -245,7 +245,7 @@ class Pointing(Base):
 
     Parameters
     ----------
-    rank : Integer
+    rank : int
         rank to use when scheduling (should be the current_rank of the linked target)
 
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
@@ -256,6 +256,7 @@ class Pointing(Base):
         can be None, if so the pointing will stay in the queue indefinitely
         (it can't be marked as expired) and will only leave when observed
         default = None
+
     creation_time : string, `astropy.time.Time` or datetime.datetime, optional
         the time the pointing was created
         this should usually be set automatically, unless doing simulations
@@ -306,8 +307,8 @@ class Pointing(Base):
         the ExposureSets linked to the Target this Pointing was generated from
     grid_tile : `GridTile`
         the GridTile the Target this Pointing was generated from covers, if any
-    survey_tile : `SurveyTile`
-        the SurveyTile the Target this Pointing was generated from covers, if any
+    survey : `Survey`
+        the Survey the Target this Pointing was generated from was part of, if any
     event : `Event`
         the Event the Target this Pointing was generated from was part of, if any
 
@@ -377,15 +378,15 @@ class Pointing(Base):
                              viewonly=True,
                              uselist=False,
                              )
-    survey_tile = relationship('SurveyTile',
-                               lazy='joined',
-                               secondary='targets',
-                               primaryjoin='Pointing.target_id == Target.db_id',
-                               secondaryjoin='SurveyTile.db_id == Target.survey_tile_id',
-                               back_populates='pointings',
-                               viewonly=True,
-                               uselist=False,
-                               )
+    survey = relationship('Survey',
+                          lazy='joined',
+                          secondary='targets',
+                          primaryjoin='Pointing.target_id == Target.db_id',
+                          secondaryjoin='Survey.db_id == Target.event_id',
+                          back_populates='pointings',
+                          viewonly=True,
+                          uselist=False,
+                          )
     event = relationship('Event',
                          lazy='joined',
                          secondary='targets',
@@ -675,11 +676,25 @@ class Target(Base):
         J2000 declination in decimal degrees
         if dec is not given and this Target is linked to a GridTile
         then the dec will be extracted from the GridTile
-    start_rank : Integer
-        rank to use for first pointing in series
     num_todo : int
-        number of (successful) observations required.
-        less than zero means repeat infinitely.
+        number of (successful) observations required
+        less than zero means repeat infinitely
+    start_rank : int
+        rank to use for first pointing in series
+        lower values are prioritised first by the scheduler
+
+    weight : int, optional
+        weighting relative to other targets in the same survey
+        default = 1
+    too : bool, optional
+        indicates if this is a Target of Opportunity (ToO)
+        default = False
+    tel_mask : int, optional
+        if set, this is a binary mask which will determine which telescopes
+        can carry out the observation.
+        A value of 4 (binary (0100) means only observable by Telescope 3, a value of
+        5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
+        default = None (no restriction)
 
     wait_time : float or list of float, optional
         time to wait between pointings in minutes.
@@ -707,15 +722,6 @@ class Target(Base):
     min_moonsep : float, optional
         distance constraint from the Moon, degrees
         default = 30
-    too : bool, optional
-        indicates if this is a Target of Opportunity (ToO)
-        default = False
-    tel_mask : int, optional
-        if set, this is a binary mask which will determine which telescopes
-        can carry out the observation.
-        A value of 4 (binary (0100) means only observable by Telescope 3, a value of
-        5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
-        default = None (no restriction)
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which Target is considered valid and can be started
         if not given then set to now, so the Target will start immediately
@@ -753,9 +759,9 @@ class Target(Base):
     grid_tile : `GridTile`, optional
         the GridTile this Target covers, if any
         can also be added with the grid_tile_id parameter
-    survey_tile : `SurveyTile`, optional
-        the SurveyTile this Target covers, if any
-        can also be added with the survey_tile_id parameter
+    survey : `Survey`, optional
+        the Survey this Target is part of, if any
+        can also be added with the survey_id parameter
     event : `Event`, optional
         the Event this Target is part of, if any
         can also be added with the event_id parameter
@@ -790,8 +796,6 @@ class Target(Base):
     -----------------------
     grid : `Grid`
         the Grid that the GridTile this Target covers, if any, is part of
-    survey : `Survey`
-        the Survey that the SurveyTile this Target covers, if any, is part of
 
     Methods
     -------
@@ -835,14 +839,15 @@ class Target(Base):
     dec = Column(Float, nullable=False)
     start_rank = Column(Integer, nullable=False)
     num_todo = Column(Integer, nullable=False)
+    weight = Column(Integer, nullable=False, default=1)
+    too = Column(Boolean, nullable=False, default=False)
+    tel_mask = Column(Integer, default=None)
     # # Constraints
     min_alt = Column(Float, nullable=False, default=30)
     max_sunalt = Column(Float, nullable=False, default=-15)
     min_time = Column(Float, nullable=False)
     max_moon = Column(String(1), nullable=False, default='B')
     min_moonsep = Column(Float, nullable=False, default=30)
-    too = Column(Boolean, nullable=False, default=False)
-    tel_mask = Column(Integer, default=None)
     start_time = Column(DateTime, nullable=False, index=True, server_default=func.now())
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
     # # Status
@@ -852,7 +857,7 @@ class Target(Base):
     # Foreign keys
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True)
-    survey_tile_id = Column(Integer, ForeignKey('survey_tiles.id'), nullable=True)
+    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True)
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
@@ -862,7 +867,7 @@ class Target(Base):
     exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='target')
     time_blocks = relationship('TimeBlock', lazy='joined', back_populates='target')
     grid_tile = relationship('GridTile', lazy='joined', back_populates='targets')
-    survey_tile = relationship('SurveyTile', lazy='joined', back_populates='targets')
+    survey = relationship('Survey', lazy='joined', back_populates='targets')
     event = relationship('Event', lazy='joined', back_populates='targets')
 
     # Secondary relationships
@@ -875,15 +880,6 @@ class Target(Base):
                         viewonly=True,
                         uselist=False,
                         )
-    survey = relationship('Survey',
-                          lazy='joined',
-                          secondary='survey_tiles',
-                          primaryjoin='Target.survey_tile_id == SurveyTile.db_id',
-                          secondaryjoin='Survey.db_id == SurveyTile.survey_id',
-                          back_populates='targets',
-                          viewonly=True,
-                          uselist=False,
-                          )
 
     # Column properties
     last_observed = column_property(select([Pointing.finished_time])
@@ -960,7 +956,7 @@ class Target(Base):
                    'deleted_time={}'.format(self.deleted_time),
                    'user_id={}'.format(self.user_id),
                    'grid_tile_id={}'.format(self.grid_tile_id),
-                   'survey_tile_id={}'.format(self.survey_tile_id),
+                   'survey_id={}'.format(self.survey_id),
                    'event_id={}'.format(self.event_id),
                    ]
         return 'Target({})'.format(', '.join(strings))
@@ -1782,7 +1778,6 @@ class Grid(Base):
 
     # Foreign relationships
     grid_tiles = relationship('GridTile', back_populates='grid')
-    surveys = relationship('Survey', back_populates='grid')
     telescopes = relationship('Telescope', back_populates='grid')
 
     # Secondary relationships
@@ -1866,8 +1861,6 @@ class GridTile(Base):
 
     targets : list of `Target`, optional
         the Targets that cover this GridTile, if any
-    survey_tiles : list of `SurveyTile`, optional
-        the SurveyTiles that cover this GridTile, if any
 
     Attributes
     ----------
@@ -1901,7 +1894,6 @@ class GridTile(Base):
 
     # Foreign relationships
     grid = relationship('Grid', back_populates='grid_tiles')
-    survey_tiles = relationship('SurveyTile', back_populates='grid_tile')
     targets = relationship('Target', back_populates='grid_tile')
 
     # Secondary relationships
@@ -1927,9 +1919,7 @@ class GridTile(Base):
 class Survey(Base):
     """A class to represent a Survey.
 
-    A Survey is a grouping of tiles from a specific Grid.
-    The purpose of Surveys is to add weighting to the base Grid Tiles.
-    This is done using Survey Tiles.
+    A Survey is a way to group Targets, usually from a paticular Event.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -1947,13 +1937,8 @@ class Survey(Base):
 
     Primary relationships
     ---------------------
-    grid : `Grid`
-        the Grid associated with this Survey
-        required before addition to the database
-        can also be added with the grid_id parameter
-
-    survey_tiles : list of `SurveyTile`, optional
-        the Survey Tiles that are part of this Survey, if any
+    targets : list of `Target`, optional
+        the Targets that are part of this Survey, if any
     event : `Event`, optional
         the Event this Survey is part of, if any
         can also be added with the event_id parameter
@@ -1969,8 +1954,8 @@ class Survey(Base):
 
     Secondary relationships
     -----------------------
-    targets : list of `Target`
-        the Targets which cover any of this Survey's SurveyTiles, if any
+    pointings : list of `Pointing`
+        the Pointings which are part of this Survey, if any
 
     """
 
@@ -1984,23 +1969,21 @@ class Survey(Base):
     name = Column(String(255), nullable=False, index=True)
 
     # Foreign keys
-    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Foreign relationships
-    survey_tiles = relationship('SurveyTile', back_populates='survey')
-    grid = relationship('Grid', back_populates='surveys')
+    targets = relationship('Target', back_populates='survey')
     event = relationship('Event', back_populates='surveys')
 
     # Secondary relationships
-    targets = relationship('Target',
-                           secondary='survey_tiles',
-                           primaryjoin='Survey.db_id == SurveyTile.survey_id',
-                           secondaryjoin='Target.survey_tile_id == SurveyTile.db_id',
-                           back_populates='survey',
-                           viewonly=True,
-                           uselist=True,
-                           )
+    pointings = relationship('Pointing',
+                             secondary='targets',
+                             primaryjoin='Survey.db_id == Target.event_id',
+                             secondaryjoin='Pointing.target_id == Target.db_id',
+                             back_populates='survey',
+                             viewonly=True,
+                             uselist=True,
+                             )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2009,90 +1992,6 @@ class Survey(Base):
                    'event_id={}'.format(self.event_id),
                    ]
         return 'Survey({})'.format(', '.join(strings))
-
-
-class SurveyTile(Base):
-    """A class to represent a Survey Tile.
-
-    Survey Tiles map onto Grid Tiles, but contain an additional weighting.
-
-    Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an instance, and set its attributes
-    without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the db_id)
-    will be None until the instance is added to the database.
-
-    Parameters
-    ----------
-    weight : float
-        weighting for this tile (between 0 and 1)
-
-    When created the instance can be linked to the following other tables as parameters,
-    otherwise they are populated when it is added to the database:
-
-    Primary relationships
-    ---------------------
-    Survey : `Survey`
-        the Survey this SurveyTile is part of
-        required before addition to the database
-        can also be added with the survey_id parameter
-
-    targets : list of `Target`, optional
-        the Targets that cover this SurveyTile, if any
-    grid_tiles : list of `GridTile`, optional
-        the GridTiles that cover this SurveyTile, if any
-
-    Attributes
-    ----------
-    db_id : int
-        primary database key
-        only populated when the instance is added to the database
-
-    The following secondary relationships are not settable directly,
-    but are populated through the primary relationships and are available as attributes:
-
-    Secondary relationships
-    -----------------------
-    pointings : list of `Pointing`
-        the Pointings that cover this SurveyTile, if any
-
-    """
-
-    # Set corresponding SQL table name
-    __tablename__ = 'survey_tiles'
-
-    # Primary key
-    db_id = Column('id', Integer, primary_key=True)
-
-    # Columns
-    weight = Column(Float, nullable=False)
-
-    # Foreign keys
-    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=False)
-    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=False)
-
-    # Foreign relationships
-    survey = relationship('Survey', back_populates='survey_tiles')
-    grid_tile = relationship('GridTile', back_populates='survey_tiles')
-    targets = relationship('Target', back_populates='survey_tile')
-
-    # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary='targets',
-                             primaryjoin='SurveyTile.db_id == Target.survey_tile_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='survey_tile',
-                             viewonly=True,
-                             uselist=True,
-                             )
-
-    def __repr__(self):
-        strings = ['db_id={}'.format(self.db_id),
-                   'weight={}'.format(self.weight),
-                   'survey_id={}'.format(self.survey_id),
-                   'grid_tile_id={}'.format(self.grid_tile_id),
-                   ]
-        return 'SurveyTile({})'.format(', '.join(strings))
 
 
 class Event(Base):

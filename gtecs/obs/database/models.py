@@ -90,9 +90,12 @@ class User(Base):
     # Foreign relationships
     mpointings = relationship('Mpointing', back_populates='user')
 
-    def __init__(self, **kwargs):
+    def __init__(self, username, password, full_name, **kwargs):
+        kwargs['username'] = username
+        kwargs['full_name'] = full_name
+
         # Use hashed password instead of plain
-        kwargs['password_hash'] = hashlib.sha512(kwargs.pop('password').encode()).hexdigest()
+        kwargs['password_hash'] = hashlib.sha512(password.encode()).hexdigest()
 
         # Init base class
         super().__init__(**kwargs)

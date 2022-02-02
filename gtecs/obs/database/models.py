@@ -908,6 +908,13 @@ class Target(Base):
         if 'start_time' not in kwargs or kwargs['start_time'] is None:
             kwargs['start_time'] = kwargs['creation_time']
 
+        # Get coordinates from tile if not given
+        if (kwargs['grid_tile'] is not None and
+                ('ra' not in kwargs or kwargs['ra'] is None) and
+                ('dec' not in kwargs or kwargs['dec'] is None)):
+            kwargs['ra'] = kwargs['grid_tile'].ra
+            kwargs['dec'] = kwargs['grid_tile'].dec
+
         # Init base class
         super().__init__(**kwargs)
 
@@ -2221,17 +2228,4 @@ class ImageLog(Base):
         return value
 
 
-TRIGGERS = [
-    # Target trigger before insert
-    # If no coordinates are given but it's linked to a grid tile then use its coordinates.
-    """CREATE TRIGGER `targets_BEFORE_INSERT` BEFORE INSERT ON `targets` FOR EACH ROW
-    BEGIN
-    IF ((NEW.`grid_tile_id` is not NULL) and (NEW.`ra` is NULL) and (NEW.`dec` is NULL)) THEN
-        SET NEW.`ra` = (SELECT `ra` FROM `grid_tiles`
-                        WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
-        SET NEW.`dec` = (SELECT `dec` FROM `grid_tiles`
-                            WHERE NEW.`grid_tile_id` = `grid_tiles`.`id`);
-    END IF;
-    END
-    """,
-]
+TRIGGERS = []

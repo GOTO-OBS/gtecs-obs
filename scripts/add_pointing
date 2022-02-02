@@ -146,7 +146,7 @@ def fill_mpointing(session, mpointing):
         db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
-        grid = db_grid.get_skygrid()
+        grid = db_grid.skygrid
 
         print('    Using grid {}'.format(db_grid.name))
 

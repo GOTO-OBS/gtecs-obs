@@ -18,7 +18,7 @@ def run(name, target_ra, target_dec):
         db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
-        grid = db_grid.get_skygrid()
+        grid = db_grid.skygrid
 
         # Find which tile the given coordinates are in
         coord = SkyCoord(target_ra * u.deg, target_dec * u.deg)

@@ -1581,13 +1581,14 @@ class Site(Base):
 
     @classmethod
     def from_location(cls, location, name=None):
-        """Create a Site from an Astropy `EarthLocation` class and a name string."""
+        """Create a Site from an Astropy `EarthLocation` class and optional name string."""
         if not isinstance(location, EarthLocation):
             raise ValueError('"location" must be an `astropy.coordinates.EarthLocation`')
-        if hasattr(location.info, 'name'):
-            name = location.info.name
         if name is None:
-            raise ValueError('Missing name for site')
+            if hasattr(location.info, 'name'):
+                name = location.info.name
+            else:
+                raise ValueError('Missing name for site')
 
         return cls(name=name,
                    latitude=location.lat.value,
@@ -1656,6 +1657,7 @@ class Telescope(Base):
     tel_mask : int
         the binary telescope mask for this Telescope, based on the db_id
         only populated when the instance is added to the database
+
     """
 
     # Set corresponding SQL table name
@@ -1804,12 +1806,31 @@ class Grid(Base):
                    ]
         return 'Grid({})'.format(', '.join(strings))
 
-    def get_skygrid(self):
-        """Create a GOTO-tile SkyGrid from the current database Grid."""
+    @classmethod
+    def from_skygrid(cls, skygrid, name=None):
+        """Create a Grid from a GOTO-tile `SkyGrid` class and optional name string."""
+        if not isinstance(skygrid, SkyGrid):
+            raise ValueError('"location" must be a `gototile.grid.SkyGrid`')
+        if name is None:
+            if hasattr(skygrid, 'name'):
+                name = skygrid.name
+            else:
+                raise ValueError('Missing name for grid')
+
+        return cls(name=name,
+                   ra_fov=skygrid.fov['ra'].value,
+                   dec_fov=skygrid.fov['dec'].value,
+                   ra_overlap=skygrid.overlap['ra'],
+                   dec_overlap=skygrid.overlap['dec'],
+                   algorithm=skygrid.algorithm,
+                   )
+
+    @property
+    def skygrid(self):
+        """Return a GOTO-tile SkyGrid for this Grid."""
         fov = {'ra': self.ra_fov * u.deg, 'dec': self.dec_fov * u.deg}
         overlap = {'ra': self.ra_overlap, 'dec': self.dec_overlap}
-        skygrid = SkyGrid(fov, overlap, kind=self.algorithm)
-        return skygrid
+        return SkyGrid(fov, overlap, kind=self.algorithm)
 
 
 class GridTile(Base):

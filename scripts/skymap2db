@@ -95,7 +95,7 @@ def run(filename, hp_lim=0.001, n_lim=20):
         db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
-        grid = db_grid.get_skygrid()
+        grid = db_grid.skygrid
 
     # open skymap and get event details
     print('Loading skymap...')

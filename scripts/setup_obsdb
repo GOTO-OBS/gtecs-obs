@@ -3,6 +3,8 @@
 
 import argparse
 
+from gototile.grid import SkyGrid
+
 from gtecs.obs import database as db
 
 
@@ -25,15 +27,33 @@ def run(overwrite=False, add_defaults=False, verbose=False):
 
         # Add in default GOTO sites and telescopes
         print('Creating entires for GOTO telescopes...')
-        # TODO: Add 8-UT grid
         site1 = db.Site.from_name('LaPalma')
         site2 = db.Site.from_name('SSO')
-        goto1 = db.Telescope(name='GOTO-1', site=site1)
-        goto2 = db.Telescope(name='GOTO-2', site=site1)
-        goto3 = db.Telescope(name='GOTO-3', site=site2)
-        goto4 = db.Telescope(name='GOTO-4', site=site2)
+
+        if 'GOTO-8' in SkyGrid.get_named_grids():
+            skygrid = SkyGrid.from_name('GOTO-8')
+        else:
+            # Use provisional grid
+            skygrid = SkyGrid.from_name('GOTO-8p')
+        grid = db.Grid.from_skygrid(skygrid, name='GOTO-8_allsky_grid')
+        for coord, name in zip(skygrid.coords, skygrid.tilenames):
+            ra = coord.ra.value
+            dec = coord.dec.value
+            if abs(dec) < 0.00001:  # GOTO-tile rounding errors
+                dec = 0
+            grid_tile = db.GridTile(name=str(name),
+                                    ra=float(ra),
+                                    dec=float(dec),
+                                    grid=grid)
+            grid.grid_tiles.append(grid_tile)
+
+        goto1 = db.Telescope(name='GOTO-1', site=site1, grid=grid)
+        goto2 = db.Telescope(name='GOTO-2', site=site1, grid=grid)
+        goto3 = db.Telescope(name='GOTO-3', site=site2, grid=grid)
+        goto4 = db.Telescope(name='GOTO-4', site=site2, grid=grid)
+
         with db.open_session() as session:
-            db.insert_items(session, [site1, site2, goto1, goto2, goto3, goto4])
+            db.insert_items(session, [site1, site2, grid, goto1, goto2, goto3, goto4])
             session.commit()
 
     print('Done')

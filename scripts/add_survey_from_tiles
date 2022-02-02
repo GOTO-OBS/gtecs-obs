@@ -19,7 +19,7 @@ def get_tiles_from_file(filename):
 
 def fill_target():
     """Fill out a target frame with user input."""
-    target_params = {'object_name': None,
+    target_params = {'name': None,
                      'ra': None,
                      'dec': None,
                      'wait_time': None,
@@ -155,7 +155,7 @@ def run(filename):
                 print('Could not find tile entry for tile "{}"!'.format(grid_tile))
                 continue
 
-            target_params['object_name'] = survey.name + '_' + grid_tile.name
+            target_params['name'] = survey.name + '_' + grid_tile.name
 
             target = db.Target(**target_params,
                                user=user,

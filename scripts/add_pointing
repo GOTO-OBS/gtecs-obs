@@ -137,7 +137,7 @@ def parse_dec(dec_str):
 
 def fill_target(session):
     """Fill out a target frame with user input."""
-    target_params = {'object_name': None,
+    target_params = {'name': None,
                      'ra': None,
                      'dec': None,
                      'too': None,
@@ -217,19 +217,19 @@ def fill_target(session):
         name = input('Enter Target name (blank for "{}"): '.format(default_name))
         if not name:
             name = default_name
-        target_params['object_name'] = name
+        target_params['name'] = name
 
     else:
         # We're off grid
         target_params['grid_tile'] = None
 
         # Object name
-        while target_params['object_name'] is None:
-            target_params['object_name'] = input('Enter Target name: ')
+        while target_params['name'] is None:
+            target_params['name'] = input('Enter Target name: ')
 
         # Try coord lookup
         try:
-            coord = SkyCoord.from_name(target_params['object_name'])
+            coord = SkyCoord.from_name(target_params['name'])
         except Exception:
             coord = None
         if coord is not None:

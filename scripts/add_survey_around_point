@@ -82,7 +82,7 @@ def run(fov, overlap, centre, area, name):
         start = time.time()
         for ra, dec, tile_num in zip(ras, decs, names):
             target_params = TARGET_PARAMS.copy()
-            target_params['object_name'] = '{}_survey_T{}'.format(name, tile_num)
+            target_params['name'] = '{}_survey_T{}'.format(name, tile_num)
             target_params['ra'] = float(ra)
             target_params['dec'] = float(dec)
 

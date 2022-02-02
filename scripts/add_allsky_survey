@@ -35,7 +35,7 @@ def run():
         start = time.time()
         for grid_tile in grid.grid_tiles:
             target_params = TARGET_PARAMS.copy()
-            target_params['object_name'] = survey.name + '_' + grid_tile.name
+            target_params['name'] = survey.name + '_' + grid_tile.name
 
             target = db.Target(**target_params,
                                user=user,

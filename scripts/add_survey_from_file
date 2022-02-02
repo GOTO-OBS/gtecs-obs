@@ -7,7 +7,7 @@ import time
 from gtecs.obs import database as db
 
 
-TARGET_PARAMS = {'object_name': None,
+TARGET_PARAMS = {'name': None,
                  'ra': None,
                  'dec': None,
                  'start_rank': None,
@@ -62,7 +62,7 @@ def run(filename):
         targets = []
         for ra, dec, rank, name in zip(ras, decs, ranks, names):
             target_params = TARGET_PARAMS.copy()
-            target_params['object_name'] = name
+            target_params['name'] = name
             target_params['ra'] = float(ra)
             target_params['dec'] = float(dec)
             target_params['start_rank'] = rank

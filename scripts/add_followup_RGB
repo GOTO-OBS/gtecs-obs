@@ -55,7 +55,7 @@ def run(name, target_ra, target_dec):
 
         # Create Target
         target_params = TARGET_PARAMS.copy()
-        target_params['object_name'] = name
+        target_params['name'] = name
         target_params['start_time'] = str(Time.now())
         target_params['stop_time'] = str(Time.now() + 1 * u.day)
 

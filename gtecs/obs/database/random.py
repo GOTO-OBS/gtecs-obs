@@ -43,7 +43,7 @@ def make_random_target(user, num_expsets=None, time=None):
     lst = time.sidereal_time('mean', longitude=lapalma.lon).deg
     t1 = time + np.random.randint(-2, 2) * u.day
     t2 = t1 + np.random.randint(2, 6) * u.day
-    p = Target(object_name='random_object',
+    p = Target(name='random_target',
                ra=np.random.uniform(lst - 3, lst + 3),
                dec=np.random.uniform(10, 89),
                start_rank=np.random.randint(1, 100),

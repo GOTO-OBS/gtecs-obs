@@ -255,7 +255,7 @@ def write_queue_page(observer):
             write_exp_file(db_id, exposure_sets)
             exp_link = 'ID_{}_exp.html'.format(db_id)
             exp_str = ('<a href=' + exp_link + ' rel=\"#overlay\">' +
-                       str(pointing.target.object_name) + '</a>' + popup_str)
+                       str(pointing.target.name) + '</a>' + popup_str)
 
             # find ra/dec
             target = ICRS(pointing.target.ra * u.deg, pointing.target.dec * u.deg)

@@ -131,7 +131,7 @@ class Pointing:
         """Import a pointing from the database."""
         # Create pointing object
         pointing = cls(db_id=db_pointing.db_id,
-                       name=db_pointing.target.object_name,
+                       name=db_pointing.target.name,
                        ra=db_pointing.target.ra,
                        dec=db_pointing.target.dec,
                        rank=db_pointing.rank,

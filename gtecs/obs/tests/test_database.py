@@ -74,7 +74,7 @@ with db.open_session() as session:
     user = db.get_user(session, username='test_user')
 
     # let's make an Target
-    target = db.Target(object_name='M31',
+    target = db.Target(name='M31',
                        ra=10.685,
                        dec=41.2875,
                        start_rank=9,

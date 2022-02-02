@@ -666,7 +666,7 @@ class Target(Base):
 
     Parameters
     ----------
-    object_name : str
+    name : str
         object name
     ra : float, optional
         J2000 right ascension in decimal degrees
@@ -834,7 +834,7 @@ class Target(Base):
 
     # Columns
     # # Basic properties
-    object_name = Column('object', Text, nullable=False)  # object is a built in class in Python
+    name = Column(Text, nullable=False)
     ra = Column(Float, nullable=False)
     dec = Column(Float, nullable=False)
     start_rank = Column(Integer, nullable=False)
@@ -941,22 +941,23 @@ class Target(Base):
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
                    'status={}'.format(self.status),
-                   'num_todo={}'.format(self.num_todo),
-                   'num_completed={}'.format(self.num_completed),
-                   'num_remaining={}'.format(self.num_remaining),
-                   'infinite={}'.format(self.infinite),
-                   'object_name={}'.format(self.object_name),
+                   'name={}'.format(self.name),
                    'ra={}'.format(self.ra),
                    'dec={}'.format(self.dec),
                    'current_rank={}'.format(self.current_rank),
                    'start_rank={}'.format(self.start_rank),
+                   'weight={}'.format(self.weight),
+                   'too={}'.format(self.too),
+                   'tel_mask={}'.format(self.tel_mask),
+                   'num_todo={}'.format(self.num_todo),
+                   'num_completed={}'.format(self.num_completed),
+                   'num_remaining={}'.format(self.num_remaining),
+                   'infinite={}'.format(self.infinite),
                    'min_alt={}'.format(self.min_alt),
                    'max_sunalt={}'.format(self.max_sunalt),
                    'min_time={}'.format(self.min_time),
                    'max_moon={}'.format(self.max_moon),
                    'min_moonsep={}'.format(self.min_moonsep),
-                   'too={}'.format(self.too),
-                   'tel_mask={}'.format(self.tel_mask),
                    'start_time={}'.format(self.start_time),
                    'stop_time={}'.format(self.stop_time),
                    'creation_time={}'.format(self.creation_time),

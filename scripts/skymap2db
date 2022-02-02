@@ -59,7 +59,7 @@ def add_to_database(session, db_grid, tiles, event_time, event_name, filename):
 
         # Create Target
         target_params = TARGET_PARAMS.copy()
-        target_params['object_name'] = '{}_{}'.format(event_name, tilename)
+        target_params['name'] = '{}_{}'.format(event_name, tilename)
         target_params['weight'] = prob
 
         target = db.Target(**target_params,

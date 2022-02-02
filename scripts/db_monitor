@@ -45,7 +45,7 @@ with db.open_session() as session:
         if show_all or pointing.status != 'expired':
             string = '{: <6.0f} | {: >20} | {: >3.0f}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
                 pointing.db_id,
-                pointing.target.object_name,
+                pointing.target.name,
                 pointing.rank,
                 '!' if pointing.target.too else ' ',
                 pointing.target.ra, pointing.target.dec,

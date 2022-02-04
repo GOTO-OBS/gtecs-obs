@@ -376,6 +376,20 @@ class PointingQueue:
         # Calculate tiebreaker values for all Pointings
         self.calculate_tiebreakers(time, observer)
 
+    def get_sorted_queue(self):
+        """Sort all the pointings.
+
+        Sorting metrics
+            - First is by validity
+            - Then by rank
+            - Then by ToO flag
+            - Then by number of times already observed
+            - Finally use the tiebreaker
+        """
+        pointings = list(self.pointings)  # make a copy
+        pointings.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
+        return pointings
+
     def get_highest_priority_pointing(self):
         """Return the pointing with the highest priority."""
         # If there are no pointings, return None
@@ -383,35 +397,24 @@ class PointingQueue:
             return None
 
         # Sort the pointings
-        #   - First is by validity
-        #   - Then by rank
-        #   - Then by ToO flag
-        #   - Then by number of times already observed
-        #   - Finally use the tiebreaker
-        pointings = list(self.pointings)  # make a copy
-        pointings.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
+        sorted_pointings = self.get_sorted_queue()
 
-        return pointings[0]
+        # Return the highest
+        return sorted_pointings[0]
 
-    def get_highest_priority_pointings(self, time, observer, horizon, readout_time, number=1):
+    def get_highest_priority_pointings(self, number=1):
         """Return the top X highest priority pointings."""
         # If there are no pointings, return None
         if len(self.pointings) == 0:
             return [None] * number
 
         # Sort the pointings
-        #   - First is by validity
-        #   - Then by rank
-        #   - Then by ToO flag
-        #   - Then by number of times already observed
-        #   - Finally use the tiebreaker
-        pointings = list(self.pointings)  # make a copy
-        pointings.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
+        sorted_pointings = self.get_sorted_queue()
 
         # Return the top X pointings as requested
-        if len(pointings) < number:
-            pointings += [None] * (number - len(pointings))
-        return pointings[0:number]
+        if len(sorted_pointings) < number:
+            sorted_pointings += [None] * (number - len(sorted_pointings))
+        return sorted_pointings[0:number]
 
     def write_to_file(self, time, observer, filename):
         """Write any time-dependent pointing infomation to a file."""

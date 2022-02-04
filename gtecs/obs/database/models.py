@@ -914,7 +914,7 @@ class Target(Base):
             kwargs['start_time'] = kwargs['creation_time']
 
         # Get coordinates from tile if not given
-        if (kwargs['grid_tile'] is not None and
+        if ('grid_tile' in kwargs and kwargs['grid_tile'] is not None and
                 ('ra' not in kwargs or kwargs['ra'] is None) and
                 ('dec' not in kwargs or kwargs['dec'] is None)):
             kwargs['ra'] = kwargs['grid_tile'].ra
@@ -1418,20 +1418,20 @@ class Target(Base):
         current_block.current = False
         next_block.current = True
 
-        # now create a pointing
-        p = Pointing(rank=self.current_rank,
-                     start_time=start_time,
-                     stop_time=stop_time,
-                     target=self,
-                     time_block=next_block,
-                     )
+        # now create the Pointing
+        new_pointing = Pointing(rank=self.current_rank,
+                                start_time=start_time,
+                                stop_time=stop_time,
+                                target=self,
+                                time_block=next_block,
+                                )
         # add the exposures
-        p.exposure_sets = self.exposure_sets
+        new_pointing.exposure_sets = self.exposure_sets
         # set the creation time (for simulations)
         if time is not None:
-            p.creation_time = time
+            new_pointing.creation_time = time
 
-        return p
+        return new_pointing
 
 
 class TimeBlock(Base):
@@ -2001,7 +2001,6 @@ class Survey(Base):
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
                    'name={}'.format(self.name),
-                   'grid_id={}'.format(self.grid_id),
                    'event_id={}'.format(self.event_id),
                    ]
         return 'Survey({})'.format(', '.join(strings))

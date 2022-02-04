@@ -43,18 +43,18 @@ def make_random_target(user, num_expsets=None, time=None):
     lst = time.sidereal_time('mean', longitude=lapalma.lon).deg
     t1 = time + np.random.randint(-2, 2) * u.day
     t2 = t1 + np.random.randint(2, 6) * u.day
-    p = Target(name='random_target',
-               ra=np.random.uniform(lst - 3, lst + 3),
-               dec=np.random.uniform(10, 89),
-               start_rank=np.random.randint(1, 100),
-               min_time=np.random.uniform(100, 3600),
-               max_moon=np.random.choice(['D', 'G', 'B']),
-               num_todo=np.random.randint(1, 5),
-               too=np.random.randint(0, 2),
-               start_time=t1,
-               stop_time=t2,
-               user=user,
-               )
+    target = Target(name='random_target',
+                    ra=np.random.uniform(lst - 3, lst + 3),
+                    dec=np.random.uniform(10, 89),
+                    start_rank=np.random.randint(1, 100),
+                    min_time=np.random.uniform(100, 3600),
+                    max_moon=np.random.choice(['D', 'G', 'B']),
+                    num_todo=np.random.randint(1, 5),
+                    too=np.random.randint(0, 2),
+                    start_time=t1,
+                    stop_time=t2,
+                    user=user,
+                    )
 
     if num_expsets is None:
         num_expsets = np.random.randint(1, 6)
@@ -63,6 +63,6 @@ def make_random_target(user, num_expsets=None, time=None):
                                    exptime=np.random.uniform(10., 360.),
                                    filt=np.random.choice(['L', 'R', 'G', 'B']),
                                    )
-        p.exposure_sets.append(exposure_set)
+        target.exposure_sets.append(exposure_set)
 
-    return p
+    return target

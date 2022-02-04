@@ -38,7 +38,7 @@ with db.open_session() as session:
     g = db.Grid(name='testgrid',
                 ra_fov=10, dec_fov=10,
                 ra_overlap=0.5, dec_overlap=0.5,
-                algorithm='NA')
+                algorithm='minverlap')
     t1.grid = g
     t2.grid = g
 
@@ -52,7 +52,6 @@ with db.open_session() as session:
     # and a survey
     s = db.Survey(name='GOTO event survey', event=e)
     s.event = e
-    s.grid = g
 
     # add them all
     db.insert_items(session, [si, t1, t2, g, gt1, gt2, e, s])
@@ -73,7 +72,7 @@ print('-------')
 with db.open_session() as session:
     user = db.get_user(session, username='test_user')
 
-    # let's make an Target
+    # let's make an Target with ExposureSets in different filters
     target = db.Target(name='M31',
                        ra=10.685,
                        dec=41.2875,
@@ -84,7 +83,6 @@ with db.open_session() as session:
                        wait_time=60,
                        user=user,
                        )
-    # and add RGBL exposure set
     L = db.ExposureSet(num_exp=3, exptime=120, filt='L')
     R = db.ExposureSet(num_exp=3, exptime=120, filt='R')
     G = db.ExposureSet(num_exp=3, exptime=120, filt='G')
@@ -105,12 +103,12 @@ with db.open_session() as session:
     user = db.get_user(session, username='test_user')
 
     # new session, add random targets
-    targets = [db.make_random_target(user) for i in range(10)]
+    targets = [db.make_random_target(user) for _ in range(5)]
     db.insert_items(session, targets)
     for target in targets:
         print(target, target.pointings)
 
-    more_targets = [db.make_random_target(user) for i in range(10)]
+    more_targets = [db.make_random_target(user) for _ in range(5)]
     db.insert_items(session, more_targets)
     for target in more_targets:
         print(target, target.pointings)

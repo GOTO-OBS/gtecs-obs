@@ -21,7 +21,6 @@ TARGET_PARAMS = {'start_rank': 2,
                  'num_todo': 5,
                  'wait_time': 1440,
                  'min_time': (60 + 30) * 3,
-                 'max_sunalt': -18,
                  }
 
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]

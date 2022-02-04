@@ -5,6 +5,7 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 
 from gtecs.obs import database as db
+from gtecs.obs import params
 
 
 def parse_ra(ra_str):
@@ -143,13 +144,13 @@ def fill_target(session):
                      'too': None,
                      'start_rank': None,
                      'num_todo': None,
+                     'min_time': None,
                      'valid_time': None,
                      'wait_time': None,
-                     'min_alt': None,
-                     'max_sunalt': None,
-                     'max_moon': None,
-                     'min_moonsep': None,
-                     'min_time': None,
+                     'min_alt': params.DEFAULT_MIN_ALT,
+                     'max_sunalt': params.DEFAULT_MAX_SUNALT,
+                     'max_moon': params.DEFAULT_MAX_MOON,
+                     'min_moonsep': params.DEFAULT_MIN_MOONSEP,
                      }
 
     # On or off grid?
@@ -315,13 +316,18 @@ def fill_target(session):
     # Constraints
     default_cons = None
     while default_cons not in ['y', 'n', 'Y', 'N']:
-        string = 'Use default constraints (alt>30, sunalt<-15, moon<B, moonsep>30)? [y/n]: '
+        string = 'Use default constraints (alt>{}, sunalt<{}, moon<{}, moonsep>{})? [y/n]: '.format(
+            params.DEFAULT_MIN_ALT,
+            params.DEFAULT_MAX_SUNALT,
+            params.DEFAULT_MAX_MOON,
+            params.DEFAULT_MIN_MOONSEP,
+        )
         default_cons = input(string)
     if default_cons in ['y', 'Y']:
-        target_params['min_alt'] = 30
-        target_params['max_sunalt'] = -15
-        target_params['max_moon'] = 'B'
-        target_params['min_moonsep'] = 30
+        target_params['min_alt'] = params.DEFAULT_MIN_ALT
+        target_params['max_sunalt'] = -params.DEFAULT_MAX_SUNALT
+        target_params['max_moon'] = params.DEFAULT_MAX_MOON
+        target_params['min_moonsep'] = params.DEFAULT_MIN_MOONSEP
     else:
         while target_params['min_alt'] is None:
             min_alt = input('Minimum target altitude (degrees): ')

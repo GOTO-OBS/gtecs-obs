@@ -34,6 +34,11 @@ DATABASE_PRE_PING = bool(config['DATABASE_PRE_PING'])
 
 ############################################################
 # Scheduler parameters
+DEFAULT_MIN_ALT = config['DEFAULT_MIN_ALT']
+DEFAULT_MAX_SUNALT = config['DEFAULT_MAX_SUNALT']
+DEFAULT_MAX_MOON = config['DEFAULT_MAX_MOON']
+DEFAULT_MIN_MOONSEP = config['DEFAULT_MIN_MOONSEP']
+
 # TODO - these should be function arguments, so e.g. the simulations could change them
 #        ultimately when the scheduler is moved here then the parameters would make sense
 WEIGHTING_WEIGHT = config['WEIGHTING_WEIGHT']

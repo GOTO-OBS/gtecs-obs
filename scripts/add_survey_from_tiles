@@ -5,6 +5,7 @@ import argparse
 import time
 
 from gtecs.obs import database as db
+from gtecs.obs import params
 
 
 def get_tiles_from_file(filename):
@@ -26,13 +27,13 @@ def fill_target():
                      'too': False,
                      'start_rank': None,
                      'num_todo': None,
+                     'min_time': None,
                      'valid_time': -1,
                      'wait_time': None,
-                     'min_alt': None,
-                     'max_sunalt': -12,
-                     'max_moon': None,
-                     'min_moonsep': None,
-                     'min_time': None,
+                     'min_alt': params.DEFAULT_MIN_ALT,
+                     'max_sunalt': params.DEFAULT_MAX_SUNALT,
+                     'max_moon': params.DEFAULT_MAX_MOON,
+                     'min_moonsep': params.DEFAULT_MIN_MOONSEP,
                      }
 
     while target_params['wait_time'] is None:

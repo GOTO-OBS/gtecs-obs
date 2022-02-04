@@ -17,6 +17,8 @@ from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import column_property, relationship, validates
 from sqlalchemy.sql import and_, case, or_
 
+from .. import params
+
 
 __all__ = ['User', 'ExposureSet', 'Pointing', 'Target', 'TimeBlock',
            'Site', 'Telescope', 'Grid', 'GridTile',
@@ -696,6 +698,10 @@ class Target(Base):
         5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
         default = None (no restriction)
 
+    min_time : float, optional
+        minimum time needed to schedule pointing
+        if the pointing is interupted before this time then it is counted as incomplete
+        default = None
     wait_time : float or list of float, optional
         time to wait between pointings in minutes.
         if num_todo is greater than times given the list will be looped.
@@ -708,20 +714,18 @@ class Target(Base):
 
     min_alt : float, optional
         minimum altitude to observe at, degrees
-        default = 30
+        default is params.DEFAULT_MIN_ALT (default=30)
     max_sunalt : float, optional
         altitude constraint on Sun, degrees
-        default = -15
-    min_time : float, optional
-        minimum time needed to schedule pointing
-        default = None
+        default is params.DEFAULT_MAX_SUNALT (default=-15)
     max_moon : string, optional
         Moon constraint
         one of 'D', 'G', 'B'
-        default = 'B'
+        default is params.DEFAULT_MAX_MOON (default='B')
     min_moonsep : float, optional
         distance constraint from the Moon, degrees
-        default = 30
+        default is params.DEFAULT_MIN_MOONSEP (default=30)
+
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which Target is considered valid and can be started
         if not given then set to now, so the Target will start immediately
@@ -731,6 +735,7 @@ class Target(Base):
         if not given the Target will continue creating pointings until
         it is completed
         default = None
+
     creation_time : string, `astropy.time.Time` or datetime.datetime, optional
         the time the Target was created
         this should usually be set automatically, unless doing simulations
@@ -842,12 +847,12 @@ class Target(Base):
     weight = Column(Integer, nullable=False, default=1)
     too = Column(Boolean, nullable=False, default=False)
     tel_mask = Column(Integer, default=None)
-    # # Constraints
-    min_alt = Column(Float, nullable=False, default=30)
-    max_sunalt = Column(Float, nullable=False, default=-15)
     min_time = Column(Float, nullable=False)
-    max_moon = Column(String(1), nullable=False, default='B')
-    min_moonsep = Column(Float, nullable=False, default=30)
+    # # Constraints
+    min_alt = Column(Float, nullable=False, default=params.DEFAULT_MIN_ALT)
+    max_sunalt = Column(Float, nullable=False, default=params.DEFAULT_MAX_SUNALT)
+    max_moon = Column(String(1), nullable=False, default=params.DEFAULT_MAX_MOON)
+    min_moonsep = Column(Float, nullable=False, default=params.DEFAULT_MIN_MOONSEP)
     start_time = Column(DateTime, nullable=False, index=True, server_default=func.now())
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
     # # Status
@@ -949,13 +954,13 @@ class Target(Base):
                    'weight={}'.format(self.weight),
                    'too={}'.format(self.too),
                    'tel_mask={}'.format(self.tel_mask),
+                   'min_time={}'.format(self.min_time),
                    'num_todo={}'.format(self.num_todo),
                    'num_completed={}'.format(self.num_completed),
                    'num_remaining={}'.format(self.num_remaining),
                    'infinite={}'.format(self.infinite),
                    'min_alt={}'.format(self.min_alt),
                    'max_sunalt={}'.format(self.max_sunalt),
-                   'min_time={}'.format(self.min_time),
                    'max_moon={}'.format(self.max_moon),
                    'min_moonsep={}'.format(self.min_moonsep),
                    'start_time={}'.format(self.start_time),

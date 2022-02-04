@@ -653,6 +653,10 @@ class Pointing(Base):
 
         self.completed = completed
 
+    def get_obstime(self, readout_time=15):
+        """Get the expected time needed to observe this Pointing."""
+        return sum(es.num_exp * (es.exptime + readout_time) for es in self.exposure_sets)
+
 
 class Target(Base):
     """A class to represent an astronomical Target.
@@ -697,10 +701,10 @@ class Target(Base):
         A value of 4 (binary (0100) means only observable by Telescope 3, a value of
         5 (binary 0101) will allow either Telescope 1 or 3 to observe the Pointing.
         default = None (no restriction)
-
     min_time : float, optional
-        minimum time needed to schedule pointing
-        if the pointing is interupted before this time then it is counted as incomplete
+        minimum time desired when observing this Target
+        if a Pointing is interrupted after observing for this time then it is marked as complete
+        instead of interrupted
         default = None
     wait_time : float or list of float, optional
         time to wait between pointings in minutes.
@@ -846,8 +850,8 @@ class Target(Base):
     num_todo = Column(Integer, nullable=False)
     weight = Column(Integer, nullable=False, default=1)
     too = Column(Boolean, nullable=False, default=False)
-    tel_mask = Column(Integer, default=None)
-    min_time = Column(Float, nullable=False)
+    tel_mask = Column(Integer, nullable=True, default=None)
+    min_time = Column(Float, nullable=True, default=None)
     # # Constraints
     min_alt = Column(Float, nullable=False, default=params.DEFAULT_MIN_ALT)
     max_sunalt = Column(Float, nullable=False, default=params.DEFAULT_MAX_SUNALT)

@@ -47,7 +47,6 @@ def make_random_target(user, num_expsets=None, time=None):
                     ra=np.random.uniform(lst - 3, lst + 3),
                     dec=np.random.uniform(10, 89),
                     start_rank=np.random.randint(1, 100),
-                    min_time=np.random.uniform(100, 3600),
                     max_moon=np.random.choice(['D', 'G', 'B']),
                     num_todo=np.random.randint(1, 5),
                     too=np.random.randint(0, 2),

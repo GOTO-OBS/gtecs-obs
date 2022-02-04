@@ -14,7 +14,6 @@ from gtecs.obs import database as db
 TARGET_PARAMS = {'start_rank': 0,
                  'num_todo': 1,
                  'wait_time': 12 * 60,
-                 'min_time': 450,  # (60+30)*5
                  }
 
 EXPS_PARAMS = [{'num_exp': 1, 'exptime': 60, 'filt': 'R'},

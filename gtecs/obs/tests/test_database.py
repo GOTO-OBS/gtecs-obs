@@ -77,7 +77,6 @@ with db.open_session() as session:
                        ra=10.685,
                        dec=41.2875,
                        start_rank=9,
-                       min_time=3600,
                        num_todo=5,
                        valid_time=[60, 120],
                        wait_time=60,

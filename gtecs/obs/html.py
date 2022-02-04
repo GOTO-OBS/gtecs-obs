@@ -41,11 +41,11 @@ def import_queue_file():
     # remaining lines are pointings
     pointing_list = []
     for line in lines[2:]:
-        db_id, altaznow, altazlater, constraints = json.loads(line)
+        db_id, altaz_start, altaz_end, constraints = json.loads(line)
         db_id = int(db_id)
         constraint_names, valid_arr = list(zip(*constraints))
         valid_bools = [bool(x) for x in valid_arr]
-        pointing_info = [db_id, altaznow, altazlater,
+        pointing_info = [db_id, altaz_start, altaz_end,
                          list(constraint_names), valid_bools]
         pointing_list.append(pointing_info)
     return time, all_constraint_names, pointing_list
@@ -53,7 +53,7 @@ def import_queue_file():
 
 def write_flag_file(pointing, time, all_constraint_names, pointing_info):
     """Write flag file for a given pointing."""
-    db_id, altaznow, altazlater, constraint_names, valid_arr = pointing_info
+    db_id, altaz_start, altaz_end, constraint_names, valid_arr = pointing_info
     flag_filename = os.path.join(params.HTML_PATH, 'ID_{}_flags.html'.format(db_id))
 
     with open(flag_filename, 'w') as f:
@@ -102,19 +102,13 @@ def write_flag_file(pointing, time, all_constraint_names, pointing_info):
             f.write('ra = ' + ra + '<br>\n')
             f.write('dec = ' + dec + '<br>\n')
 
-            alt_now, az_now = altaznow
-            f.write('alt_now = {:.2f}<br>\n'.format(alt_now))
-            f.write('az_now = {:.2f}<br>\n'.format(az_now))
+            alt_start, az_start = altaz_start
+            f.write('alt_start = {:.2f}<br>\n'.format(alt_start))
+            f.write('az_start = {:.2f}<br>\n'.format(az_start))
 
-            alt_later, az_later = altazlater
-            f.write('alt_mintime = {:.2f}<br>\n'.format(alt_later))
-            f.write('az_mintime = {:.2f}<br>\n'.format(az_later))
-
-            # altart
-            # altart_mintime
-
-            # moondist
-            # sunalt_mintime
+            alt_end, az_end = altaz_end
+            f.write('alt_end = {:.2f}<br>\n'.format(alt_end))
+            f.write('az_end = {:.2f}<br>\n'.format(az_end))
         f.write("</body></html>")
 
 

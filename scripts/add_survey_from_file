@@ -13,7 +13,6 @@ TARGET_PARAMS = {'name': None,
                  'start_rank': None,
                  'num_todo': -1,
                  'wait_time': 4320,  # 3 days
-                 'min_time': (60 + 5) * 3,
                  }
 
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]

@@ -13,7 +13,7 @@ from gtecs.common.style import boldtxt, gtxt, rtxt, ytxt
 from gtecs.obs.scheduler import PointingQueue
 
 
-def run(time, observer, horizon, limit=None):
+def run(time, observer, horizon, readout_time, limit=None):
     """Print the current queue."""
     # Create Queue from DB
     queue = PointingQueue.from_database(time, observer)
@@ -21,9 +21,8 @@ def run(time, observer, horizon, limit=None):
         print('No pointings in queue')
         return
 
-    #  Apply constraints and calculate tiebreakers for all pointings
-    queue.apply_constraints(time, observer, horizon)
-    queue.calculate_tiebreakers(time, observer)
+    # Calculate pointing validity at the given time
+    queue.calculate(time, observer, horizon, readout_time)
 
     # Get the pointings, now with extra infomation
     pointing_list = list(queue.pointings)
@@ -77,7 +76,7 @@ def run(time, observer, horizon, limit=None):
     for name in sorted(all_cons):
         if '_' not in name:
             print('{}={}'.format(boldtxt(all_cons[name]), name), end='  ')
-    print('{}=mintime'.format(boldtxt('_')))
+    print('{}=end'.format(boldtxt('_')))
 
 
 if __name__ == '__main__':
@@ -92,6 +91,8 @@ if __name__ == '__main__':
                         help='Site to observe from (default="LaPalma")')
     parser.add_argument('-l', '--horizon-limit', type=int, default=30,
                         help='Telescope horizon limit (default=30 degrees)')
+    parser.add_argument('-r', '--readout-time', type=int, default=10,
+                        help='The expected time between each exposure (default=10 seconds)')
     lines_group = parser.add_mutually_exclusive_group()
     lines_group.add_argument('-n', '--lines', type=int, default=20,
                              help='Number of lines to print (default=20)')
@@ -119,6 +120,7 @@ if __name__ == '__main__':
 
     min_alt = args.horizon_limit
     horizon = ([0, 90, 180, 270, 360], [min_alt, min_alt, min_alt, min_alt, min_alt])
+    readout_time = args.readout_time
 
     if args.all:
         limit = -1
@@ -127,4 +129,4 @@ if __name__ == '__main__':
     else:
         limit = 20
 
-    run(time, observer, horizon, limit)
+    run(time, observer, horizon, readout_time, limit)

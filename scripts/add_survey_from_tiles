@@ -27,7 +27,6 @@ def fill_target():
                      'too': False,
                      'start_rank': None,
                      'num_todo': None,
-                     'min_time': None,
                      'valid_time': -1,
                      'wait_time': None,
                      'min_alt': params.DEFAULT_MIN_ALT,
@@ -123,9 +122,6 @@ def run(filename):
 
     # Get ExposureSet params
     exps_params = fill_exposure_set()
-
-    # Calculate mintime
-    target_params['min_time'] = (exps_params['exptime'] + 30) * exps_params['num_exp']
 
     # Add to the database
     with db.open_session() as session:

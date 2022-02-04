@@ -12,7 +12,6 @@ import numpy as np
 TARGET_PARAMS = {'start_rank': 998,
                  'num_todo': -1,
                  'wait_time': 4320,  # 3 days
-                 'min_time': (60 + 30) * 3,
                  }
 
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'},

@@ -144,7 +144,6 @@ def fill_target(session):
                      'too': None,
                      'start_rank': None,
                      'num_todo': None,
-                     'min_time': None,
                      'valid_time': None,
                      'wait_time': None,
                      'min_alt': params.DEFAULT_MIN_ALT,
@@ -398,11 +397,9 @@ def run():
 
     # Get Exposure Set params
     exposure_sets = []
-    total_exptime = 0
     more_exposures = True
     while more_exposures is True:
         exps_params = fill_exposure_set()
-        total_exptime += (exps_params['exptime'] + 30) * exps_params['num_exp']
         exposure_sets.append(exps_params)
 
         add_more = None
@@ -411,9 +408,6 @@ def run():
 
         if add_more not in ['y', 'Y']:
             more_exposures = False
-
-    # Calculate mintime
-    target_params['min_time'] = total_exptime
 
     # Add to the database
     with db.open_session() as session:

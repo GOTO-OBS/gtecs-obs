@@ -12,9 +12,10 @@ from gtecs.obs import database as db
 
 
 TARGET_PARAMS = {'start_rank': 0,
-                 'num_todo': 1,
-                 'wait_time': 12 * 60,
                  }
+STRATEGY_PARAMS = {'num_todo': 1,
+                   'wait_time': 12 * 60,
+                   }
 
 EXPS_PARAMS = [{'num_exp': 5, 'exptime': 60, 'filt': 'L'}]
 
@@ -57,6 +58,7 @@ def run(name, target_ra, target_dec):
 
         target = db.Target(**target_params,
                            user=user,
+                           strategy=db.Strategy(**STRATEGY_PARAMS.copy()),
                            grid_tile=db_grid_tile,
                            )
         for exps_params in EXPS_PARAMS:

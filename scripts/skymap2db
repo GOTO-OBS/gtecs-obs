@@ -18,10 +18,10 @@ from gtecs.obs import database as db
 
 
 TARGET_PARAMS = {'start_rank': 2,
-                 'num_todo': 5,
-                 'wait_time': 1440,
                  }
-
+STRATEGY_PARAMS = {'num_todo': 5,
+                   'wait_time': 1440,
+                   }
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]
 
 
@@ -62,6 +62,7 @@ def add_to_database(session, db_grid, tiles, event_time, event_name, filename):
 
         target = db.Target(**target_params,
                            user=user,
+                           strategy=db.Strategy(**STRATEGY_PARAMS.copy()),
                            grid_tile=grid_tile,
                            survey=survey,
                            event=event,

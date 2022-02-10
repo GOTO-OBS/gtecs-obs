@@ -10,10 +10,10 @@ import numpy as np
 
 
 TARGET_PARAMS = {'start_rank': 998,
-                 'num_todo': -1,
-                 'wait_time': 4320,  # 3 days
                  }
-
+STRATEGY_PARAMS = {'num_todo': -1,
+                   'wait_time': 4320,  # 3 days
+                   }
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'},
                {'num_exp': 1, 'exptime': 60, 'filt': 'R'},
                {'num_exp': 1, 'exptime': 60, 'filt': 'G'},
@@ -86,6 +86,7 @@ def run(fov, overlap, centre, area, name):
 
             target = db.Target(**target_params,
                                user=user,
+                               strategy=db.Strategy(**STRATEGY_PARAMS.copy()),
                                )
             for exps_params in EXPS_PARAMS:
                 target.exposure_sets.append(db.ExposureSet(**exps_params))

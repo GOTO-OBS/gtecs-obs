@@ -144,12 +144,15 @@ class Pointing:
         dec = db_target.dec
         weight = db_target.weight
         num_completed = db_target.num_completed
-        too = db_target.too
-        min_time = db_target.min_time
-        max_sunalt = db_target.max_sunalt
-        min_alt = db_target.min_alt
-        max_moon = db_target.max_moon
-        min_moonsep = db_target.min_moonsep
+
+        # Get linked Strategy properties
+        db_strategy = db_pointing.strategy
+        too = db_strategy.too
+        min_time = db_strategy.min_time
+        max_sunalt = db_strategy.max_sunalt
+        min_alt = db_strategy.min_alt
+        max_moon = db_strategy.max_moon
+        min_moonsep = db_strategy.min_moonsep
 
         # Get linked ExposureSet properties
         exp_sets = [(es.num_exp, es.exptime) for es in db_pointing.exposure_sets]

@@ -141,16 +141,17 @@ def fill_target(session):
     target_params = {'name': None,
                      'ra': None,
                      'dec': None,
-                     'too': None,
                      'start_rank': None,
-                     'num_todo': None,
-                     'valid_time': None,
-                     'wait_time': None,
-                     'min_alt': params.DEFAULT_MIN_ALT,
-                     'max_sunalt': params.DEFAULT_MAX_SUNALT,
-                     'max_moon': params.DEFAULT_MAX_MOON,
-                     'min_moonsep': params.DEFAULT_MIN_MOONSEP,
                      }
+    strategy_params = {'num_todo': None,
+                       'wait_time': None,
+                       'valid_time': None,
+                       'too': None,
+                       'min_alt': params.DEFAULT_MIN_ALT,
+                       'max_sunalt': params.DEFAULT_MAX_SUNALT,
+                       'max_moon': params.DEFAULT_MAX_MOON,
+                       'min_moonsep': params.DEFAULT_MIN_MOONSEP,
+                       }
 
     # On or off grid?
     on_grid = None
@@ -261,7 +262,7 @@ def fill_target(session):
     while too not in ['y', 'n', 'Y', 'N']:
         too = input('Is the target a ToO (can interupt)? [y/n]: ')
     if too in ['y', 'Y']:
-        target_params['too'] = 1
+        strategy_params['too'] = 1
         rank_zero = 'None'
         while rank_zero not in ['y', 'n', 'Y', 'N']:
             rank_zero = input('Enter as Rank 0 (higher than GW targets - use with care)? [y/n]: ')
@@ -270,7 +271,7 @@ def fill_target(session):
         else:
             target_params['start_rank'] = 506
     else:
-        target_params['too'] = 0
+        strategy_params['too'] = 0
         rank_str = 'None'
         while rank_str.lower() not in ['low', 'medium', 'high', 'l', 'm', 'h']:
             rank_str = input('Enter rank [low/medium/high]: ')
@@ -287,28 +288,28 @@ def fill_target(session):
     while daily not in ['y', 'n', 'Y', 'N']:
         daily = input('Use default cadence (once a night)? [y/n]: ')
     if daily in ['y', 'Y']:
-        target_params['valid_time'] = -1
-        target_params['wait_time'] = 1000  # ensures once a night
+        strategy_params['valid_time'] = -1
+        strategy_params['wait_time'] = 1000  # ensures once a night
     else:
-        while target_params['valid_time'] is None:
+        while strategy_params['valid_time'] is None:
             valid_time = input('Time for the pointing to be valid for (minutes, -1=infinite): ')
             try:
-                target_params['valid_time'] = int(valid_time)
+                strategy_params['valid_time'] = int(valid_time)
             except Exception:
                 print('Invalid input')
 
-        while target_params['wait_time'] is None:
+        while strategy_params['wait_time'] is None:
             wait_time = input('Time between visits (minutes, can be array, 0=no wait): ')
             try:
-                target_params['wait_time'] = [int(i) for i in wait_time.split(',')]
+                strategy_params['wait_time'] = [int(i) for i in wait_time.split(',')]
             except Exception:
                 print('Invalid input')
 
     # Number to do
-    while target_params['num_todo'] is None:
+    while strategy_params['num_todo'] is None:
         num_todo = input('Number of visits? (-1=infinite): ')
         try:
-            target_params['num_todo'] = int(num_todo)
+            strategy_params['num_todo'] = int(num_todo)
         except Exception:
             print('Invalid input')
 
@@ -323,40 +324,40 @@ def fill_target(session):
         )
         default_cons = input(string)
     if default_cons in ['y', 'Y']:
-        target_params['min_alt'] = params.DEFAULT_MIN_ALT
-        target_params['max_sunalt'] = -params.DEFAULT_MAX_SUNALT
-        target_params['max_moon'] = params.DEFAULT_MAX_MOON
-        target_params['min_moonsep'] = params.DEFAULT_MIN_MOONSEP
+        strategy_params['min_alt'] = params.DEFAULT_MIN_ALT
+        strategy_params['max_sunalt'] = -params.DEFAULT_MAX_SUNALT
+        strategy_params['max_moon'] = params.DEFAULT_MAX_MOON
+        strategy_params['min_moonsep'] = params.DEFAULT_MIN_MOONSEP
     else:
-        while target_params['min_alt'] is None:
+        while strategy_params['min_alt'] is None:
             min_alt = input('Minimum target altitude (degrees): ')
             try:
-                target_params['min_alt'] = float(min_alt)
+                strategy_params['min_alt'] = float(min_alt)
             except Exception:
                 print('Invalid input')
 
-        while target_params['max_sunalt'] is None:
+        while strategy_params['max_sunalt'] is None:
             max_sunalt = input('Maximum Sun altitude (degrees): ')
             try:
-                target_params['max_sunalt'] = float(max_sunalt)
+                strategy_params['max_sunalt'] = float(max_sunalt)
             except Exception:
                 print('Invalid input')
 
-        while target_params['max_moon'] not in ['D', 'G', 'B']:
+        while strategy_params['max_moon'] not in ['D', 'G', 'B']:
             max_moon = input('Maximum Moon brightness [D/G/B]: ')
             try:
-                target_params['max_moon'] = max_moon.upper()
+                strategy_params['max_moon'] = max_moon.upper()
             except Exception:
                 print('Invalid input')
 
-        while target_params['min_moonsep'] is None:
+        while strategy_params['min_moonsep'] is None:
             min_moonsep = input('Minimum seperation from the Moon (degrees): ')
             try:
-                target_params['min_moonsep'] = float(min_moonsep)
+                strategy_params['min_moonsep'] = float(min_moonsep)
             except Exception:
                 print('Invalid input')
 
-    return target_params
+    return target_params, strategy_params
 
 
 def fill_exposure_set():
@@ -391,9 +392,9 @@ def run():
     """Create the targets and add them to the database."""
     print('** Insert pointing into GOTO queue database **')
 
-    # Get Target params
+    # Get Target and Strategy params
     with db.open_session() as session:
-        target_params = fill_target(session)
+        target_params, strategy_params = fill_target(session)
 
     # Get Exposure Set params
     exposure_sets = []
@@ -417,6 +418,7 @@ def run():
         # Create Target
         target = db.Target(**target_params,
                            user=user,
+                           strategy=db.Strategy(**strategy_params),
                            )
         for exps_params in exposure_sets:
             target.exposure_sets.append(db.ExposureSet(**exps_params))

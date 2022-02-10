@@ -261,11 +261,11 @@ def write_queue_page(observer):
             f.write('<td>' + exp_str + '</td>' +
                     '<td>' + ra + '</td>' +
                     '<td>' + dec + '</td>' +
-                    '<td>' + str(pointing.target.min_time) + '</td>' +
-                    '<td>' + str(pointing.target.min_alt) + '</td>' +
-                    '<td>' + str(pointing.target.max_sunalt) + '</td>' +
-                    '<td>' + str(pointing.target.max_moon) + '</td>' +
-                    '<td>' + str(pointing.target.min_moonsep) + '</td>' +
+                    '<td>' + str(pointing.strategy.min_time) + '</td>' +
+                    '<td>' + str(pointing.strategy.min_alt) + '</td>' +
+                    '<td>' + str(pointing.strategy.max_sunalt) + '</td>' +
+                    '<td>' + str(pointing.strategy.max_moon) + '</td>' +
+                    '<td>' + str(pointing.strategy.min_moonsep) + '</td>' +
                     '<td>' + str(username) + '</td>' +
                     '<td>' + str(pointing.start_time) + '</td>' +
                     '<td>' + str(pointing.stop_time) + '</td>' +

@@ -10,10 +10,10 @@ from gtecs.obs import database as db
 
 
 TARGET_PARAMS = {'start_rank': 800,
-                 'num_todo': 3,
-                 'wait_time': 10080,  # 1 week
                  }
-
+STRATEGY_PARAMS = {'num_todo': 3,
+                   'wait_time': 10080,  # 1 week
+                   }
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L', }]
 
 
@@ -86,6 +86,7 @@ def run(filename):
 
             target = db.Target(**target_params,
                                user=user,
+                               strategy=db.Strategy(**STRATEGY_PARAMS.copy()),
                                )
             for exps_params in EXPS_PARAMS:
                 target.exposure_sets.append(db.ExposureSet(**exps_params))

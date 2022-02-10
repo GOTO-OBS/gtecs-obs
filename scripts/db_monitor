@@ -47,7 +47,7 @@ with db.open_session() as session:
                 pointing.db_id,
                 pointing.target.name,
                 pointing.rank,
-                '!' if pointing.target.too else ' ',
+                '!' if pointing.strategy.too else ' ',
                 pointing.target.ra, pointing.target.dec,
                 pointing.start_time)
 

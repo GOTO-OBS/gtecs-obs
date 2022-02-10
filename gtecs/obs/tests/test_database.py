@@ -73,25 +73,28 @@ with db.open_session() as session:
     user = db.get_user(session, username='test_user')
 
     # let's make an Target with ExposureSets in different filters
-    target = db.Target(name='M31',
-                       ra=10.685,
-                       dec=41.2875,
-                       start_rank=9,
-                       num_todo=5,
-                       valid_time=[60, 120],
-                       wait_time=60,
-                       user=user,
-                       )
     L = db.ExposureSet(num_exp=3, exptime=120, filt='L')
     R = db.ExposureSet(num_exp=3, exptime=120, filt='R')
     G = db.ExposureSet(num_exp=3, exptime=120, filt='G')
     B = db.ExposureSet(num_exp=3, exptime=120, filt='B')
-    target.exposure_sets = [L, R, G, B]
+    strategy = db.Strategy(num_todo=5,
+                           valid_time=[60, 120],
+                           wait_time=60,
+                           )
+    target = db.Target(name='M31',
+                       ra=10.685,
+                       dec=41.2875,
+                       start_rank=9,
+                       user=user,
+                       strategy=strategy,
+                       exposure_sets=[L, R, G, B],
+                       )
     session.add(target)
     session.commit()
     print(target, end='\n\n')
     print(target.pointings, end='\n\n')
-    print(target.time_blocks, end='\n\n')
+    print(target.strategy, end='\n\n')
+    print(target.strategy.time_blocks, end='\n\n')
     print(L)
     print(R)
     print(G)
@@ -126,8 +129,11 @@ print('-------')
 with db.open_session() as s:
     def print_summary(target, now):
         """Print a summary of the database."""
-        print(now, f'Target is {target.status.upper()} ({target.num_remaining} remaining)')
-        print('                    Pointings:', [p.status_at_time(now) for p in target.pointings])
+        print(now, end=' ')
+        print(f'Target is {target.status.upper()}', end=', ')
+        print(f'completed {target.strategy.num_completed}/{target.strategy.num_todo} pointings')
+        print('                    ', end='')
+        print('Pointings:', [p.status_at_time(now) for p in target.pointings])
         # print('                    Time blocks:')
         # for block in target.time_blocks:
         #     print('                    \t', (block.block_num, block.valid_time, block.wait_time,
@@ -135,8 +141,7 @@ with db.open_session() as s:
 
     target = db.get_target_by_id(s, 1)
     print(target)
-    print(target.pointings)
-    print(target.time_blocks, end='\n\n')
+    print(target.pointings, end='\n\n')
 
     # lets pretend we're observing with a telescope to check the triggers
     t = db.get_telescope_by_id(s, 1)

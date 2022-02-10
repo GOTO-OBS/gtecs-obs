@@ -23,29 +23,29 @@ def fill_target():
     target_params = {'name': None,
                      'ra': None,
                      'dec': None,
-                     'wait_time': None,
-                     'too': False,
                      'start_rank': None,
-                     'num_todo': None,
-                     'valid_time': -1,
-                     'wait_time': None,
-                     'min_alt': params.DEFAULT_MIN_ALT,
-                     'max_sunalt': params.DEFAULT_MAX_SUNALT,
-                     'max_moon': params.DEFAULT_MAX_MOON,
-                     'min_moonsep': params.DEFAULT_MIN_MOONSEP,
                      }
+    strategy_params = {'num_todo': None,
+                       'wait_time': None,
+                       'valid_time': -1,
+                       'too': False,
+                       'min_alt': params.DEFAULT_MIN_ALT,
+                       'max_sunalt': params.DEFAULT_MAX_SUNALT,
+                       'max_moon': params.DEFAULT_MAX_MOON,
+                       'min_moonsep': params.DEFAULT_MIN_MOONSEP,
+                       }
 
-    while target_params['wait_time'] is None:
+    while strategy_params['wait_time'] is None:
         wait_time = input('Delay between observations (in days): ')
         try:
-            target_params['wait_time'] = float(wait_time) * 24 * 60  # in minutes
+            strategy_params['wait_time'] = float(wait_time) * 24 * 60  # in minutes
         except Exception:
             print('Invalid input')
 
-    while target_params['num_todo'] is None:
+    while strategy_params['num_todo'] is None:
         num_todo = input('Number of visits? (-1=infinite): ')
         try:
-            target_params['num_todo'] = int(num_todo)
+            strategy_params['num_todo'] = int(num_todo)
         except Exception:
             print('Invalid input')
 
@@ -56,28 +56,28 @@ def fill_target():
         except Exception:
             print('Invalid input')
 
-    while target_params['min_alt'] is None:
+    while strategy_params['min_alt'] is None:
         min_alt = input('Minimum altitude limit (degrees): ')
         try:
-            target_params['min_alt'] = int(min_alt)
+            strategy_params['min_alt'] = int(min_alt)
         except Exception:
             print('Invalid input')
 
-    while target_params['max_moon'] not in ['D', 'G', 'B']:
+    while strategy_params['max_moon'] not in ['D', 'G', 'B']:
         max_moon = input('Maximum Moon brightness [D/G/B]: ')
         try:
-            target_params['max_moon'] = max_moon.upper()
+            strategy_params['max_moon'] = max_moon.upper()
         except Exception:
             print('Invalid input')
 
-    while target_params['min_moonsep'] is None:
+    while strategy_params['min_moonsep'] is None:
         min_moonsep = input('Minimum seperation from the Moon (degrees): ')
         try:
-            target_params['min_moonsep'] = int(min_moonsep)
+            strategy_params['min_moonsep'] = int(min_moonsep)
         except Exception:
             print('Invalid input')
 
-    return target_params
+    return target_params, strategy_params
 
 
 def fill_exposure_set():
@@ -117,8 +117,8 @@ def run(filename):
     # Get survey name
     survey_name = input('Survey name: ').replace(' ', '_')
 
-    # Get Target params
-    target_params = fill_target()
+    # Get  Target and Strategy params
+    target_params, strategy_params = fill_target()
 
     # Get ExposureSet params
     exps_params = fill_exposure_set()
@@ -156,6 +156,7 @@ def run(filename):
 
             target = db.Target(**target_params,
                                user=user,
+                               strategy=db.Strategy(**strategy_params),
                                grid_tile=grid_tile,
                                survey=survey,
                                )

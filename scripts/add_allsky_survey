@@ -7,10 +7,10 @@ from gtecs.obs import database as db
 
 
 TARGET_PARAMS = {'start_rank': 999,
-                 'num_todo': -1,
-                 'wait_time': 4320,
                  }
-
+STRATEGY_PARAMS = {'num_todo': -1,
+                   'wait_time': 4320,
+                   }
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]
 
 
@@ -37,6 +37,7 @@ def run():
 
             target = db.Target(**target_params,
                                user=user,
+                               strategy=db.Strategy(**STRATEGY_PARAMS.copy()),
                                grid_tile=grid_tile,
                                survey=survey,
                                )

@@ -23,7 +23,6 @@ from .. import params
 __all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
            'Site', 'Telescope', 'Grid', 'GridTile',
            'Survey', 'Event',
-           'ImageLog',
            'TRIGGERS']
 
 
@@ -201,7 +200,6 @@ class ExposureSet(Base):
 
     # Foreign relationships
     target = relationship('Target', back_populates='exposure_sets')
-    image_logs = relationship('ImageLog', lazy='joined', back_populates='exposure_set')
 
     # Secondary relationships
     pointings = relationship('Pointing',
@@ -365,7 +363,6 @@ class Pointing(Base):
     time_block = relationship('TimeBlock', lazy='joined', back_populates='pointings')
     strategy = relationship('Strategy', lazy='joined', back_populates='pointings')
     telescope = relationship('Telescope', lazy='joined', back_populates='pointings')
-    image_logs = relationship('ImageLog', lazy='joined', back_populates='pointing')
 
     # Secondary relationships
     exposure_sets = relationship('ExposureSet',
@@ -2377,126 +2374,6 @@ class Event(Base):
         else:
             # just hope the string works!
             value = str(field)
-        return value
-
-
-class ImageLog(Base):
-    """A class to store a record of an Image.
-
-    The ImageLog is a simple way to link Pointings in the database to physical
-    FITS files. An ImageLog should be created each time an exposure is taken,
-    even if taken manually rather than originating from the database.
-
-    Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an instance, and set its attributes
-    without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the db_id)
-    will be None until the instance is added to the database.
-
-    Parameters
-    ----------
-    filename : string
-        the name of the image file
-    run_number : int
-        the run ID number for this exposure
-    ut : int
-        the unit telescope this frame was captured on
-    ut_mask : int
-        a binary mask for which unit telescopes carried out this exposure.
-        A value of 5 (binary 0101) will have been exposed by cameras 1 and 3.
-    start_time : string, `astropy.time.Time` or datetime.datetime
-        the time that the exposure began
-    write_time : string, `astropy.time.Time` or datetime.datetime
-        the time that the image file was written
-
-    set_position : int, optional
-        position of this exposure in a set, if it's in one
-        if not, it will default to 1
-    set_total : int, optional
-        total number of exposures in this set, if any
-        if not given, it will default to 1
-
-    When created the instance can be linked to the following other tables as parameters,
-    otherwise they are populated when it is added to the database:
-
-    Primary relationships
-    ---------------------
-    exposure_set : `ExposureSet`, optional
-        the Exposure Set associated with this ImageLog, if any
-        can also be added with the exposure_set_id parameter
-    pointing : `Pointing`, optional
-        the Pointing associated with this ImageLog, if any
-        can also be added with the pointing_id parameter
-
-    Attributes
-    ----------
-    db_id : int
-        primary database key
-        only populated when the instance is added to the database
-
-    """
-
-    # Set corresponding SQL table name
-    __tablename__ = 'image_logs'
-
-    # Primary key
-    db_id = Column('id', Integer, primary_key=True)
-
-    # Columns
-    filename = Column(String(30), nullable=False, unique=True)
-    run_number = Column(Integer, nullable=False, index=True)
-    ut = Column(Integer, nullable=False)
-    ut_mask = Column(Integer, nullable=False)
-    start_time = Column(DateTime, nullable=False)
-    write_time = Column(DateTime, nullable=False, index=True)
-    set_position = Column(Integer, nullable=False, default=1)
-    set_total = Column(Integer, nullable=False, default=1)
-
-    # Foreign keys
-    exposure_set_id = Column(Integer, ForeignKey('exposure_sets.id'), nullable=True)
-    pointing_id = Column(Integer, ForeignKey('pointings.id'), nullable=True)
-
-    # Foreign relationships
-    exposure_set = relationship('ExposureSet', back_populates='image_logs')
-    pointing = relationship('Pointing', back_populates='image_logs')
-
-    def __repr__(self):
-        strings = ['db_id={}'.format(self.db_id),
-                   'filename={}'.format(self.filename),
-                   'run_number={}'.format(self.run_number),
-                   'ut={}'.format(self.ut),
-                   'ut_mask={}'.format(self.ut_mask),
-                   'start_time={}'.format(self.start_time),
-                   'write_time={}'.format(self.write_time),
-                   'exposure_set_id={}'.format(self.exposure_set_id),
-                   'pointing_id={}'.format(self.pointing_id),
-                   'target_id={}'.format(self.target_id),
-                   ]
-        return 'ImageLog({})'.format(', '.join(strings))
-
-    @validates('start_time', 'write_time')
-    def validate_times(self, key, field):
-        """Use validators to allow various types of input for times.
-
-        Also enforce write_time > start_time.
-        """
-        if isinstance(field, datetime.datetime):
-            value = field.strftime('%Y-%m-%d %H:%M:%S')
-        elif isinstance(field, Time):
-            field.precision = 0  # no D.P on seconds
-            value = field.iso
-        else:
-            # just hope the string works!
-            value = str(field)
-
-        # force write_time > start_time
-        if (key == 'start_time' and self.write_time is not None and
-                Time(value) >= Time(self.write_time)):
-            raise ValueError(f'start_time must be before write_time ({self.write_time})')
-        if (key == 'write_time' and self.start_time is not None and
-                Time(self.start_time) >= Time(value)):
-            raise ValueError(f'write_time must be after start_time ({self.start_time})')
-
         return value
 
 

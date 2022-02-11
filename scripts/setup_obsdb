@@ -35,7 +35,7 @@ def run(overwrite=False, add_defaults=False, verbose=False):
         else:
             # Use provisional grid
             skygrid = SkyGrid.from_name('GOTO-8p')
-        grid = db.Grid.from_skygrid(skygrid, name='GOTO-8_allsky_grid')
+        grid = db.Grid.from_skygrid(skygrid, name='GOTO-8_grid')
         for coord, name in zip(skygrid.coords, skygrid.tilenames):
             ra = coord.ra.value
             dec = coord.dec.value

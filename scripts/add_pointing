@@ -391,27 +391,24 @@ def fill_exposure_set():
 def run():
     """Create the targets and add them to the database."""
     print('** Insert pointing into GOTO queue database **')
-
-    # Get Target and Strategy params
     with db.open_session() as session:
+        # Get Target and Strategy params
         target_params, strategy_params = fill_target(session)
 
-    # Get Exposure Set params
-    exposure_sets = []
-    more_exposures = True
-    while more_exposures is True:
-        exps_params = fill_exposure_set()
-        exposure_sets.append(exps_params)
+        # Get Exposure Set params
+        exposure_sets = []
+        more_exposures = True
+        while more_exposures is True:
+            exps_params = fill_exposure_set()
+            exposure_sets.append(exps_params)
 
-        add_more = None
-        while add_more not in ['y', 'Y', 'n', 'N']:
-            add_more = input('Add another exposure set? [y/n]: ')
+            add_more = None
+            while add_more not in ['y', 'Y', 'n', 'N']:
+                add_more = input('Add another exposure set? [y/n]: ')
 
-        if add_more not in ['y', 'Y']:
-            more_exposures = False
+            if add_more not in ['y', 'Y']:
+                more_exposures = False
 
-    # Add to the database
-    with db.open_session() as session:
         # Get default User
         user = db.get_user(session, username='default')
 

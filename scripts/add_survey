@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""A script add a limited survey of targets into the G-TeCS database."""
+
+import argparse
+import sys
+import time
+
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+
+from gtecs.obs import database as db
+from gtecs.obs import params
+
+
+def get_coords_from_file(filename):
+    """Load mini-survey coordinates, with optional weights."""
+    names = []
+    ras = []
+    decs = []
+    weights = []
+    with open(filename) as file:
+        for line in file:
+            if line[0] == '#':
+                continue
+            try:
+                name, ra, dec, weight = line.split()
+                names.append(name)
+                ras.append(ra)
+                decs.append(dec)
+                weights.append(int(weight))
+            except Exception:
+                name, ra, dec = line.split()
+                names.append(name)
+                ras.append(ra)
+                decs.append(dec)
+                weights.append(1)
+    return names, ras, decs, weights
+
+
+def get_tiles_from_file(filename):
+    """Load mini-survey tiles, with optional weights."""
+    tilenames = []
+    weights = []
+    with open(filename, 'r') as file:
+        for line in file:
+            if line[0] == '#':
+                continue
+            try:
+                tilename, weight = line.split()
+                tilenames.append(tilename)
+                weights.append(int(weight))
+            except Exception:
+                tilename = line.split()
+                tilenames.append(tilename)
+                weights.append(1)
+    return tilenames, weights
+
+
+def fill_target():
+    """Fill out a target frame with user input."""
+    target_params = {'rank': None,
+                     'rank_decay': None,
+                     }
+    strategy_params = {'num_todo': None,
+                       'wait_time': None,
+                       'valid_time': -1,  # Rarely ever not infinitely valid
+                       'too': False,  # Never ToO
+                       'min_alt': None,
+                       'max_sunalt': None,
+                       'max_moon': None,
+                       'min_moonsep': None,
+                       }
+
+    while target_params['rank'] is None:
+        rank = input('Pointing initial rank: ')
+        try:
+            target_params['rank'] = int(rank)
+        except Exception:
+            print('Invalid input')
+
+    while target_params['rank_decay'] is None:
+        rank_decay = input('Should pointing ranks decrease with time? [y/n]: ')
+        if rank_decay in ['y', 'Y']:
+            target_params['rank_decay'] = True
+        elif rank_decay in ['n', 'N']:
+            target_params['rank_decay'] = False
+        else:
+            print('Invalid input')
+
+    while strategy_params['num_todo'] is None:
+        num_todo = input('Number of observations (-1=infinite): ')
+        try:
+            strategy_params['num_todo'] = int(num_todo)
+        except Exception:
+            print('Invalid input')
+
+    while strategy_params['wait_time'] is None:
+        wait_time = input('Delay between observations (in days): ')
+        try:
+            strategy_params['wait_time'] = float(wait_time) * 24 * 60  # in minutes
+        except Exception:
+            print('Invalid input')
+
+    # Constraints
+    default_cons = None
+    while default_cons not in ['y', 'n', 'Y', 'N']:
+        string = 'Use default constraints (alt>{}, sunalt<{}, moon<{}, moonsep>{})? [y/n]: '.format(
+            params.DEFAULT_MIN_ALT,
+            params.DEFAULT_MAX_SUNALT,
+            params.DEFAULT_MAX_MOON,
+            params.DEFAULT_MIN_MOONSEP,
+        )
+        default_cons = input(string)
+    if default_cons in ['y', 'Y']:
+        strategy_params['min_alt'] = params.DEFAULT_MIN_ALT
+        strategy_params['max_sunalt'] = -params.DEFAULT_MAX_SUNALT
+        strategy_params['max_moon'] = params.DEFAULT_MAX_MOON
+        strategy_params['min_moonsep'] = params.DEFAULT_MIN_MOONSEP
+    else:
+        while strategy_params['min_alt'] is None:
+            min_alt = input('Minimum target altitude (degrees): ')
+            try:
+                strategy_params['min_alt'] = float(min_alt)
+            except Exception:
+                print('Invalid input')
+
+        while strategy_params['max_sunalt'] is None:
+            max_sunalt = input('Maximum Sun altitude (degrees): ')
+            try:
+                strategy_params['max_sunalt'] = float(max_sunalt)
+            except Exception:
+                print('Invalid input')
+
+        while strategy_params['max_moon'] not in ['D', 'G', 'B']:
+            max_moon = input('Maximum Moon brightness [D/G/B]: ')
+            try:
+                strategy_params['max_moon'] = max_moon.upper()
+            except Exception:
+                print('Invalid input')
+
+        while strategy_params['min_moonsep'] is None:
+            min_moonsep = input('Minimum seperation from the Moon (degrees): ')
+            try:
+                strategy_params['min_moonsep'] = float(min_moonsep)
+            except Exception:
+                print('Invalid input')
+
+    return target_params, strategy_params
+
+
+def fill_exposure_set():
+    """Fill out an exposure set frame with user input."""
+    exps_params = {'num_exp': None, 'exptime': None, 'filt': None}
+
+    while exps_params['num_exp'] is None:
+        num_exp = input('Number of exposures: ')
+        try:
+            exps_params['num_exp'] = int(num_exp)
+        except Exception:
+            print('Invalid input')
+
+    while exps_params['exptime'] is None:
+        exptime = input('Exposure time: ')
+        try:
+            exps_params['exptime'] = int(exptime)
+        except Exception:
+            print('Invalid input')
+
+    while exps_params['filt'] not in ['L', 'R', 'G', 'B']:
+        filt = input('Filter [L/R/G/B]: ')
+        try:
+            exps_params['filt'] = filt.upper()
+        except Exception:
+            print('Invalid input')
+
+    return exps_params
+
+
+def run(filename, coords_or_tiles='coords', on_grid=True):
+    """Create the targets and add them to the database."""
+    print('** Insert survey into GOTO queue database **')
+    with db.open_session() as session:
+        names = None
+        ras = None
+        decs = None
+        tilenames = None
+        weights = None
+        if coords_or_tiles == 'coords':
+            # Load from file
+            names, ras, decs, weights = get_coords_from_file(filename)
+
+            if on_grid:
+                # Get the current grid
+                db_grid = db.get_current_grid(session)
+
+                # Create a SkyGrid from the database Grid
+                grid = db_grid.skygrid
+
+                # Find which tile the given coordinates are in
+                tilenames = []
+                for ra, dec in zip(ras, decs):
+                    coord = SkyCoord(ra * u.deg, dec * u.deg)
+                    tilename = grid.get_tile(coord)
+                    tilenames.append(tilename)
+
+                # Replace RAs and Decs
+                ras = None
+                decs = None
+
+        elif coords_or_tiles == 'tiles':
+            # Load from file
+            tilenames, weights = get_tiles_from_file(filename)
+
+        else:
+            raise ValueError('Invalid value for coords_or_tiles: {}'.format(coords_or_tiles))
+
+        # Get Survey name
+        survey_name = input('Survey name: ').replace(' ', '_')
+        if not survey_name.endswith('survey'):
+            survey_name += '_survey'
+
+        # Get Target and Strategy params
+        target_params, strategy_params = fill_target()
+
+        # Get ExposureSet params
+        exps_params = fill_exposure_set()
+
+        # Get default User
+        user = db.get_user(session, username='default')
+
+        # Create or fetch Survey
+        survey = session.query(db.Survey).filter(db.Survey.name == survey_name).one_or_none()
+        if survey is None:
+            print('Creating survey database entry')
+            survey = db.Survey(name=survey_name)
+        else:
+            print('Linking to existing survey:', survey)
+
+        # Create Targets
+        print('Creating targets...')
+        start = time.time()
+        targets = []
+        for i in range(len(weights)):
+            if tilenames is not None:
+                # Get the current grid
+                db_grid = db.get_current_grid(session)
+
+                # Find the matching GridTile
+                query = session.query(db.GridTile)
+                query = query.filter(db.GridTile.grid == db_grid,
+                                     db.GridTile.name == tilenames[i])
+                grid_tile = query.one_or_none()
+                if not grid_tile:
+                    raise ValueError('Cannot find tile in the database')
+            else:
+                grid_tile = None
+
+            if names is not None:
+                name = names[i]
+            elif grid_tile is not None:
+                name = survey.name + '_' + grid_tile.name
+            else:
+                # shouldn't happen?
+                name = survey.name + '_' + str(int(i))
+
+            target = db.Target(ra=ras[i] if ras is not None else None,
+                               dec=decs[i] if decs is not None else None,
+                               name=name,
+                               weight=weights[i],
+                               **target_params,
+                               user=user,
+                               strategy=db.Strategy(**strategy_params),
+                               grid_tile=grid_tile,
+                               survey=survey,
+                               )
+            target.exposure_sets.append(db.ExposureSet(**exps_params))
+
+            targets.append(target)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+        # Add to database
+        print('Adding {} targets to database...'.format(len(targets)))
+        start = time.time()
+        db.insert_items(session, targets)
+        print('  took {:.2f} secs'.format(time.time() - start))
+
+    print('Done')
+
+
+if __name__ == '__main__':
+    description = """Add a limited survey of targets into the G-TeCS database."""
+
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('file', help='File defining survey targets', type=str)
+    parser.add_argument('-c', '--coords', action='store_true', default=False,
+                        help='File format is <name> <ra> <dec> [weight] (weight is optional)')
+    parser.add_argument('-t', '--tiles', action='store_true', default=False,
+                        help='File format is <tile> [weight] (weight is optional)')
+    parser.add_argument('-g', '--on-grid', action='store_true', default=False,
+                        help='Force targets to be on the grid (only relevant for --coords)')
+
+    args = parser.parse_args()
+
+    filename = args.file
+    if args.coords and not args.tiles:
+        coords_or_tiles = 'coords'
+        on_grid = args.on_grid
+    elif args.tiles and not args.coords:
+        coords_or_tiles = 'tiles'
+        on_grid = True
+    else:
+        print('Chose either --coords or --tiles formatting')
+        sys.exit()
+
+    run(filename, coords_or_tiles, on_grid)

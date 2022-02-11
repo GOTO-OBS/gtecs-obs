@@ -88,6 +88,10 @@ class User(Base):
     password_hash = Column('password', String(255), nullable=False)
     full_name = Column(Text, nullable=False)
 
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+
     # Foreign relationships
     targets = relationship('Target', back_populates='user')
 
@@ -181,6 +185,10 @@ class ExposureSet(Base):
 
     # Foreign keys
     target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
+
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign relationships
     target = relationship('Target', back_populates='exposure_sets')
@@ -331,15 +339,16 @@ class Pointing(Base):
     running_time = Column(DateTime, nullable=True, default=None)
     finished_time = Column(DateTime, nullable=True, default=None)
     completed = Column(Boolean, nullable=False, default=False)
-    # # Update timestamp (TODO: Do we still need this? Or should more tables have it?)
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign keys
     target_id = Column(Integer, ForeignKey('targets.id'), nullable=False)
     time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=False)
     strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
     telescope_id = Column(Integer, ForeignKey('telescopes.id'), nullable=True)
+
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign relationships
     target = relationship('Target', lazy='joined', back_populates='pointings')
@@ -801,6 +810,10 @@ class Target(Base):
     survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True)
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+
     # Foreign relationships
     # (remember to add to __init__)
     user = relationship('User', lazy='joined', back_populates='targets')
@@ -1186,7 +1199,7 @@ class Target(Base):
 
     @property
     def strategy(self):
-        """The currently valid Strategy."""
+        """Get the currently valid Strategy."""
         return self.get_current_strategy()
 
     @strategy.setter
@@ -1446,6 +1459,10 @@ class Strategy(Base):
 
     # Foreign keys
     target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
+
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign relationships
     target = relationship('Target', back_populates='strategies')
@@ -1787,6 +1804,10 @@ class TimeBlock(Base):
     # Foreign keys
     strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
 
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+
     # Foreign relationships
     strategy = relationship('Strategy', back_populates='time_blocks')
     pointings = relationship('Pointing', back_populates='time_block')
@@ -1862,6 +1883,10 @@ class Site(Base):
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     height = Column(Float, nullable=False)
+
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign relationships
     telescopes = relationship('Telescope', back_populates='site')
@@ -1969,6 +1994,10 @@ class Telescope(Base):
     site_id = Column(Integer, ForeignKey('sites.id'), nullable=False)
     grid_id = Column(Integer, ForeignKey('grids.id'), nullable=True)
 
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+
     # Foreign relationships
     site = relationship('Site', back_populates='telescopes')
     grid = relationship('Grid', back_populates='telescopes')
@@ -2075,6 +2104,10 @@ class Grid(Base):
     ra_overlap = Column(Float, nullable=False)
     dec_overlap = Column(Float, nullable=False)
     algorithm = Column(String(255), nullable=False)
+
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign relationships
     grid_tiles = relationship('GridTile', back_populates='grid')
@@ -2194,6 +2227,10 @@ class GridTile(Base):
     # Foreign keys
     grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
 
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+
     # Foreign relationships
     grid = relationship('Grid', back_populates='grid_tiles')
     targets = relationship('Target', back_populates='grid_tile')
@@ -2287,6 +2324,10 @@ class Survey(Base):
     # Foreign keys
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+
     # Foreign relationships
     targets = relationship('Target', back_populates='survey')
     event = relationship('Event', back_populates='surveys')
@@ -2373,6 +2414,10 @@ class Event(Base):
     source = Column(String(255), nullable=False)
     type = Column(String(255), nullable=True, index=True, default=None)  # noqa: A003
     time = Column(DateTime, nullable=True, default=None)
+
+    # Update timestamp
+    ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
 
     # Foreign relationships
     surveys = relationship('Survey', back_populates='event')

@@ -147,10 +147,10 @@ def fill_target(session):
                        'wait_time': None,
                        'valid_time': None,
                        'too': None,
-                       'min_alt': params.DEFAULT_MIN_ALT,
-                       'max_sunalt': params.DEFAULT_MAX_SUNALT,
-                       'max_moon': params.DEFAULT_MAX_MOON,
-                       'min_moonsep': params.DEFAULT_MIN_MOONSEP,
+                       'min_alt': None,
+                       'max_sunalt': None,
+                       'max_moon': None,
+                       'min_moonsep': None,
                        }
 
     # On or off grid?
@@ -426,6 +426,7 @@ def run():
         # Confirm before adding to database
         print('~~ Final check ~~')
         print(target)
+        print(target.strategy)
         for es in target.exposure_sets:
             print(es)
 

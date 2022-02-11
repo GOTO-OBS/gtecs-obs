@@ -9,7 +9,7 @@ from astropy.time import Time
 
 from gototile.grid import SkyGrid
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.mysql import TIMESTAMP
 from sqlalchemy.ext.declarative import declarative_base
@@ -134,23 +134,11 @@ class ExposureSet(Base):
     binning : int, optional
         binning factor to apply
         default = 1 (no binning)
-    imgtype : string, optional
-        indicates the type of exposure set.
-        one of SCIENCE, FOCUS, STD, FLAT, BIAS, DARK
-        default = 'SCIENCE'
     ut_mask : int, optional
         if set, this is a binary mask which will determine which unit
         telescopes carry out the exposure. A value of 5 (binary 0101) will
         be exposed by cameras 1 and 3.
         default = None
-    ra_offset : float, optional
-        the size of the random offset to apply between each exposure
-        if not set, no offset will be made
-        default = 0
-    dec_offset : float, optional
-        the size of the random offset to apply between each exposure
-        if not set, no offset will be made
-        default = 0
 
     When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
@@ -189,11 +177,7 @@ class ExposureSet(Base):
     filt = Column('filter',   # filter is a built in function in Python
                   String(1), nullable=False)
     binning = Column(Integer, nullable=False, default=1)
-    imgtype = Column(Enum('SCIENCE', 'FOCUS', 'DARK', 'BIAS', 'FLAT', 'STD'), nullable=False,
-                     default='SCIENCE')
     ut_mask = Column(Integer, default=None)
-    ra_offset = Column(Float, nullable=False, default=0)
-    dec_offset = Column(Float, nullable=False, default=0)
 
     # Foreign keys
     target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
@@ -217,10 +201,7 @@ class ExposureSet(Base):
                    'exptime={}'.format(self.exptime),
                    'filt={}'.format(self.filt),
                    'binning={}'.format(self.binning),
-                   'imgtype={}'.format(self.imgtype),
                    'ut_mask={}'.format(self.ut_mask),
-                   'ra_offset={}'.format(self.ra_offset),
-                   'dec_offset={}'.format(self.dec_offset),
                    'target_id={}'.format(self.target_id),
                    ]
         return 'ExposureSet({})'.format(', '.join(strings))

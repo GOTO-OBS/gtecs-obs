@@ -128,17 +128,19 @@ def run(filename):
         # Get default User
         user = db.get_user(session, username='default')
 
-        # Get the current grid from the database
-        grid = db.get_current_grid(session)
-        print('Using grid "{}"'.format(grid.name))
-
         # Create or fetch Survey
         survey = session.query(db.Survey).filter(db.Survey.name == survey_name).one_or_none()
         if survey is None:
             print('Creating survey database entry')
             survey = db.Survey(name=survey_name)
+            if not survey_name.endswith('survey'):
+                survey_name += '_survey'
         else:
             print('Linking to existing survey:', survey)
+
+        # Get the current grid from the database
+        grid = db.get_current_grid(session)
+        print('Using grid "{}"'.format(grid.name))
 
         # Create Targets
         targets = []
@@ -163,7 +165,6 @@ def run(filename):
             target.exposure_sets.append(db.ExposureSet(**exps_params))
 
             targets.append(target)
-
         print('  took {:.2f} secs'.format(time.time() - start))
 
         # Add to database

@@ -65,28 +65,35 @@ def get_coords(fov, overlap, centre, area):
     return all_ras, all_decs, names
 
 
-def run(fov, overlap, centre, area, name):
+def run(fov, overlap, centre, area, survey_name):
     """Create the targets and add them to the database."""
-    # Create the tile centres
-    ras, decs, names = get_coords(fov, overlap, centre, area)
-
     with db.open_session() as session:
         # Get default User
         user = db.get_user(session, username='default')
 
+        # Create a Survey
+        print('Creating survey...')
+        if not survey_name.endswith('survey'):
+            survey_name += '_survey'
+        survey = db.Survey(name=survey_name)
+
+        # Create the tile centres
+        ras, decs, names = get_coords(fov, overlap, centre, area)
+
         # Create Targets
-        targets = []
         print('Creating targets...')
         start = time.time()
+        targets = []
         for ra, dec, tile_num in zip(ras, decs, names):
             target_params = TARGET_PARAMS.copy()
-            target_params['name'] = '{}_survey_T{}'.format(name, tile_num)
+            target_params['name'] = survey.name + '_' + 'T{}'.format(tile_num)
             target_params['ra'] = float(ra)
             target_params['dec'] = float(dec)
 
             target = db.Target(**target_params,
                                user=user,
                                strategy=db.Strategy(**STRATEGY_PARAMS.copy()),
+                               survey=survey,
                                )
             for exps_params in EXPS_PARAMS:
                 target.exposure_sets.append(db.ExposureSet(**exps_params))
@@ -124,6 +131,6 @@ if __name__ == '__main__':
     overlap = {'ra': args.ra_overlap, 'dec': args.dec_overlap}
     centre = {'ra': args.ra_centre, 'dec': args.dec_centre}
     area = args.area
-    name = args.name
+    survey_name = args.name
 
-    run(fov, overlap, centre, area, name)
+    run(fov, overlap, centre, area, survey_name)

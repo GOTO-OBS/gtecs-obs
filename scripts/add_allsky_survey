@@ -24,7 +24,7 @@ def run():
         grid = db.get_current_grid(session)
 
         # Create a Survey
-        print('Creating all-sky survey...')
+        print('Creating survey...')
         survey = db.Survey(name='Allsky_survey')
 
         # Create Targets

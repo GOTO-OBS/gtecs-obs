@@ -9,7 +9,7 @@ from gtecs.obs import database as db
 import numpy as np
 
 
-TARGET_PARAMS = {'start_rank': 998,
+TARGET_PARAMS = {'rank': 998,
                  }
 STRATEGY_PARAMS = {'num_todo': -1,
                    'wait_time': 4320,  # 3 days

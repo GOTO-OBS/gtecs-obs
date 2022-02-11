@@ -11,7 +11,7 @@ from astropy.time import Time
 from gtecs.obs import database as db
 
 
-TARGET_PARAMS = {'start_rank': 0,
+TARGET_PARAMS = {'rank': 0,
                  }
 STRATEGY_PARAMS = {'num_todo': 1,
                    'wait_time': 12 * 60,

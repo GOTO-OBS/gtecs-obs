@@ -7,7 +7,7 @@ import time
 from gtecs.obs import database as db
 
 
-TARGET_PARAMS = {'start_rank': None,
+TARGET_PARAMS = {'rank': None,
                  }
 STRATEGY_PARAMS = {'num_todo': -1,
                    'wait_time': 4320,  # 3 days
@@ -64,7 +64,7 @@ def run(filename, survey_name):
             target_params['name'] = name
             target_params['ra'] = float(ra)
             target_params['dec'] = float(dec)
-            target_params['start_rank'] = rank
+            target_params['rank'] = rank
 
             target = db.Target(**target_params,
                                user=user,

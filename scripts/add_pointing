@@ -141,7 +141,7 @@ def fill_target(session):
     target_params = {'name': None,
                      'ra': None,
                      'dec': None,
-                     'start_rank': None,
+                     'rank': None,
                      }
     strategy_params = {'num_todo': None,
                        'wait_time': None,
@@ -267,9 +267,9 @@ def fill_target(session):
         while rank_zero not in ['y', 'n', 'Y', 'N']:
             rank_zero = input('Enter as Rank 0 (higher than GW targets - use with care)? [y/n]: ')
         if rank_zero in ['y', 'Y']:
-            target_params['start_rank'] = 0
+            target_params['rank'] = 0
         else:
-            target_params['start_rank'] = 506
+            target_params['rank'] = 506
     else:
         strategy_params['too'] = 0
         rank_str = 'None'
@@ -277,11 +277,11 @@ def fill_target(session):
             rank_str = input('Enter rank [low/medium/high]: ')
 
         if rank_str.lower() in ['low', 'l']:
-            target_params['start_rank'] = 508
+            target_params['rank'] = 508
         elif rank_str.lower() in ['medium', 'm']:
-            target_params['start_rank'] = 507
+            target_params['rank'] = 507
         elif rank_str.lower() in ['high', 'h']:
-            target_params['start_rank'] = 506
+            target_params['rank'] = 506
 
     # Valid time & wait time
     daily = None

@@ -84,7 +84,7 @@ with db.open_session() as session:
     target = db.Target(name='M31',
                        ra=10.685,
                        dec=41.2875,
-                       start_rank=9,
+                       rank=9,
                        user=user,
                        strategy=strategy,
                        exposure_sets=[L, R, G, B],

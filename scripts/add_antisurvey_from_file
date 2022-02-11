@@ -9,7 +9,7 @@ from astropy.coordinates import SkyCoord
 from gtecs.obs import database as db
 
 
-TARGET_PARAMS = {'start_rank': 800,
+TARGET_PARAMS = {'rank': 800,
                  }
 STRATEGY_PARAMS = {'num_todo': 3,
                    'wait_time': 10080,  # 1 week

@@ -23,7 +23,7 @@ def fill_target():
     target_params = {'name': None,
                      'ra': None,
                      'dec': None,
-                     'start_rank': None,
+                     'rank': None,
                      }
     strategy_params = {'num_todo': None,
                        'wait_time': None,
@@ -49,10 +49,10 @@ def fill_target():
         except Exception:
             print('Invalid input')
 
-    while target_params['start_rank'] is None:
-        start_rank = input('Pointing initial rank: ')
+    while target_params['rank'] is None:
+        rank = input('Pointing initial rank: ')
         try:
-            target_params['start_rank'] = int(start_rank)
+            target_params['rank'] = int(rank)
         except Exception:
             print('Invalid input')
 

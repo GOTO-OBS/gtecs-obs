@@ -52,7 +52,7 @@ def make_random_target(user, num_expsets=None, time=None):
     target = Target(name='random_target',
                     ra=np.random.uniform(lst - 3, lst + 3),
                     dec=np.random.uniform(10, 89),
-                    start_rank=np.random.randint(1, 100),
+                    rank=np.random.randint(1, 100),
                     start_time=t1,
                     stop_time=t2,
                     user=user,

@@ -17,7 +17,7 @@ from gototile.skymap import SkyMap
 from gtecs.obs import database as db
 
 
-TARGET_PARAMS = {'start_rank': 2,
+TARGET_PARAMS = {'rank': 2,
                  }
 STRATEGY_PARAMS = {'num_todo': 5,
                    'wait_time': 1440,

@@ -6,7 +6,7 @@ import time
 from gtecs.obs import database as db
 
 
-TARGET_PARAMS = {'start_rank': None,  # Infinite rank == queue fillers
+TARGET_PARAMS = {'rank': None,  # Infinite rank == queue fillers
                  }
 STRATEGY_PARAMS = {'num_todo': -1,
                    'wait_time': 4320,

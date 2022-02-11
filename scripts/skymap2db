@@ -32,15 +32,14 @@ def add_to_database(session, db_grid, tiles, event_time, event_name, filename):
 
     # Create Event
     event = db.Event(name=event_name,
-                     ivorn=str(event_time),  # no official IVORN yet
                      source='LVC',
-                     event_type='GW',
+                     type='GW',
                      time=Time.now(),
-                     skymap=filename,
                      )
 
     # Create Survey
     survey = db.Survey(name=event_name,
+                       skymap=filename,
                        grid=db_grid,
                        event=event,
                        )

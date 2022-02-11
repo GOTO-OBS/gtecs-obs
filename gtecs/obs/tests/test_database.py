@@ -47,7 +47,7 @@ with db.open_session() as session:
     gt2 = db.GridTile(name='T0002', ra=100, dec=40, grid=g)
 
     # create an event
-    e = db.Event(name='event', ivorn='ivo://goto', source='made-up', event_type='FAKE')
+    e = db.Event(name='event', source='made-up', type='FAKE')
 
     # and a survey
     s = db.Survey(name='GOTO event survey', event=e)

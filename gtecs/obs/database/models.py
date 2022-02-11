@@ -2190,6 +2190,9 @@ class Survey(Base):
     name : string
         a human-readable identifier for the survey
 
+    skymap : string, optional
+        the location of the source skymap for this survey
+
     When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
 
@@ -2225,6 +2228,7 @@ class Survey(Base):
 
     # Columns
     name = Column(String(255), nullable=False, index=True)
+    skymap = Column(String(255), nullable=True, default=None)
 
     # Foreign keys
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
@@ -2246,6 +2250,7 @@ class Survey(Base):
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
                    'name={}'.format(self.name),
+                   'skymap={}'.format(self.skymap),
                    'event_id={}'.format(self.event_id),
                    ]
         return 'Survey({})'.format(', '.join(strings))
@@ -2254,7 +2259,10 @@ class Survey(Base):
 class Event(Base):
     """A class to represent a transient Event.
 
-    Events in the database are used to store infomation and link Surveys and Pointings.
+    Events can be linked to specific Surveys made of Targets, usually weighted
+    based on a skymap. A specific astrophysical event (e.g. GW170817) might
+    produce multiple Surveys as the skymap is updated, which will all be linked
+    to the one Event.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -2265,18 +2273,14 @@ class Event(Base):
     Parameters
     ----------
     name : string
-        a human-readable identifier for the event
-    ivorn : string
-        unique IVORN (International Virtual Observatory Resource Name) for the event
+        a unique, human-readable identifier for the event
     source : string
         the event's origin, e.g. LVC, Fermi, GAIA
-    event_type : string
-        the type of event, e.g. GW, GRB
 
+    type : string, optional
+        the type of event, e.g. GW, GRB
     time : string, `astropy.time.Time` or datetime.datetime, optional
         time the event occurred
-    skymap : string, optional
-        the location of the source skymap file
 
     When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
@@ -2286,7 +2290,7 @@ class Event(Base):
     surveys : list of `Survey`, optional
         the Surveys created for this Event, if any
     targets : list of `Target`, optional
-        the Targets which are part of this Event, if any
+        the Targets created for this Event, if any
 
     Attributes
     ----------
@@ -2300,7 +2304,7 @@ class Event(Base):
     Secondary relationships
     -----------------------
     pointings : list of `Pointing`
-        the Pointings which are part of this Event, if any
+        the Pointings created for this Event, if any
 
     """
 
@@ -2311,13 +2315,10 @@ class Event(Base):
     db_id = Column('id', Integer, primary_key=True)
 
     # Columns
-    name = Column(String(255), nullable=False, index=True)
-    ivorn = Column(String(255), nullable=False, unique=True)
+    name = Column(String(255), nullable=False, unique=True, index=True)
     source = Column(String(255), nullable=False)
-    # type is a built in function in Python
-    event_type = Column('type', String(255), nullable=False, index=True)
-    time = Column(DateTime)
-    skymap = Column(String(255))
+    type = Column(String(255), nullable=True, index=True, default=None)  # noqa: A003
+    time = Column(DateTime, nullable=True, default=None)
 
     # Foreign relationships
     surveys = relationship('Survey', back_populates='event')
@@ -2336,11 +2337,9 @@ class Event(Base):
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
                    'name={}'.format(self.name),
-                   'ivorn={}'.format(self.ivorn),
                    'source={}'.format(self.source),
-                   'event_type={}'.format(self.event_type),
+                   'type={}'.format(self.type),
                    'time={}'.format(self.time),
-                   'skymap={}'.format(self.skymap),
                    ]
         return 'Event({})'.format(', '.join(strings))
 

@@ -450,7 +450,7 @@ def get_events(session, event_type=None, source=None):
     if event_type is not None:
         if isinstance(event_type, str):
             event_type = [event_type]
-        query = query.filter(Event.event_type.in_(event_type))
+        query = query.filter(Event.type.in_(event_type))
     if source is not None:
         if isinstance(source, str):
             source = [source]

@@ -43,10 +43,10 @@ with db.open_session() as session:
 
     for pointing in all_pointings:
         if show_all or pointing.status != 'expired':
-            string = '{: <6.0f} | {: >20} | {: >3.0f}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
+            string = '{: <6.0f} | {: >20} | {}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
                 pointing.db_id,
                 pointing.target.name,
-                pointing.rank,
+                '{: >3.0f}'.format(pointing.rank) if pointing.rank is not None else 'inf',
                 '!' if pointing.strategy.too else ' ',
                 pointing.target.ra, pointing.target.dec,
                 pointing.start_time)

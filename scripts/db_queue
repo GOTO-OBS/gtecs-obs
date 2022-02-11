@@ -12,6 +12,8 @@ from astropy.time import Time
 from gtecs.common.style import boldtxt, gtxt, rtxt, ytxt
 from gtecs.obs.scheduler import PointingQueue
 
+import numpy as np
+
 
 def run(time, observer, horizon, readout_time, limit=None):
     """Print the current queue."""
@@ -51,7 +53,7 @@ def run(time, observer, horizon, readout_time, limit=None):
 
         print(gtxt(' Y ') if pointing.valid else rtxt(' N '), end=' | ')
 
-        print('{: >3.0f}'.format(pointing.rank), end=' | ')
+        print('{: >3.0f}'.format(pointing.rank) if pointing.rank != np.inf else 'inf', end=' | ')
         print(' Y ' if pointing.too else ' N ', end=' | ')
         print('{: >4.0f}'.format(pointing.num_obs), end=' | ')
         print('{: >6.4f}'.format(pointing.tiebreaker), end=' | ')

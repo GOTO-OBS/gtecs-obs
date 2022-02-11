@@ -93,7 +93,7 @@ class Pointing:
         self.name = name
         self.ra = float(ra)
         self.dec = float(dec)
-        self.rank = int(rank)
+        self.rank = int(rank) if rank is not None else np.inf
         self.weight = float(weight)
         self.num_obs = int(num_obs)
         self.too = bool(int(too))

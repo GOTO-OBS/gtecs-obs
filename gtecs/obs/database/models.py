@@ -2125,6 +2125,8 @@ class GridTile(Base):
     db_id : int
         primary database key
         only populated when the instance is added to the database
+    last_observed : `astropy.time.Time`
+        the most recent time of completion of any Target covering this GridTile, if any
 
     The following secondary relationships are not settable directly,
     but are populated through the primary relationships and are available as attributes:
@@ -2163,6 +2165,16 @@ class GridTile(Base):
                              viewonly=True,
                              uselist=True,
                              )
+
+    # Column properties
+    last_observed = column_property(select([Target.last_observed])
+                                    .where(Target.grid_tile_id == db_id,
+                                           )
+                                    .order_by(Target.last_observed.desc())
+                                    .limit(1)
+                                    .correlate_except(Pointing)
+                                    .scalar_subquery()
+                                    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),

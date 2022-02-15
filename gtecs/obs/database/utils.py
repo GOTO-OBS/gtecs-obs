@@ -21,7 +21,7 @@ __all__ = ['get_user', 'validate_user',
            'get_current_grid', 'get_grid_tile_by_name',
            'get_events', 'delete_event_pointings',
            'insert_items',
-           'mark_completed', 'mark_interrupted', 'mark_running',
+           'mark_completed', 'mark_interrupted', 'mark_running', 'mark_confirmed', 'mark_failed',
            ]
 
 
@@ -506,7 +506,7 @@ def mark_completed(pointing_id):
     with open_session() as s:
         pointing = get_pointing_by_id(s, pointing_id)
         pointing.mark_finished(completed=True)
-        # Could we schedule the next pointing at this point??
+        # TODO: Could we schedule the next pointing at this point??
 
 
 def mark_interrupted(pointing_id):
@@ -523,7 +523,7 @@ def mark_interrupted(pointing_id):
     with open_session() as s:
         pointing = get_pointing_by_id(s, pointing_id)
         pointing.mark_finished(completed=False)
-        # Could we schedule the next pointing at this point??
+        # TODO: Could we schedule the next pointing at this point??
 
 
 def mark_running(pointing_id, telescope_id):
@@ -543,3 +543,38 @@ def mark_running(pointing_id, telescope_id):
         pointing = get_pointing_by_id(s, pointing_id)
         telescope = get_telescope_by_id(s, telescope_id)
         pointing.mark_running(telescope)
+
+
+def mark_confirmed(pointing_id):
+    """Validate the given pointing's data as confirmed to be good quality.
+
+    A utility function that creates its own session.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    """
+    with open_session() as s:
+        pointing = get_pointing_by_id(s, pointing_id)
+        pointing.mark_validated(good=True)
+
+
+def mark_failed(pointing_id):
+    """Validate the given pointing's data quality as poor, and needs re-observing.
+
+    A utility function that creates its own session.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    """
+    with open_session() as s:
+        pointing = get_pointing_by_id(s, pointing_id)
+        pointing.mark_validated(good=False)
+        # TODO: Could we schedule the next pointing at this point??
+        #       We might also first delete any new upcoming/pending pointings that have been
+        #       created since, since we'll want to go back to the previous strategy.

@@ -256,13 +256,21 @@ class Pointing(Base):
         the time the pointing was marked as running (i.e. started being observed)
         this should usually be set automatically when the pointing status is set
         default = None
+    completed : bool or None, optional
+        if the pointing was successfully completed (True) or interrupted (False), or just
+        hasn't started yet (None)
+        default = None
     finished_time : string, `astropy.time.Time` or datetime.datetime, or None, optional
-        the time the pointing was marked as finished (i.e. completed or interupted)
+        the time the pointing was marked as finished (i.e. completed or interrupted)
         this should usually be set automatically when the pointing status is set
         default = None
-    completed : bool or None, optional
-        if the pointing was successfully completed (True) or interupted (False), or just
-        hasn't started yet (None)
+    valid : bool or None, optional
+        if the results of the completed Pointing was confirmed as good (True) or failed (False),
+        or just hasn't been reviewed yet (None)
+        default = None
+    validation_time : string, `astropy.time.Time` or datetime.datetime, or None, optional
+        the time the resulting images from this Pointing were reviewed
+        this should usually be set automatically when the validity is set
         default = None
 
     When created the instance can be linked to the following other tables as parameters,
@@ -317,7 +325,10 @@ class Pointing(Base):
         mark the pointing as running on the given telescope
         if no time is given, default to Time.now()
     mark_finished(self, completed=True, time=None)
-        mark the pointing as finished, either completed (True) or interupted (False)
+        mark the pointing as finished, either completed (True) or interrupted (False)
+        if no time is given, default to Time.now()
+    mark_validated(self, good=True, time=None)
+        mark the pointing as validated, either good (True) or failed (False)
         if no time is given, default to Time.now()
 
     """
@@ -337,8 +348,10 @@ class Pointing(Base):
     # # Status
     creation_time = Column(DateTime, nullable=False, server_default=func.now())
     running_time = Column(DateTime, nullable=True, default=None)
-    finished_time = Column(DateTime, nullable=True, default=None)
     completed = Column(Boolean, nullable=False, default=False)
+    finished_time = Column(DateTime, nullable=True, default=None)
+    valid = Column(Boolean, nullable=True, default=None)
+    validation_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
     target_id = Column(Integer, ForeignKey('targets.id'), nullable=False)
@@ -411,19 +424,25 @@ class Pointing(Base):
                    'stop_time={}'.format(self.stop_time),
                    'creation_time={}'.format(self.creation_time),
                    'running_time={}'.format(self.running_time),
-                   'finished_time={}'.format(self.finished_time),
                    'completed={}'.format(self.completed),
+                   'finished_time={}'.format(self.finished_time),
+                   'valid={}'.format(self.valid),
+                   'validation_time={}'.format(self.validation_time),
                    'target_id={}'.format(self.target_id),
                    'time_block_id={}'.format(self.time_block_id),
                    'telescope_id={}'.format(self.telescope_id),
                    ]
         return 'Pointing({})'.format(', '.join(strings))
 
-    @validates('start_time', 'stop_time', 'creation_time', 'running_time', 'finished_time')
+    @validates('start_time', 'stop_time', 'creation_time', 'running_time', 'finished_time',
+               'validation_time')
     def validate_times(self, key, field):
         """Use validators to allow various types of input for times.
 
-        Also enforce stop_time > start_time and finished_time > running_time.
+        Also enforce logical orders:
+            - stop_time > start_time
+            - finished_time > running_time
+            - validation_time > finished_time
         """
         if key not in ['start_time', 'creation_time'] and field is None:
             # start_time and creation_time are not nullable, the others are
@@ -438,7 +457,7 @@ class Pointing(Base):
             # just hope the string works!
             value = str(field)
 
-        # force start_time > stop_time
+        # force start_time < stop_time
         if (key == 'start_time' and self.stop_time is not None and
                 Time(value) >= Time(self.stop_time)):
             raise ValueError(f'start_time must be before stop_time ({self.stop_time})')
@@ -446,13 +465,22 @@ class Pointing(Base):
                 Time(self.start_time) >= Time(value)):
             raise ValueError(f'stop_time must be after start_time ({self.start_time})')
 
-        # force running_time > finished_time
+        # force running_time < finished_time
         if (key == 'running_time' and self.finished_time is not None and
                 Time(value) >= Time(self.finished_time)):
             raise ValueError(f'running_time must be before finished_time ({self.finished_time})')
         if (key == 'finished_time' and self.running_time is not None and
                 Time(self.running_time) >= Time(value)):
             raise ValueError(f'finished_time must be after running_time ({self.running_time})')
+
+        # force finished_time < validation_time
+        if (key == 'finished_time' and self.validation_time is not None and
+                Time(value) >= Time(self.validation_time)):
+            msg = f'finished_time must be before validation_time ({self.validation_time})'
+            raise ValueError(msg)
+        if (key == 'validation_time' and self.finished_time is not None and
+                Time(self.finished_time) >= Time(value)):
+            raise ValueError(f'validation_time must be after finished_time ({self.finished_time})')
 
         return value
 
@@ -467,8 +495,16 @@ class Pointing(Base):
         elif self.running_time is not None and self.finished_time is None:
             # The Pointing has started but hasn't finished yet: running
             return 'running'
+        elif self.validation_time is not None and not self.valid:
+            # The Pointing has been completed and judged as good enough: failed
+            return 'failed'
+        # # We don't need a successful status, there's no real difference with completed
+        # # since we consider everything as successful by default
+        # elif self.validation_time is not None and self.valid:
+        #     # The Pointing has been completed and judged as good enough: confirmed
+        #     return 'confirmed'
         elif self.finished_time is not None and self.completed:
-            # The Pointing has finished and is flagged as completed: completed
+            # The Pointing has finished and is flagged as successful: completed
             return 'completed'
         elif self.finished_time is not None and not self.completed:
             # The Pointing has finished and is not flagged as completed: interrupted
@@ -489,6 +525,10 @@ class Pointing(Base):
             self.mark_deleted()
         elif value == 'running':
             self.mark_running()  # Will raise an error since we don't give a Telescope
+        elif value == 'confirmed':
+            self.mark_validated(good=True)
+        elif value == 'failed':
+            self.mark_validated(good=False)
         elif value == 'completed':
             self.mark_finished(completed=True)
         elif value == 'interrupted':
@@ -505,6 +545,8 @@ class Pointing(Base):
                       'deleted'),
                      (and_(self.running_time.isnot(None), self.finished_time.is_(None)),
                       'running'),
+                     (and_(self.validation_time.isnot(None), self.valid.is_(False)),
+                      'failed'),
                      (and_(self.finished_time.isnot(None), self.completed.is_(True)),
                       'completed'),
                      (and_(self.finished_time.isnot(None), self.completed.is_(False)),
@@ -533,6 +575,9 @@ class Pointing(Base):
         elif (self.running_time is not None and time >= Time(self.running_time) and
               (self.finished_time is None or time < Time(self.finished_time))):
             return 'running'
+        elif (self.validation_time is not None and time >= Time(self.validation_time) and
+              not self.valid):
+            return 'failed'
         elif (self.finished_time is not None and time >= Time(self.finished_time) and
               self.completed):
             return 'completed'
@@ -561,6 +606,9 @@ class Pointing(Base):
                   (and_(self.running_time.isnot(None), time >= self.running_time,
                         or_(self.finished_time.is_(None), time < self.finished_time)),
                    'running'),
+                  (and_(self.validation_time.isnot(None), time >= self.validation_time,
+                        self.valid.is_(False)),
+                   'failed'),
                   (and_(self.finished_time.isnot(None), time >= self.finished_time,
                         self.completed.is_(True)),
                    'completed'),
@@ -588,7 +636,7 @@ class Pointing(Base):
             raise ValueError(f'Pointing is already expired (at {self.stop_time})')
         if self.status_at_time(time) == 'running':
             raise ValueError(f'Pointing is already running (at {self.running_time})')
-        if self.status_at_time(time) in ['completed', 'interrupted']:
+        if self.status_at_time(time) in ['completed', 'interrupted', 'failed']:
             raise ValueError(f'Pointing is already finished (at {self.finished_time})')
 
         self.finished_time = time
@@ -610,7 +658,7 @@ class Pointing(Base):
             raise ValueError(f'Pointing is already expired (at {self.stop_time})')
         if self.status_at_time(time) == 'running':
             raise ValueError(f'Pointing is already running (at {self.running_time})')
-        if self.status_at_time(time) in ['completed', 'interrupted']:
+        if self.status_at_time(time) in ['completed', 'interrupted', 'failed']:
             raise ValueError(f'Pointing is already finished (at {self.finished_time})')
 
         if self.telescope is not None or self.telescope_id is not None:
@@ -638,14 +686,36 @@ class Pointing(Base):
             raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
         if self.status_at_time(time) == 'expired':
             raise ValueError(f'Pointing is already expired (at {self.stop_time})')
-        if self.status_at_time(time) in ['completed', 'interrupted']:
+        if self.status_at_time(time) in ['completed', 'interrupted', 'failed']:
             raise ValueError(f'Pointing is already finished (at {self.finished_time})')
         if self.status_at_time(time) != 'running':
             raise ValueError('Pointing is not running (use mark_deleted to stop before running)')
 
         self.finished_time = time
-
         self.completed = completed
+
+    def mark_validated(self, good=True, time=None):
+        """Mark this Pointing as validated, either good (True) or failed (False)."""
+        if time is None:
+            time = Time.now()
+        if isinstance(time, (str, datetime.datetime)):
+            time = Time(time)
+
+        if self.status_at_time(time) == 'deleted':
+            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
+        if self.status_at_time(time) == 'expired':
+            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
+        if self.status_at_time(time) == 'running':
+            raise ValueError(f'Pointing is still running (at {self.running_time})')
+        if self.status_at_time(time) == 'interrupted':
+            raise ValueError(f'Pointing was interrupted (at {self.finished_time})')
+        if self.status_at_time(time) != 'completed':
+            raise ValueError('Pointing is not completed (use mark_finished before validating)')
+        if self.validated_time is not None and self.validated_time > time:
+            raise ValueError('Pointing has already been validated (at {self.validated_time})')
+
+        self.validated_time = time
+        self.valid = good
 
     def get_obstime(self, readout_time=15):
         """Get the expected time needed to observe this Pointing."""
@@ -921,7 +991,7 @@ class Target(Base):
             # just hope the string works!
             value = str(field)
 
-        # force start_time > stop_time
+        # force start_time < stop_time
         if (key == 'start_time' and self.stop_time is not None and
                 Time(value) >= Time(self.stop_time)):
             raise ValueError(f'start_time must be before stop_time ({self.stop_time})')
@@ -1252,12 +1322,13 @@ class Target(Base):
             # All observations were completed (or we have no linked Strategies)
             return None
 
-        # Get last "finished" Pointing for this Target (could be completed/interupted, or expired)
+        # Get last "finished" Pointing for this Target
+        # (could be completed, interrupted, failed or expired)
         # The checks earlier should mean there aren't any pending or running Pointings,
         # but we also want to ignore "deleted" Pointings when getting the times.
         # NB This Pointing might have been observed under a different Strategy,
         # so we can't just do current_block.pointings[-1] as we used to.
-        finished_statuses = ['completed', 'interupted', 'expired']
+        finished_statuses = ['completed', 'interrupted', 'failed', 'expired']
         finished_pointings = [p for p in self.pointings if p.status in finished_statuses]
         if len(finished_pointings) == 0:
             latest_pointing = None
@@ -1295,7 +1366,8 @@ class Target(Base):
                 # Get the next time block from the one this Pointing used
                 next_block = strategy.get_next_block(latest_pointing.time_block)
             else:
-                # The Pointing was interrupted before it could complete or expire.
+                # The Pointing was interrupted before it could complete or expire,
+                # or it completed but was validated as bad and needs to be re-observed.
                 # Need to re-create the Pointing starting from the same time, using the same
                 # time block and try again.
                 start_time = latest_pointing.start_time

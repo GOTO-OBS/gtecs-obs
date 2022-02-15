@@ -1252,65 +1252,76 @@ class Target(Base):
             # All observations were completed (or we have no linked Strategies)
             return None
 
-        # Get the current and next TimeBlocks from the Strategy
-        current_block = strategy.get_current_block()
-        next_block = strategy.get_next_block()
+        # Get last "finished" Pointing for this Target (could be completed/interupted, or expired)
+        # The checks earlier should mean there aren't any pending or running Pointings,
+        # but we also want to ignore "deleted" Pointings when getting the times.
+        # NB This Pointing might have been observed under a different Strategy,
+        # so we can't just do current_block.pointings[-1] as we used to.
+        finished_statuses = ['completed', 'interupted', 'expired']
+        finished_pointings = [p for p in self.pointings if p.status in finished_statuses]
+        if len(finished_pointings) == 0:
+            latest_pointing = None
+        else:
+            latest_pointing = finished_pointings[-1]
 
         # Find the Pointing start_time
-        if current_block is None or len(current_block.pointings) == 0:
-            # No current block or Pointings, should only happen the first time
-            # So use the start_time from the Target
+        if latest_pointing is None:
+            # We haven't observed anything yet, so use the start_time from the Target
             start_time = self.start_time
+            # The "next" block should be the first one in the list
+            next_block = strategy.time_blocks[0]
         else:
-            latest_pointing = current_block.pointings[-1]
             # Decide to go onto the next block:
             #  - if the last block's pointing was completed, OR
             #  - if the last block's pointing's valid time has expired
             if latest_pointing.status in ['completed', 'expired']:
-                if current_block.valid_time > 0:
-                    # We want to start after the wait_time from the last Pointing's block.
-                    # We can't just use the stop_time, because it might have been set by the
-                    # Target's stop_time instead (see below).
-                    # So we take the previous Pointing's start time + the valid_time, then
-                    # add the wait_time.
+                # We want to start after "wait_time" from when the last Pointing was due to finish.
+                # (i.e. the stop_time, the end of its "block").
+                # But that might have been forshortened by the Target's stop_time, so we
+                # take the previous Pointing's start_time, add the valid time (if it has one) to
+                # get its nominal stop_time, then add the wait time.
+                if latest_pointing.time_block.valid_time is not None:
                     start_time = (Time(latest_pointing.start_time) +
-                                  current_block.valid_time * u.min +
-                                  current_block.wait_time * u.min)
+                                  latest_pointing.time_block.valid_time * u.min +
+                                  latest_pointing.time_block.wait_time * u.min)
                 else:
-                    # The valid_time means we have non-expiring Pointings.
-                    # So we just add the wait_time to the stopped_time of the previous Pointing.
-                    start_time = (Time(latest_pointing.stopped_time) +
-                                  current_block.wait_time * u.minute)
+                    # There was no set "block" for this Pointing, since it had no valid_time.
+                    # Note in this case it's impossible for the Pointing to be expired,
+                    # so it must have been completed and we want to start "wait_time" after
+                    # the time it was completed.
+                    start_time = (Time(latest_pointing.finished_time) +
+                                  latest_pointing.time_block.wait_time * u.minute)
+
+                # Get the next time block from the one this Pointing used
+                next_block = strategy.get_next_block(latest_pointing.time_block)
             else:
-                # The current block wasn't completed, and there's still time left
-                # (i.e. the Pointing was interrupted)
-                # Need to re-insert the current block with a new pointing
+                # The Pointing was interrupted before it could complete or expire.
+                # Need to re-create the Pointing starting from the same time, using the same
+                # time block and try again.
                 start_time = latest_pointing.start_time
+                next_block = latest_pointing.time_block
 
         # Find the Pointing stop_time
-        if next_block.valid_time < 0 and not self.stop_time:
-            # The valid_time is infinite and there's no Target stop_time,
-            # so the Pointings should never expire and they don't have a stop_time.
-            stop_time = None
+        if next_block.valid_time is not None:
+            # The stop_time is calculated by adding the valid_time to the start_time.
+            stop_time = Time(start_time) + next_block.valid_time * u.minute
+            if self.stop_time and stop_time > self.stop_time:
+                # The Pointing stop_time would overrun past when this Target is valid for,
+                # so we force it to stop at the earlier time.
+                stop_time = self.stop_time
         else:
-            if next_block.valid_time > 0:
-                # The stop_time is calculated by adding the valid_time to the start_time.
-                stop_time = Time(start_time) + next_block.valid_time * u.minute
-                if self.stop_time and stop_time > self.stop_time:
-                    # The Pointing stop_time would overrun past when this Target is valid for,
-                    # so we force it to stop at the earlier time.
-                    stop_time = self.stop_time
-            else:
+            if self.stop_time:
                 # The Target stop time takes priority over infinite valid time.
                 stop_time = self.stop_time
+            else:
+                # The Pointing should never expire, so it doesn't have a stop_time.
+                stop_time = None
 
-            if start_time >= stop_time:
-                # This can happen if the Target has a stop_time, the Pointing would be impossible.
-                return None
-
-        # Mark the new block as current
-        current_block.current = False
-        next_block.current = True
+        # Sanity check that the stop_time is after the start time.
+        # It can break if the Target has a stop_time, then the Pointing would be impossible.
+        if stop_time is not None and start_time >= stop_time:
+            # In this case there is no valid Pointing, so we have to return None.
+            return None
 
         # Now create the pointing
         new_pointing = Pointing(rank=self.current_rank,
@@ -1359,11 +1370,11 @@ class Strategy(Base):
         minimum time to wait between completed Pointings, in minutes.
         if the given `num_todo` is greater than times given the list will be looped.
         default = 0 (no delay)
-    valid_time : float or list of float, optional
+    valid_time : float or list of float or None, optional
         the amount of time Pointing should reamin valid in the queue, in minutes.
-        less than zero means valid indefinitely
+        less than zero or None means valid indefinitely
         if the given `num_todo` is greater than times given the list will be looped.
-        default = -1 (indefinitely valid)
+        default = None (indefinitely valid)
     min_time : float, optional
         minimum time desired when observing a Pointing, in seconds.
         if a Pointing is interrupted after observing for this time then it is marked as complete
@@ -1426,11 +1437,11 @@ class Strategy(Base):
 
     Methods
     -------
-    get_current_block() : TimeBlock, or None
+    get_current_block() : TimeBlock
         get the current TimeBlock
-    get_last_block() : TimeBlock, or None
+    get_last_block() : TimeBlock
         get the previous TimeBlock
-    get_next_block() : TimeBlock, or None
+    get_next_block() : TimeBlock
         get the upcoming TimeBlock
 
     """
@@ -1471,27 +1482,28 @@ class Strategy(Base):
 
     def __init__(self, **kwargs):
         # Get extra arguments (need to remove from kwargs before super init)
-        valid_times = kwargs.pop('valid_time') if 'valid_time' in kwargs else -1
-        if not isinstance(valid_times, list):
-            valid_times = [valid_times]
         wait_times = kwargs.pop('wait_time') if 'wait_time' in kwargs else 0
         if not isinstance(wait_times, list):
             wait_times = [wait_times]
+        valid_times = kwargs.pop('valid_time') if 'valid_time' in kwargs else None
+        if not isinstance(valid_times, list):
+            valid_times = [valid_times]
 
         # Init base class
         super().__init__(**kwargs)
 
-        # Create TimeBlocks
-        for i in range(max(len(valid_times), len(wait_times))):
-            valid = valid_times[i % len(valid_times)]
-            wait = wait_times[i % len(wait_times)]
-            # check if non-expiring
-            if valid < 0:
-                valid = -1
-            block = TimeBlock(block_num=i + 1, valid_time=valid, wait_time=wait)
-            self.time_blocks.append(block)
-        if len(self.time_blocks):
-            self.time_blocks[0].current = True
+        # Create TimeBlocks (if none were given)
+        if len(self.time_blocks) == 0:
+            for i in range(max(len(valid_times), len(wait_times))):
+                # Loop through lists to get values
+                valid = valid_times[i % len(valid_times)]
+                wait = wait_times[i % len(wait_times)]
+                # Allow negative values as None
+                if valid is not None and valid < 0:
+                    valid = None
+                # Create the block and add to list
+                block = TimeBlock(block_num=i + 1, valid_time=valid, wait_time=wait)
+                self.time_blocks.append(block)
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1654,85 +1666,35 @@ class Strategy(Base):
             tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
             self.tel_mask = tel_mask
 
-    def get_current_block(self):
-        """Return the current time block.
+    def get_block_by_number(self, block_num):
+        """Return the TimeBlock with the given number."""
+        if len(self.time_blocks) == 0:
+            # This shouldn't happen, since TimeBlocks are created on init
+            raise ValueError('Strategy has no linked TimeBlocks')
 
-        Assumes this object is still associated to an active session.
-
-        Returns
-        -------
-        current_block : `TimeBlock`
-            The current time block (may be None).
-
-        """
-        current_block = [block for block in self.time_blocks if block.current]
-        if len(current_block) == 0:
-            return None
-        elif len(current_block) > 1:
-            raise ValueError('Multiple time blocks marked as current')
+        time_block = [block for block in self.time_blocks if block.block_num == block_num]
+        if len(time_block) > 1:
+            raise ValueError('Multiple TimeBlocks with the same number: {}'.format(block_num))
         else:
-            return current_block[0]
+            return time_block[0]
 
-    def get_last_block(self):
-        """Return the last time block executed.
-
-        Assumes this object is still associated to an active session.
-
-        Returns
-        -------
-        last : `TimeBlock`
-            The last block done (may be None).
-
-        """
-        current_block = self.get_current_block()
-        if not current_block:
-            return None
-
-        current_num = current_block.block_num
-        if current_num == 1:
-            last_num = len(self.time_blocks)
+    def get_previous_block(self, block):
+        """Return the last TimeBlock executed before the current one."""
+        if block.block_num == 1:
+            # This is the first block, so loop back to the end
+            block_num = len(self.time_blocks)
         else:
-            last_num = current_num - 1
+            block_num = block.block_num - 1
+        return self.get_block_by_number(block_num)
 
-        last_block = [block for block in self.time_blocks
-                      if block.block_num == last_num][0]
-        return last_block
-
-    def get_next_block(self):
-        """Return the next time block to be executed.
-
-        Assumes this object is still associated to an active session.
-
-        Returns
-        -------
-        next_block : `TimeBlock`
-            The next block to do after the current one (may be None).
-
-        """
-        current_block = self.get_current_block()
-        if not current_block and self.num_completed > 0:
-            # no current block (for some reason, aside from just starting)
-            return None
-
-        elif not current_block or len(current_block.pointings) == 0:
-            # just starting
-            next_num = 1
-
-        elif self.num_remaining == 0:
-            # current block is the last one
-            return None
-
+    def get_next_block(self, block):
+        """Return the next TimeBlock to be executed after the given one."""
+        if block.block_num == len(self.time_blocks):
+            # This is the last block, so loop back to the start
+            block_num = 1
         else:
-            current_num = current_block.block_num
-            latest_pointing = current_block.pointings[-1]
-            if latest_pointing.status in ['completed', 'expired']:
-                next_num = (current_num % len(self.time_blocks)) + 1
-            else:
-                next_num = current_num
-
-        next_block = [block for block in self.time_blocks
-                      if block.block_num == next_num][0]
-        return next_block
+            block_num = block.block_num + 1
+        return self.get_block_by_number(block_num)
 
 
 class TimeBlock(Base):
@@ -1756,14 +1718,11 @@ class TimeBlock(Base):
     ----------
     block_num : int
         an integer indicating which block in a sequence this is
-    valid_time : float
+    valid_time : float or None
         amount of time a pointing in this block should stay valid in the queue, in minutes.
+        less than zero or None means valid indefinitely.
     wait_time : float
         time to wait after this block before allowing the next pointing, in minutes
-
-    current : bool, optional
-        True if this Time Block is the one that is currently linked to
-        a Pointing in the queue
 
     When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
@@ -1797,9 +1756,8 @@ class TimeBlock(Base):
 
     # Columns
     block_num = Column(Integer, nullable=False, index=True)
-    valid_time = Column(Float, nullable=False)
+    valid_time = Column(Float, nullable=True)
     wait_time = Column(Float, nullable=False)
-    current = Column(Boolean, nullable=False, index=True, default=False)
 
     # Foreign keys
     strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
@@ -1817,7 +1775,6 @@ class TimeBlock(Base):
                    'block_num={}'.format(self.block_num),
                    'valid_time={}'.format(self.valid_time),
                    'wait_time={}'.format(self.wait_time),
-                   'current={}'.format(self.current),
                    'strategy_id={}'.format(self.strategy_id),
                    ]
         return 'TimeBlock({})'.format(', '.join(strings))

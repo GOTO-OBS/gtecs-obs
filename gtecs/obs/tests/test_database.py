@@ -78,13 +78,16 @@ with db.open_session() as session:
     G = db.ExposureSet(num_exp=3, exptime=120, filt='G')
     B = db.ExposureSet(num_exp=3, exptime=120, filt='B')
     strategy = db.Strategy(num_todo=5,
-                           valid_time=[60, 120],
-                           wait_time=60,
+                           wait_time=[60, 120],
+                           valid_time=[None, 60, -1, 1],
                            )
     target = db.Target(name='M31',
                        ra=10.685,
                        dec=41.2875,
                        rank=9,
+                       start_time=Time('2020-01-01 00:00'),
+                       stop_time=None,
+                       creation_time=Time('2020-01-01 00:00'),  # Need to fake
                        user=user,
                        strategy=strategy,
                        exposure_sets=[L, R, G, B],
@@ -131,7 +134,7 @@ with db.open_session() as s:
         """Print a summary of the database."""
         print(now, end=' ')
         print(f'Target is {target.status.upper()}', end=', ')
-        print(f'completed {target.strategy.num_completed}/{target.strategy.num_todo} pointings')
+        print(f'completed {target.num_completed} pointings')
         print('                    ', end='')
         print('Pointings:', [p.status_at_time(now) for p in target.pointings])
         # print('                    Time blocks:')
@@ -151,7 +154,7 @@ with db.open_session() as s:
 
     while True:
         next_pointing = target.pointings[-1]
-        if next_pointing.status == 'upcoming':
+        if next_pointing.status_at_time(now) == 'upcoming':
             # skip ahead until the pointing is pending
             print(now, 'Skipping ahead to Pointing start time')
             now = Time(next_pointing.start_time) + 30 * u.s

@@ -1341,37 +1341,35 @@ class Target(Base):
             start_time = self.start_time
             # The "next" block should be the first one in the list
             next_block = strategy.time_blocks[0]
+        elif latest_pointing.status in ['interrupted', 'failed']:
+            # The Pointing was interrupted before it could complete or expire,
+            # or it completed but was validated as bad and needs to be re-observed.
+            # Need to re-create the Pointing starting from the same time, using the same
+            # time block and try again.
+            start_time = latest_pointing.start_time
+            next_block = latest_pointing.time_block
         else:
-            # Decide to go onto the next block:
-            #  - if the last block's pointing was completed, OR
-            #  - if the last block's pointing's valid time has expired
-            if latest_pointing.status in ['completed', 'expired']:
+            # We go onto the next block if the previous pointing was completed,
+            #  or if the previous pointing's valid time has expired.
+            if latest_pointing.time_block.valid_time is not None:
                 # We want to start after "wait_time" from when the last Pointing was due to finish.
                 # (i.e. the stop_time, the end of its "block").
                 # But that might have been forshortened by the Target's stop_time, so we
                 # take the previous Pointing's start_time, add the valid time (if it has one) to
                 # get its nominal stop_time, then add the wait time.
-                if latest_pointing.time_block.valid_time is not None:
-                    start_time = (Time(latest_pointing.start_time) +
-                                  latest_pointing.time_block.valid_time * u.min +
-                                  latest_pointing.time_block.wait_time * u.min)
-                else:
-                    # There was no set "block" for this Pointing, since it had no valid_time.
-                    # Note in this case it's impossible for the Pointing to be expired,
-                    # so it must have been completed and we want to start "wait_time" after
-                    # the time it was completed.
-                    start_time = (Time(latest_pointing.finished_time) +
-                                  latest_pointing.time_block.wait_time * u.minute)
-
-                # Get the next time block from the one this Pointing used
-                next_block = strategy.get_next_block(latest_pointing.time_block)
+                start_time = (Time(latest_pointing.start_time) +
+                              latest_pointing.time_block.valid_time * u.min +
+                              latest_pointing.time_block.wait_time * u.min)
             else:
-                # The Pointing was interrupted before it could complete or expire,
-                # or it completed but was validated as bad and needs to be re-observed.
-                # Need to re-create the Pointing starting from the same time, using the same
-                # time block and try again.
-                start_time = latest_pointing.start_time
-                next_block = latest_pointing.time_block
+                # There was no set "block" for this Pointing, since it had no valid_time.
+                # Note in this case it's impossible for the Pointing to be expired,
+                # so it must have been completed and we want to start "wait_time" after
+                # the time it was completed.
+                start_time = (Time(latest_pointing.finished_time) +
+                              latest_pointing.time_block.wait_time * u.minute)
+
+            # Get the next TimeBlock after the one this Pointing used
+            next_block = strategy.get_next_block(latest_pointing.time_block)
 
         # Find the Pointing stop_time
         if next_block.valid_time is not None:
@@ -1751,7 +1749,7 @@ class Strategy(Base):
             return time_block[0]
 
     def get_previous_block(self, block):
-        """Return the last TimeBlock executed before the current one."""
+        """Return the last TimeBlock executed before the given one."""
         if block.block_num == 1:
             # This is the first block, so loop back to the end
             block_num = len(self.time_blocks)

@@ -26,16 +26,7 @@ __all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
            'TRIGGERS']
 
 
-class Utf8Base:
-    """A simple base to force the table to use UTF8 encoding.
-
-    See https://stackoverflow.com/questions/63488890/
-    """
-
-    __table_args__ = {'mysql_default_charset': 'utf8'}
-
-
-Base = declarative_base(cls=Utf8Base)
+Base = declarative_base()
 
 
 class User(Base):

@@ -56,14 +56,17 @@ def create_database(overwrite=False, verbose=False):
     db_name = params.DATABASE_NAME
     engine = get_engine(db_name=None, echo=verbose)
     with engine.connect() as conn:
+        create_command = f'CREATE DATABASE `{db_name}`'
+        # Set default encoding to UTF8 (see https://dba.stackexchange.com/questions/76788)
+        create_command += 'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
         if not overwrite:
             try:
-                conn.execute(f'CREATE DATABASE `{db_name}`')  # will raise if it exists
+                conn.execute(create_command)  # will raise if it exists
             except ProgrammingError as err:
                 raise ValueError(f'WARNING: Database "{db_name}" already exists!') from err
         else:
             conn.execute(f'DROP DATABASE IF EXISTS `{db_name}`')
-            conn.execute(f'CREATE DATABASE `{db_name}`')
+            conn.execute(create_command)
 
 
 def fill_database(verbose=False):

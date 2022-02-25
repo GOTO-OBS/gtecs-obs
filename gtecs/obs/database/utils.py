@@ -164,16 +164,16 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
         lo_lim = Longitude(lst - hourangle_limit * u.hourangle).deg
         up_lim = Longitude(lst + hourangle_limit * u.hourangle).deg
         if up_lim > lo_lim:
-            queue = queue.filter(Pointing.target.has(Target.ra < up_lim),
-                                 Pointing.target.has(Target.ra > lo_lim))
+            queue = queue.filter(Pointing.ra < up_lim,
+                                 Pointing.ra > lo_lim)
         else:
-            queue = queue.filter(or_(Pointing.target.has(Target.ra < up_lim),
-                                     Pointing.target.has(Target.ra > lo_lim)))
+            queue = queue.filter(or_(Pointing.ra < up_lim,
+                                     Pointing.ra > lo_lim))
 
         # is latitude ever greater than limit?
         lat = location.lat.deg
-        queue = queue.filter(Pointing.target.has(Target.dec > lat - 90 + altitude_limit),
-                             Pointing.target.has(Target.dec < lat + 90 - altitude_limit))
+        queue = queue.filter(Pointing.dec > lat - 90 + altitude_limit,
+                             Pointing.dec < lat + 90 - altitude_limit)
 
     queue = queue.order_by('rank')
 

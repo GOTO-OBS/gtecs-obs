@@ -96,7 +96,7 @@ def write_flag_file(pointing, time, all_constraint_names, pointing_info):
                 stop = 'None'
             f.write('stop_time = ' + str(stop) + '<br>\n')
 
-            target = ICRS(pointing.target.ra * u.deg, pointing.target.dec * u.deg)
+            target = ICRS(pointing.ra * u.deg, pointing.dec * u.deg)
             ra = target.ra.to_string(sep=':', precision=2, unit=u.hour)
             dec = target.dec.to_string(sep=':', precision=2)
             f.write('ra = ' + ra + '<br>\n')
@@ -246,10 +246,10 @@ def write_queue_page(observer):
             write_exp_file(db_id, exposure_sets)
             exp_link = 'ID_{}_exp.html'.format(db_id)
             exp_str = ('<a href=' + exp_link + ' rel=\"#overlay\">' +
-                       str(pointing.target.name) + '</a>' + popup_str)
+                       str(pointing.name) + '</a>' + popup_str)
 
             # find ra/dec
-            target = ICRS(pointing.target.ra * u.deg, pointing.target.dec * u.deg)
+            target = ICRS(pointing.ra * u.deg, pointing.dec * u.deg)
             ra = target.ra.to_string(sep=':', precision=2, unit=u.hour)
             dec = target.dec.to_string(sep=':', precision=2)
 
@@ -258,11 +258,11 @@ def write_queue_page(observer):
             f.write('<td>' + exp_str + '</td>' +
                     '<td>' + ra + '</td>' +
                     '<td>' + dec + '</td>' +
-                    '<td>' + str(pointing.strategy.min_time) + '</td>' +
-                    '<td>' + str(pointing.strategy.min_alt) + '</td>' +
-                    '<td>' + str(pointing.strategy.max_sunalt) + '</td>' +
-                    '<td>' + str(pointing.strategy.max_moon) + '</td>' +
-                    '<td>' + str(pointing.strategy.min_moonsep) + '</td>' +
+                    '<td>' + str(pointing.min_time) + '</td>' +
+                    '<td>' + str(pointing.min_alt) + '</td>' +
+                    '<td>' + str(pointing.max_sunalt) + '</td>' +
+                    '<td>' + str(pointing.max_moon) + '</td>' +
+                    '<td>' + str(pointing.min_moonsep) + '</td>' +
                     '<td>' + str(username) + '</td>' +
                     '<td>' + str(pointing.start_time) + '</td>' +
                     '<td>' + str(pointing.stop_time) + '</td>' +

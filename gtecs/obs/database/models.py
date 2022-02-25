@@ -12,6 +12,7 @@ from gototile.grid import SkyGrid
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.mysql import TIMESTAMP
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import column_property, relationship, validates
@@ -305,6 +306,46 @@ class Pointing(Base):
     event : `Event`
         the Event the Target this Pointing was generated from was part of, if any
 
+    The following proxy attributes are attributes of related classes, and are included
+    as a useful shortcut (e.g. `pointing.ra` is the same as `pointing.target.ra`)
+
+    Proxy attributes
+    ----------------
+    name : str
+        object name
+        (inherited from linked Target)
+    ra : float, optional
+        J2000 right ascension in decimal degrees
+        (inherited from linked Target)
+    dec : float, optional
+        J2000 declination in decimal degrees
+        (inherited from linked Target)
+    weight : int, optional
+        weighting relative to other Targets in the same survey
+        (inherited from linked Target)
+
+    min_time : float, optional
+        minimum time desired when observing this Pointing, in seconds.
+        (inherited from linked Strategy)
+    too : bool, optional
+        indicates if this Pointing should be considered a Targets of Opportunity (ToO) or not.
+        (inherited from linked Strategy)
+    min_alt : float, optional
+        minimum altitude to observe at, degrees
+        (inherited from linked Strategy)
+    max_sunalt : float, optional
+        altitude constraint on Sun, degrees
+        (inherited from linked Strategy)
+    max_moon : string, optional
+        Moon constraint, one of 'D', 'G', 'B'
+        (inherited from linked Strategy)
+    min_moonsep : float, optional
+        distance constraint from the Moon, degrees
+        (inherited from linked Strategy)
+    tel_mask : int, optional
+        a binary mask which will determine which telescopes can carry out the observation
+        (inherited from linked Strategy)
+
     Methods
     -------
     status_at_time(time) : str
@@ -378,6 +419,7 @@ class Pointing(Base):
                              viewonly=True,
                              uselist=False,
                              )
+    grid_tile_id = association_proxy('grid_tile', 'db_id')
     survey = relationship('Survey',
                           lazy='joined',
                           secondary='targets',
@@ -387,6 +429,7 @@ class Pointing(Base):
                           viewonly=True,
                           uselist=False,
                           )
+    survey_id = association_proxy('survey', 'db_id')
     event = relationship('Event',
                          lazy='joined',
                          secondary='targets',
@@ -396,6 +439,20 @@ class Pointing(Base):
                          viewonly=True,
                          uselist=False,
                          )
+    event_id = association_proxy('event', 'db_id')
+
+    # Proxy attributes
+    name = association_proxy('target', 'name')
+    ra = association_proxy('target', 'ra')
+    dec = association_proxy('target', 'dec')
+    weight = association_proxy('target', 'weight')
+    min_time = association_proxy('strategy', 'min_time')
+    too = association_proxy('strategy', 'too')
+    min_alt = association_proxy('strategy', 'min_alt')
+    max_sunalt = association_proxy('strategy', 'max_sunalt')
+    max_moon = association_proxy('strategy', 'max_moon')
+    min_moonsep = association_proxy('strategy', 'min_moonsep')
+    tel_mask = association_proxy('strategy', 'tel_mask')
 
     def __init__(self, **kwargs):
         # Set default times
@@ -614,6 +671,26 @@ class Pointing(Base):
                  else_='pending')
         return c
 
+    @property
+    def valid_telescopes(self):
+        """Get a list of valid Telescope IDs, if any, based on the tel_mask."""
+        if self.tel_mask is None:
+            return None
+        tel_mask_str = str(bin(self.tel_mask))[2:]
+        valid_dict = {i + 1: bool(int(d)) for i, d in enumerate(tel_mask_str[::-1])}
+        return [tel for tel in valid_dict if valid_dict[tel] is True]
+
+    @valid_telescopes.setter
+    def valid_telescopes(self, telescope_ids):
+        if telescope_ids is None:
+            self.tel_mask = None
+        else:
+            if not isinstance(telescope_ids, (list, tuple)):
+                telescope_ids = [telescope_ids]
+            telescope_ids = {int(t) for t in telescope_ids}
+            tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
+            self.tel_mask = tel_mask
+
     def mark_deleted(self, time=None):
         """Mark this Pointing as deleted."""
         if time is None:
@@ -655,10 +732,10 @@ class Pointing(Base):
         if self.telescope is not None or self.telescope_id is not None:
             raise ValueError(f'Pointing is already linked to a Telescope: {self.telescope}')
 
-        if (self.strategy.valid_telescopes is not None and
-                telescope.db_id not in self.strategy.valid_telescopes):
+        if (self.valid_telescopes is not None and
+                telescope.db_id not in self.valid_telescopes):
             raise ValueError(f'Telescope ID ({telescope.db_id}) not in '
-                             f'list of valid telescopes ({self.strategy.valid_telescopes})')
+                             f'list of valid telescopes ({self.valid_telescopes})')
         if telescope.current_pointing is not None:
             pointing_id = telescope.current_pointing.db_id
             raise ValueError(f'Telescope is already observing Pointing ID {pointing_id}')
@@ -895,6 +972,7 @@ class Target(Base):
                         viewonly=True,
                         uselist=False,
                         )
+    grid_id = association_proxy('grid', 'db_id')
 
     # Column properties
     last_observed = column_property(select([Pointing.finished_time])
@@ -2269,7 +2347,7 @@ class GridTile(Base):
                                            )
                                     .order_by(Target.last_observed.desc())
                                     .limit(1)
-                                    .correlate_except(Pointing)
+                                    .correlate_except(Target)
                                     .scalar_subquery()
                                     )
 

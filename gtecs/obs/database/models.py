@@ -323,12 +323,19 @@ class Pointing(Base):
     weight : int, optional
         weighting relative to other Targets in the same survey
         (inherited from linked Target)
+    is_template : bool, optional
+        if True, this Pointing will count as a template for a linked GridTile
+        (inherited from linked Target)
 
     min_time : float, optional
         minimum time desired when observing this Pointing, in seconds.
         (inherited from linked Strategy)
     too : bool, optional
         indicates if this Pointing should be considered a Targets of Opportunity (ToO) or not.
+        (inherited from linked Strategy)
+    requires_template : bool, optional
+        if True, this Pointing won't be valid in the scheduler queue unless the linked GridTile
+        has at least 1 completed Pointing with `is_template=True`
         (inherited from linked Strategy)
     min_alt : float, optional
         minimum altitude to observe at, degrees
@@ -446,8 +453,10 @@ class Pointing(Base):
     ra = association_proxy('target', 'ra')
     dec = association_proxy('target', 'dec')
     weight = association_proxy('target', 'weight')
+    is_template = association_proxy('target', 'is_template')
     min_time = association_proxy('strategy', 'min_time')
     too = association_proxy('strategy', 'too')
+    requires_template = association_proxy('strategy', 'requires_template')
     min_alt = association_proxy('strategy', 'min_alt')
     max_sunalt = association_proxy('strategy', 'max_sunalt')
     max_moon = association_proxy('strategy', 'max_moon')
@@ -817,6 +826,10 @@ class Target(Base):
     weight : int, optional
         weighting relative to other Targets in the same survey
         default = 1
+    is_template : bool, optional
+        if True, completed Pointings for this Target will count as templates for their linked
+        GridTiles (this parameter is meaningless unless this Target is linked to a GridTile)
+        default = False
 
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
         UTC time from which Target is considered valid and can be started.
@@ -921,9 +934,11 @@ class Target(Base):
     name = Column(Text, nullable=False)
     ra = Column(Float, nullable=False)
     dec = Column(Float, nullable=False)
+    # # Scheduling
     rank = Column(Integer, nullable=True)
     rank_decay = Column(Boolean, nullable=False, default=True)
     weight = Column(Integer, nullable=False, default=1)
+    is_template = Column(Boolean, nullable=False, default=False)
     # # Constraints
     start_time = Column(DateTime, nullable=False, index=True, server_default=func.now())
     stop_time = Column(DateTime, nullable=True, index=True, default=None)
@@ -1513,6 +1528,10 @@ class Strategy(Base):
         Pointings which are ToOs can interupt lower-(or equal-) ranked Pointings in the scheduler
         queue.
         default = False
+    requires_template : bool, optional
+        if True, Pointings won't be valid in the scheduler queue unless their GridTile has at
+        least 1 completed Pointing with `is_template=True`
+        default = False
 
     min_alt : float, optional
         minimum altitude to observe at, degrees
@@ -1584,11 +1603,13 @@ class Strategy(Base):
     # # Basic properties
     num_todo = Column(Integer, nullable=False)
     stop_time = Column(DateTime, nullable=True, default=None)
-    # # Pointing properties
+    # # TimeBlock properties
     # wait_time - not stored in database (use TimeBlocks)
     # valid_time - not stored in database (use TimeBlocks)
+    # # Scheduling
     min_time = Column(Float, nullable=True, default=None)
     too = Column(Boolean, nullable=False, default=False)
+    requires_template = Column(Boolean, nullable=False, default=False)
     # # Observing constraints
     min_alt = Column(Float, nullable=False, default=params.DEFAULT_MIN_ALT)
     max_sunalt = Column(Float, nullable=False, default=params.DEFAULT_MAX_SUNALT)
@@ -2296,6 +2317,24 @@ class GridTile(Base):
     pointings : list of `Pointing`
         the Pointings that cover this GridTile, if any
 
+    Methods
+    -------
+    get_templates(telescope_id=None) : list of Pointings
+        returns any Pointings linked to this GridTile that have been successfully observed
+        (i.e. status=completed) and has is_template=True.
+        if a Telescope ID is given it will only return Pointings which have been observed
+        by the given Telescope.
+        see also the `get_templates_at_time()` method
+
+    has_template(telescope_id=None) : bool
+        returns True if at least one template Pointing has been observed (for the given Telescope).
+        equivalent to `GridTile.len(get_templates(telescope_id)) >= 1`.
+        see also the `has_template_at_time()` method
+
+    get_template_telescopes() : list of int
+        returns the Telescope IDs, if any, which have a completed template Pointing for this tile.
+        see also the `get_template_telescopes_at_time()` method
+
     """
 
     # Set corresponding SQL table name
@@ -2348,6 +2387,52 @@ class GridTile(Base):
                    'grid_id={}'.format(self.grid_id),
                    ]
         return 'GridTile({})'.format(', '.join(strings))
+
+    def get_templates(self, telescope_id=None):
+        """Return any completed template Pointings for this tile."""
+        if telescope_id is None:
+            return [p for p in self.pointings
+                    if (p.is_template is True and
+                        p.status == 'completed')
+                    ]
+        else:
+            return [p for p in self.pointings
+                    if (p.is_template is True and
+                        p.status == 'completed' and
+                        p.telescope_id == telescope_id)
+                    ]
+
+    def get_templates_at_time(self, time, telescope_id=None):
+        """Return any completed template Pointings for this tile at the given time."""
+        if telescope_id is None:
+            return [p for p in self.pointings
+                    if (p.is_template is True and
+                        p.status_at_time(time) == 'completed')
+                    ]
+        else:
+            return [p for p in self.pointings
+                    if (p.is_template is True and
+                        p.status_at_time(time) == 'completed' and
+                        p.telescope_id == telescope_id)
+                    ]
+
+    def has_template(self, telescope_id=None):
+        """Return True if this tile has any completed template Pointings."""
+        return len(self.get_templates(telescope_id)) >= 1
+
+    def has_template_at_time(self, time, telescope_id=None):
+        """Return True if this tile has any completed template Pointings at the given time."""
+        return len(self.get_templates_at_time(time, telescope_id)) >= 1
+
+    def get_template_telescopes(self):
+        """Return a list of Telescope IDs with completed template Pointings for this tile."""
+        pointings = self.get_templates(telescope_id=None)
+        return sorted({p.telescope.db_id for p in pointings})
+
+    def get_template_telescopes_at_time(self, time):
+        """Return a list of Telescope IDs with completed template Pointings at the given time."""
+        pointings = self.get_templates_at_time(time, telescope_id=None)
+        return sorted({p.telescope.db_id for p in pointings})
 
 
 class Survey(Base):

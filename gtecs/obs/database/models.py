@@ -674,22 +674,11 @@ class Pointing(Base):
     @property
     def valid_telescopes(self):
         """Get a list of valid Telescope IDs, if any, based on the tel_mask."""
-        if self.tel_mask is None:
-            return None
-        tel_mask_str = str(bin(self.tel_mask))[2:]
-        valid_dict = {i + 1: bool(int(d)) for i, d in enumerate(tel_mask_str[::-1])}
-        return [tel for tel in valid_dict if valid_dict[tel] is True]
+        return self.strategy.valid_telescopes
 
     @valid_telescopes.setter
     def valid_telescopes(self, telescope_ids):
-        if telescope_ids is None:
-            self.tel_mask = None
-        else:
-            if not isinstance(telescope_ids, (list, tuple)):
-                telescope_ids = [telescope_ids]
-            telescope_ids = {int(t) for t in telescope_ids}
-            tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
-            self.tel_mask = tel_mask
+        self.strategy.valid_telescopes = telescope_ids
 
     def mark_deleted(self, time=None):
         """Mark this Pointing as deleted."""

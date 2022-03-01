@@ -88,7 +88,7 @@ class Pointing:
 
     def __init__(self, db_id, name, ra, dec, rank, weight, num_obs, too,
                  mintime, maxsunalt, minalt, maxmoon, minmoonsep,
-                 start, stop, current, exp_sets):
+                 start, stop, current, valid_telescopes, template_telescopes, exp_sets):
         self.db_id = int(db_id)
         self.name = name
         self.ra = float(ra)
@@ -105,6 +105,8 @@ class Pointing:
         self.start = start
         self.stop = stop
         self.current = bool(current)
+        self.valid_telescopes = valid_telescopes
+        self.template_telescopes = template_telescopes
         self.exp_sets = exp_sets
 
     def __eq__(self, other):
@@ -153,6 +155,17 @@ class Pointing:
         min_alt = db_strategy.min_alt
         max_moon = db_strategy.max_moon
         min_moonsep = db_strategy.min_moonsep
+        valid_telescopes = db_strategy.valid_telescopes
+
+        # Get linked GridTile properties
+        if db_strategy.requires_template:
+            db_grid_tile = db_pointing.grid_tile
+            if db_grid_tile is not None:
+                template_telescopes = db_grid_tile.get_template_telescopes()
+            else:
+                template_telescopes = []
+        else:
+            template_telescopes = None  # no restriction
 
         # Get linked ExposureSet properties
         exp_sets = [(es.num_exp, es.exptime) for es in db_pointing.exposure_sets]
@@ -174,6 +187,8 @@ class Pointing:
                        start=start_time,
                        stop=stop_time,
                        current=current,
+                       valid_telescopes=valid_telescopes,
+                       template_telescopes=template_telescopes,
                        exp_sets=exp_sets,
                        )
         return pointing
@@ -208,7 +223,7 @@ class PointingQueue:
         return template.format(len(self.pointings))
 
     @classmethod
-    def from_database(cls, time, observer):
+    def from_database(cls, time, observer, telescope_id):
         """Create a Pointing Queue from current Pointings in the database.
 
         Parameters
@@ -216,7 +231,9 @@ class PointingQueue:
         time : `~astropy.time.Time`
             The time to fetch the queue for.
         observer : `astroplan.Observer`
-            The observer of the pointings
+            The observer of the pointings.
+        telescope_id : int
+            The telescope to fetch the queue for.
 
         Returns
         -------
@@ -228,6 +245,7 @@ class PointingQueue:
             current, pending = db.get_filtered_queue(session,
                                                      time=time,
                                                      location=observer.location,
+                                                     telescope_id=telescope_id,
                                                      altitude_limit=params.HARD_ALT_LIM,
                                                      hourangle_limit=params.HARD_HA_LIM)
 
@@ -252,7 +270,7 @@ class PointingQueue:
                        for p in self.pointings]
         self.finish_times = time + u.Quantity(obstime_arr, unit=u.s)
 
-    def apply_constraints(self, time, observer, horizon):
+    def apply_constraints(self, time, observer, telescope_id, horizon):
         """Check if the pointings are valid, both at start and end of expected observing period."""
         # Create Constraints
         self.constraints = {}
@@ -294,16 +312,26 @@ class PointingQueue:
         end_cons = ['SunAlt', 'MinAlt', 'ArtHoriz']
         end_cons_valid_arr = apply_constraints([self.constraints[name] for name in end_cons],
                                                observer, self.targets, self.finish_times)
+        end_cons = [name + '_end' for name in end_cons]
 
         # Apply time constraint
         time_cons = ['Time']
         time_cons_valid_arr = apply_constraints([self.constraints[name] for name in time_cons],
                                                 observer, self.targets, time)
 
+        # Calculate telescope constraints
+        telescope_cons = ['Telescope', 'Template']
+        telescope_cons_valid_arr = [[telescope_id in p.valid_telescopes
+                                     if p.valid_telescopes is not None else True,
+                                     telescope_id in p.template_telescopes
+                                     if p.template_telescopes is not None else True]
+                                    for p in self.pointings]
+        telescope_cons_valid_arr = np.array(telescope_cons_valid_arr)
+
         # Save constraint results on Pointings and calculate if they are valid
-        self.all_constraint_names = start_cons + time_cons + [name + '_end' for name in end_cons]
+        self.all_constraint_names = start_cons + time_cons + end_cons + telescope_cons
         for i, pointing in enumerate(self.pointings):
-            # start constraints (applies to everything)
+            # start constraints (apply to everything)
             pointing.constraint_names = list(start_cons)
             pointing.valid_arr = start_cons_valid_arr[i]
 
@@ -312,12 +340,19 @@ class PointingQueue:
                 pointing.constraint_names += time_cons
                 pointing.valid_arr = np.concatenate((pointing.valid_arr,
                                                      time_cons_valid_arr[i]))
-                pointing.constraint_names += [name + '_end' for name in end_cons]
+                pointing.constraint_names += end_cons
                 pointing.valid_arr = np.concatenate((pointing.valid_arr,
                                                     end_cons_valid_arr[i]))
 
+            # telescope constraints (apply to everything)
+            pointing.constraint_names += telescope_cons
+            pointing.valid_arr = np.concatenate((pointing.valid_arr,
+                                                 telescope_cons_valid_arr[i]))
+
             # save all constraint names on all
             pointing.all_constraint_names = self.all_constraint_names
+            pointing.constraint_dict = {name: valid for name, valid in
+                                        zip(pointing.constraint_names, pointing.valid_arr)}
 
             # finally find out if each pointing is valid or not
             pointing.valid = np.all(pointing.valid_arr)
@@ -368,13 +403,13 @@ class PointingQueue:
             pointing.tts = tts_arr[i]
             pointing.tiebreaker = tiebreak_arr[i]
 
-    def calculate(self, time, observer, horizon, readout_time):
+    def calculate(self, time, observer, telescope_id, horizon, readout_time):
         """Calculate pointing validities at the given time."""
         # Calculate the expected needed time to observe each Pointing
         self.calculate_times(time, readout_time)
 
         # Apply constraints to all Pointings
-        self.apply_constraints(time, observer, horizon)
+        self.apply_constraints(time, observer, telescope_id, horizon)
 
         # Calculate tiebreaker values for all Pointings
         self.calculate_tiebreakers(time, observer)
@@ -563,7 +598,7 @@ def what_to_do_next(current_pointing, highest_pointing, log=None):
     return new_pointing
 
 
-def check_queue(time=None, location=None, horizon=None, readout_time=10,
+def check_queue(telescope_id, time=None, location=None, horizon=None, readout_time=10,
                 write_file=True, write_html=False, log=None):
     """Check the queue and decide what to do.
 
@@ -573,6 +608,9 @@ def check_queue(time=None, location=None, horizon=None, readout_time=10,
 
     Parameters
     ----------
+    telescope_id : int
+        The ID number for the Telescope to fetch the queue for.
+
     time : `~astropy.time.Time`, optional
         The time to calculate the priorities at.
         Default is `astropy.time.Time.now()`.
@@ -621,12 +659,12 @@ def check_queue(time=None, location=None, horizon=None, readout_time=10,
         horizon = ([0, 90, 180, 270, 360], [horizon, horizon, horizon, horizon, horizon])
 
     # Import the queue from the database
-    queue = PointingQueue.from_database(time, observer)
+    queue = PointingQueue.from_database(time, observer, telescope_id)
     if len(queue) == 0:
         return None
 
     # Calculate pointing validity at the given time
-    queue.calculate(time, observer, horizon, readout_time)
+    queue.calculate(time, observer, telescope_id, horizon, readout_time)
 
     # Get the current pointing and the highest priority pointing
     current_pointing = queue.get_current_pointing()

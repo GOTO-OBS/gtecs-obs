@@ -10,21 +10,26 @@ from astropy.coordinates import EarthLocation
 from astropy.time import Time
 
 from gtecs.common.style import boldtxt, gtxt, rtxt, ytxt
+from gtecs.obs import database as db
 from gtecs.obs.scheduler import PointingQueue
 
 import numpy as np
 
 
-def run(time, observer, horizon, readout_time, limit=None):
+def run(time, observer, telescope_id, horizon, readout_time, limit=None):
     """Print the current queue."""
+    print(boldtxt('Pointings queue for Telescope {}'.format(telescope_id)), end='')
+    print(boldtxt(' at {} UTC'.format(time.iso)), end='')
+    print(': ')
+
     # Create Queue from DB
-    queue = PointingQueue.from_database(time, observer)
+    queue = PointingQueue.from_database(time, observer, telescope_id)
     if len(queue) == 0:
         print('No pointings in queue')
         return
 
     # Calculate pointing validity at the given time
-    queue.calculate(time, observer, horizon, readout_time)
+    queue.calculate(time, observer, telescope_id, horizon, readout_time)
 
     # Get the pointings, now with extra infomation
     pointing_list = list(queue.pointings)
@@ -38,8 +43,7 @@ def run(time, observer, horizon, readout_time, limit=None):
 
     # Print the pointings
     all_cons = {}
-    print(boldtxt('Pointings queue at {} UTC'.format(time.iso)), end='')
-    print(': {} pointings, {} valid'.format(n_pointings, n_valid))
+    print('{} pointings, {} valid'.format(n_pointings, n_valid))
     print('  db_id | {: >{w}} | Vld | Rnk | ToO | Nobs | TieBrk | Constraints'.format(
           'Object name', w=name_len))
     for pointing in pointing_list[:limit]:
@@ -63,6 +67,8 @@ def run(time, observer, horizon, readout_time, limit=None):
 
         for name, valid in cons:
             short_name = ''.join(c for c in name if not c.islower())
+            if len(short_name) == 1:
+                short_name = ''.join([c for c in name if c not in ('a', 'e', 'i', 'o', 'u')])[:3]
             if valid:
                 print(gtxt(short_name), end=' ')
             else:
@@ -85,7 +91,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     time_group = parser.add_mutually_exclusive_group()
-    time_group.add_argument('-t', '--time',
+    time_group.add_argument('-T', '--telescope', default=None,
+                            help='ID number for the telescope to get the queue for (default=all)')
+    time_group.add_argument('-t', '--time', default=None,
                             help='Time to check the queue at (default=Now)')
     time_group.add_argument('-s', '--sunalt', default=None,
                             help='Sun altitude to check the queue at (next)')
@@ -96,16 +104,21 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--readout-time', type=int, default=10,
                         help='The expected time between each exposure (default=10 seconds)')
     lines_group = parser.add_mutually_exclusive_group()
-    lines_group.add_argument('-n', '--lines', type=int, default=20,
+    lines_group.add_argument('-n', '--lines', type=int,
                              help='Number of lines to print (default=20)')
     lines_group.add_argument('-a', '--all', action='store_true', default=False,
                              help='Print all items in the queue')
     args = parser.parse_args()
 
+    if args.telescope is not None:
+        telescope = int(args.telescope)
+    else:
+        telescope = None
+
     location = EarthLocation.of_site(args.site)
     observer = Observer(location)
 
-    if args.time:
+    if args.time is not None:
         time = Time(args.time)
     elif args.sunalt:
         sunalt = float(args.sunalt) * u.deg
@@ -128,7 +141,17 @@ if __name__ == '__main__':
         limit = -1
     elif args.lines:
         limit = args.lines
+    elif telescope is None:
+        limit = 5
     else:
         limit = 20
 
-    run(time, observer, horizon, readout_time, limit)
+    if telescope is not None:
+        # Just a single telescope ID
+        run(time, observer, telescope, horizon, readout_time, limit)
+    else:
+        # Want to get queue for all telescopes in the DB
+        with db.open_session() as session:
+            all_telescopes = session.query(db.Telescope).all()
+            for telescope in all_telescopes:
+                run(time, observer, telescope.db_id, horizon, readout_time, limit)

@@ -32,7 +32,6 @@ with db.open_session() as session:
     # and two telescopes at that site
     t1 = db.Telescope(name='North Telescope', site=si)
     t2 = db.Telescope(name='South Telescope', site=si)
-    t2.site = si
 
     # and create a grid
     g = db.Grid(name='testgrid',
@@ -111,12 +110,20 @@ with db.open_session() as session:
     targets = [db.make_random_target(user) for _ in range(5)]
     db.insert_items(session, targets)
     for target in targets:
-        print(target, target.pointings)
+        print(target)
+        print(target.strategy)
+        print(target.pointings)
 
+    # make more targets, but only valid for a given telescope
     more_targets = [db.make_random_target(user) for _ in range(5)]
+    for i, target in enumerate(more_targets):
+        # alternate between tel 1 and tel 2
+        target.strategy.tel_mask = i % 2 + 1
     db.insert_items(session, more_targets)
     for target in more_targets:
-        print(target, target.pointings)
+        print(target)
+        print(target.strategy)
+        print(target.pointings)
 
     # now check how many pointings we have (should be 1 for each target)
     n_pointings = len(db.get_pointings(session))
@@ -126,6 +133,12 @@ with db.open_session() as session:
     current, pending = db.get_queue(session)
     n_queue = len(pending)
     print('{} pointings in queue'.format(n_queue))
+
+    # check how many are pending for each telescope
+    for telescope_id in [1, 2]:
+        current, pending = db.get_filtered_queue(session, telescope_id=telescope_id)
+        n_queue = len(pending)
+        print('{} pointings in queue for telescope {}'.format(n_queue, telescope_id))
 time.sleep(2)
 
 print('-------')

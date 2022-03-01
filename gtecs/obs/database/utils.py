@@ -77,15 +77,15 @@ def validate_user(session, username, password):
     return user.password_hash == hashlib.sha512(password.encode()).hexdigest()
 
 
-def get_filtered_queue(session, time=None, rank_limit=None, location=None,
+def get_filtered_queue(session, time=None, rank_limit=None, location=None, telescope_id=None,
                        altitude_limit=20, hourangle_limit=6, limit_number=None):
     """Get the currently valid queue, and filter against visibility and rank.
 
     The queue is defined as all pending pointings with a valid date range. We then filter
-    out tiles that are not visible, order by rank and limit by rank if requested.
+    out pointings that are not visible, order by rank and limit by rank if requested.
 
-    Note that rank limits are designed to not return low rank tiles, but *only* if higher
-    ranked tiles exist. If all tiles are below the rank limit, all tiles are returned.
+    Note that rank limits are designed to not return low rank pointings, but *only* if higher
+    ranked pointings exist. If all pointings are below the rank limit, all pointings are returned.
 
     Parameters
     ----------
@@ -98,10 +98,13 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
 
     rank_limit: int or None, default None
         Only return pointings with rank greater than given value.
-        If all tiles are below the rank limit, all tiles are returned.
+        If all pointings are below the rank limit, all pointings are returned.
 
     location : `~astropy.coordinates.EarthLocation`
         Location of observatory. If provided, only visible pointings are returned.
+
+    telescope_id : int or None
+        If given, only pointings set for the given telescope are returned.
 
     altitude_limit : float
         If filtering by visibility, only pointings which ever rise above this altitude are returned
@@ -157,7 +160,7 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
     # are we before the stop time (if any)?
     queue = queue.filter(or_(Pointing.stop_time > now, Pointing.stop_time == None))  # noqa: E711
 
-    # now limit by RA and Dec (note use of .has() for Target properties)
+    # now limit by RA and Dec
     if location is not None:
         # local sidereal time, units of degrees
         lst = time.sidereal_time('mean', location.lon)
@@ -174,6 +177,10 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None,
         lat = location.lat.deg
         queue = queue.filter(Pointing.dec > lat - 90 + altitude_limit,
                              Pointing.dec < lat + 90 - altitude_limit)
+
+    # limit by telescope ID
+    if telescope_id is not None:
+        queue = queue.filter(Pointing.tel_is_valid(telescope_id))
 
     queue = queue.order_by('rank')
 

@@ -689,6 +689,15 @@ class Pointing(Base):
     def valid_telescopes(self, telescope_ids):
         self.strategy.valid_telescopes = telescope_ids
 
+    @hybrid_method
+    def tel_is_valid(self, telescope_id):
+        """Return True if the given Telescope ID is valid, based on the tel_mask."""
+        return self.strategy.tel_is_valid(telescope_id)
+
+    @tel_is_valid.expression
+    def tel_is_valid(self, telescope_id):
+        return self.strategy.has(Strategy.tel_is_valid(telescope_id).is_(True))
+
     def mark_deleted(self, time=None):
         """Mark this Pointing as deleted."""
         if time is None:
@@ -1814,6 +1823,21 @@ class Strategy(Base):
             telescope_ids = {int(t) for t in telescope_ids}
             tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
             self.tel_mask = tel_mask
+
+    @hybrid_method
+    def tel_is_valid(self, telescope_id):
+        """Return True if the given Telescope ID is valid, based on the tel_mask."""
+        if self.tel_mask is None:
+            return True
+        else:
+            return bool(self.tel_mask & 1 << int(telescope_id) - 1)
+
+    @tel_is_valid.expression
+    def tel_is_valid(self, telescope_id):
+        return case([(self.tel_mask.is_(None), True)],
+                    else_=self.tel_mask.op('&', precedence=2, is_comparison=True)(1)
+                                       .op('<<', precedence=1)(telescope_id - 1)
+                    )
 
     def get_block_by_number(self, block_num):
         """Return the TimeBlock with the given number."""

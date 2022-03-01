@@ -52,8 +52,9 @@ def run(overwrite=False, add_defaults=False, verbose=False):
         goto3 = db.Telescope(name='GOTO-3', site=site2, grid=grid)
         goto4 = db.Telescope(name='GOTO-4', site=site2, grid=grid)
 
-        with db.open_session() as session:
-            db.insert_items(session, [site1, site2, grid, goto1, goto2, goto3, goto4])
+        # We need to be specific about the order for the IDs to be correct...
+        for tel in [goto1, goto2, goto3, goto4]:
+            session.add(tel)
             session.commit()
 
     print('Done')

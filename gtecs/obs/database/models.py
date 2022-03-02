@@ -786,10 +786,10 @@ class Pointing(Base):
             raise ValueError(f'Pointing was interrupted (at {self.finished_time})')
         if self.status_at_time(time) != 'completed':
             raise ValueError('Pointing is not completed (use mark_finished before validating)')
-        if self.validated_time is not None and self.validated_time > time:
-            raise ValueError('Pointing has already been validated (at {self.validated_time})')
+        if self.validation_time is not None and self.validation_time > time:
+            raise ValueError('Pointing has already been validated (at {self.validation_time})')
 
-        self.validated_time = time
+        self.validation_time = time
         self.valid = good
 
     def get_obstime(self, readout_time=15):

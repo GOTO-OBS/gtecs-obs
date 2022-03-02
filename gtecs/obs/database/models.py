@@ -988,6 +988,24 @@ class Target(Base):
     grid_id = association_proxy('grid', 'db_id')
 
     # Column properties
+    scheduled = column_property(exists()
+                                .where(and_(Pointing.target_id == db_id,
+                                            or_(Pointing.status == 'upcoming',
+                                                Pointing.status == 'pending',
+                                                Pointing.status == 'running',
+                                                )
+                                            )
+                                       )
+                                .correlate_except(Pointing)
+                                )
+    num_completed = column_property(select([func.count(Pointing.db_id)])
+                                    .where(and_(Pointing.target_id == db_id,
+                                                Pointing.status == 'completed',
+                                                )
+                                           )
+                                    .correlate_except(Pointing)
+                                    .scalar_subquery()
+                                    )
     last_observed = column_property(select([Pointing.finished_time])
                                     .where(and_(Pointing.target_id == db_id,
                                                 Pointing.status == 'completed',
@@ -998,6 +1016,14 @@ class Target(Base):
                                     .correlate_except(Pointing)
                                     .scalar_subquery()
                                     )
+    # Have to invert and return if any are incomplete, no way to do all()
+    # Also note we need to use text() because Strategies aren't defined yet
+    completed = column_property(~exists()
+                                .where(and_(Strategy.target_id == db_id,
+                                            Strategy.finished.is_(False),
+                                            )
+                                       )
+                                )
 
     def __init__(self, **kwargs):
         # Set default times
@@ -1083,19 +1109,21 @@ class Target(Base):
 
         return value
 
-    @hybrid_property
-    def scheduled(self):
-        """Return True if currently linked to a pending or running Pointing."""
-        return any(p.status in ['upcoming', 'pending', 'running'] for p in self.pointings)
+    # These have been replaced by a column property, which is a lot faster
 
-    @scheduled.expression
-    def scheduled(self):
-        return exists().where(and_(Pointing.target_id == self.db_id,
-                                   or_(Pointing.status == 'upcoming',
-                                       Pointing.status == 'pending',
-                                       Pointing.status == 'running',
-                                       )
-                                   ))
+    # @hybrid_property
+    # def scheduled(self):
+    #     """Return True if currently linked to a pending or running Pointing."""
+    #     return any(p.status in ['upcoming', 'pending', 'running'] for p in self.pointings)
+
+    # @scheduled.expression
+    # def scheduled(self):
+    #     return exists().where(and_(Pointing.target_id == self.db_id,
+    #                                or_(Pointing.status == 'upcoming',
+    #                                    Pointing.status == 'pending',
+    #                                    Pointing.status == 'running',
+    #                                    )
+    #                                ))
 
     @hybrid_method
     def scheduled_at_time(self, time):
@@ -1112,17 +1140,19 @@ class Target(Base):
                                        )
                                    ))
 
-    @hybrid_property
-    def num_completed(self):
-        """Return the number of Pointings successfully completed."""
-        return sum(p.status == 'completed' for p in self.pointings)
+    # These have been replaced by a column property, which is a lot faster
 
-    @num_completed.expression
-    def num_completed(self):
-        return select([func.count(Pointing.db_id)]).\
-            where(and_(Pointing.target_id == self.db_id,
-                       Pointing.status == 'completed',
-                       )).scalar_subquery()
+    # @hybrid_property
+    # def num_completed(self):
+    #     """Return the number of Pointings successfully completed."""
+    #     return sum(p.status == 'completed' for p in self.pointings)
+
+    # @num_completed.expression
+    # def num_completed(self):
+    #     return select([func.count(Pointing.db_id)]).\
+    #         where(and_(Pointing.target_id == self.db_id,
+    #                    Pointing.status == 'completed',
+    #                    )).scalar_subquery()
 
     @hybrid_method
     def num_completed_at_time(self, time):
@@ -1136,18 +1166,20 @@ class Target(Base):
                        Pointing.status_at_time(time) == 'completed',
                        ))
 
-    @hybrid_property
-    def completed(self):
-        """Are all Strategies linked to this Target completed (or expired)."""
-        # I guess we're completed by default if we have no Strategies, but it's not ideal...
-        return all(strategy.finished for strategy in self.strategies)
+    # These have been replaced by a column property, which is a lot faster
 
-    @completed.expression
-    def completed(self):
-        # Have to invert and return if any are incomplete
-        return ~exists().where(and_(Strategy.target_id == self.db_id,
-                                    Strategy.finished.is_(False)
-                                    ))
+    # @hybrid_property
+    # def completed(self):
+    #     """Are all Strategies linked to this Target completed (or expired)."""
+    #     # I guess we're completed by default if we have no Strategies, but it's not ideal...
+    #     return all(strategy.finished for strategy in self.strategies)
+
+    # @completed.expression
+    # def completed(self):
+    #     # Have to invert and return if any are incomplete, no way to do all()
+    #     return ~exists().where(and_(Strategy.target_id == self.db_id,
+    #                                 Strategy.finished.is_(False)
+    #                                 ))
 
     @hybrid_method
     def completed_at_time(self, time):
@@ -1638,6 +1670,16 @@ class Strategy(Base):
     pointings = relationship('Pointing', back_populates='strategy')
     time_blocks = relationship('TimeBlock', lazy='joined', back_populates='strategy')
 
+    # Column properties
+    num_completed = column_property(select([func.count(Pointing.db_id)])
+                                    .where(and_(Pointing.strategy_id == db_id,
+                                                Pointing.status == 'completed',
+                                                )
+                                           )
+                                    .correlate_except(Pointing)
+                                    .scalar_subquery()
+                                    )
+
     def __init__(self, **kwargs):
         # Get extra arguments (need to remove from kwargs before super init)
         wait_times = kwargs.pop('wait_time') if 'wait_time' in kwargs else 0
@@ -1702,17 +1744,19 @@ class Strategy(Base):
         """Return True if the number of Pointings to generate is infinite."""
         return self.num_todo < 0
 
-    @hybrid_property
-    def num_completed(self):
-        """Return the number of Pointings successfully completed."""
-        return sum(p.status == 'completed' for p in self.pointings)
+    # These have been replaced by a column property, which is a lot faster
 
-    @num_completed.expression
-    def num_completed(self):
-        return select([func.count(Pointing.db_id)]).\
-            where(and_(Pointing.strategy_id == self.db_id,
-                       Pointing.status == 'completed',
-                       )).scalar_subquery()
+    # @hybrid_property
+    # def num_completed(self):
+    #     """Return the number of Pointings successfully completed."""
+    #     return sum(p.status == 'completed' for p in self.pointings)
+
+    # @num_completed.expression
+    # def num_completed(self):
+    #     return select([func.count(Pointing.db_id)]).\
+    #         where(and_(Pointing.strategy_id == self.db_id,
+    #                    Pointing.status == 'completed',
+    #                    )).scalar_subquery()
 
     @hybrid_method
     def num_completed_at_time(self, time):

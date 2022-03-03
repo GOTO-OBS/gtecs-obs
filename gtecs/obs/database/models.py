@@ -1889,7 +1889,7 @@ class Target(Base):
 
         """
         # Already scheduled or finished, return None
-        if self.status not in ['upcoming', 'unscheduled']:
+        if self.status_at_time(time) not in ['upcoming', 'unscheduled']:
             return None
 
         # As a safety check, see if the Target has any other Pointings that
@@ -1899,7 +1899,7 @@ class Target(Base):
         # This should prevent the cases where Targets have multiple
         # Pointings in the queue, hopefully!
         if len(self.pointings) > 0:
-            statuses = [p.status for p in self.pointings]
+            statuses = [p.status_at_time(time) for p in self.pointings]
             if 'pending' in statuses or 'running' in statuses:
                 return None
 
@@ -1917,7 +1917,8 @@ class Target(Base):
         # NB This Pointing might have been observed under a different Strategy,
         # so we can't just do current_block.pointings[-1] as we used to.
         finished_statuses = ['completed', 'interrupted', 'failed', 'expired']
-        finished_pointings = [p for p in self.pointings if p.status in finished_statuses]
+        finished_pointings = [p for p in self.pointings
+                              if p.status_at_time(time) in finished_statuses]
         if len(finished_pointings) == 0:
             latest_pointing = None
         else:
@@ -1929,7 +1930,7 @@ class Target(Base):
             start_time = self.start_time
             # The "next" block should be the first one in the list
             next_block = strategy.time_blocks[0]
-        elif latest_pointing.status in ['interrupted', 'failed']:
+        elif latest_pointing.status_at_time(time) in ['interrupted', 'failed']:
             # The Pointing was interrupted before it could complete or expire,
             # or it completed but was validated as bad and needs to be re-observed.
             # Need to re-create the Pointing starting from the same time, using the same

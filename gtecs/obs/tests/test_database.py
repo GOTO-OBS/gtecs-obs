@@ -216,3 +216,208 @@ with db.open_session() as s:
     current, pending = db.get_queue(session)
     n_queue = len(pending)
     print('{} pointings in queue'.format(n_queue))
+time.sleep(2)
+
+print('-------')
+# Now let's run through a target again, but from the point of view of the pilot
+now = Time('2020-01-01 00:00')
+
+# First create a new, basic Target
+with db.open_session() as session:
+    user = db.get_user(session, username='test_user')
+
+    # Let's make an Target with ExposureSets in different filters
+    exps = db.ExposureSet(num_exp=3, exptime=120, filt='L')
+    strategy = db.Strategy(num_todo=5,
+                           wait_time=60,
+                           valid_time=None,
+                           )
+    target = db.Target(name='TEST',
+                       ra=0,
+                       dec=50,
+                       rank=9,
+                       start_time=now,
+                       stop_time=now + 1 * u.day,
+                       creation_time=now,  # Need to fake
+                       user=user,
+                       strategy=strategy,
+                       exposure_sets=[exps],
+                       )
+    session.add(target)
+    session.commit()
+
+    target_id = target.db_id
+    pointing_id = target.pointings[-1].db_id
+
+# ~~~~~~~~~~~
+# The first pointing should have been created and be pending
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check the pointing was created
+    if len(target.pointings) != 1 or target.pointings[0].status_at_time(now) != 'pending':
+        raise ValueError
+    if target.pointings[0].start_time != Time('2020-01-01 00:00'):
+        raise ValueError
+
+# ~~~~~~~~~~~
+# Let's go on 10 minutes, then mark it as running
+# now += 10 * u.minute  # We can't keep adding, the floating point errors add up too quickly
+now = Time('2020-01-01 00:10')
+db.mark_running(pointing_id, telescope_id=1, time=now)
+
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check it marked correctly
+    if target.pointings[0].status_at_time(now) != 'running':
+        raise ValueError
+    if target.pointings[0].running_time != Time('2020-01-01 00:10'):
+        raise ValueError
+
+# ~~~~~~~~~~~
+# Wait 5 minutes, mark it as completed
+now = Time('2020-01-01 00:15')
+db.mark_completed(pointing_id, time=now)
+
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check it marked correctly
+    if target.pointings[0].status_at_time(now) != 'completed':
+        raise ValueError
+    if target.pointings[0].finished_time != Time('2020-01-01 00:15'):
+        raise ValueError
+    # A new pointing should have been created, starting 60 minutes from now
+    if len(target.pointings) != 2 or target.pointings[1].status_at_time(now) != 'upcoming':
+        raise ValueError
+    if target.pointings[1].start_time != Time('2020-01-01 01:15'):
+        raise ValueError
+
+    # Get the new pointing ID
+    pointing_id = target.pointings[1].db_id
+
+# ~~~~~~~~~~~
+# Let's go on 65 minutes until after it's valid, then mark it as running
+now = Time('2020-01-01 01:20')
+db.mark_running(pointing_id, telescope_id=1, time=now)
+
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check it marked correctly
+    if target.pointings[1].status_at_time(now) != 'running':
+        raise ValueError
+    if target.pointings[1].running_time != Time('2020-01-01 01:20'):
+        raise ValueError
+
+# ~~~~~~~~~~~
+# Wait 3 minutes, mark it as interupted
+now = Time('2020-01-01 01:23')
+db.mark_interrupted(pointing_id, time=now)
+
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check it marked correctly
+    if target.pointings[1].status_at_time(now) != 'interrupted':
+        raise ValueError
+    if target.pointings[1].finished_time != Time('2020-01-01 01:23'):
+        raise ValueError
+    # A new pointing should have been created, starting at the previous start time
+    if len(target.pointings) != 3 or target.pointings[2].status_at_time(now) != 'pending':
+        raise ValueError
+    if target.pointings[2].start_time != Time('2020-01-01 01:15'):
+        raise ValueError
+
+    # Get the new pointing ID
+    pointing_id = target.pointings[2].db_id
+
+# ~~~~~~~~~~~
+# Let's wait for 2 minutes, then mark it as running
+now = Time('2020-01-01 01:25')
+db.mark_running(pointing_id, telescope_id=1, time=now)
+
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check it marked correctly
+    if target.pointings[2].status_at_time(now) != 'running':
+        raise ValueError
+    if target.pointings[2].running_time != Time('2020-01-01 01:25'):
+        raise ValueError
+
+# ~~~~~~~~~~~
+# Wait another 5 minutes, mark it as completed
+now = Time('2020-01-01 01:30')
+db.mark_completed(pointing_id, time=now)
+
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check it marked correctly
+    if target.pointings[2].status_at_time(now) != 'completed':
+        raise ValueError
+    if target.pointings[2].finished_time != Time('2020-01-01 01:30'):
+        raise ValueError
+    # A new pointing should have been created, starting 60 minutes from now
+    if len(target.pointings) != 4 or target.pointings[3].status_at_time(now) != 'upcoming':
+        raise ValueError
+    if target.pointings[3].start_time != Time('2020-01-01 02:30'):
+        raise ValueError
+
+# ~~~~~~~~~~~
+# Now let's wait 5 minutes and mark the previous pointing as failed
+now = Time('2020-01-01 01:35')
+db.mark_failed(pointing_id, time=now)
+
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check it marked correctly
+    if target.pointings[2].status_at_time(now) != 'failed':
+        raise ValueError
+    if target.pointings[2].validated_time != Time('2020-01-01 01:35'):
+        raise ValueError
+    # The previously pending pointing should have been deleted
+    if target.pointings[3].status_at_time(now) != 'deleted':
+        raise ValueError
+    # And a new pointing should have been created, re-using the previous start time
+    if len(target.pointings) != 5 or target.pointings[4].status_at_time(now) != 'pending':
+        raise ValueError
+    if target.pointings[4].start_time != Time('2020-01-01 01:15'):
+        raise ValueError
+
+# ~~~~~~~~~~~
+# Finally let's wait for a day so the Target should have expired
+now = Time('2020-01-02 01:35')
+
+with db.open_session() as session:
+    target = db.get_target_by_id(session, target_id)
+    print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
+    print()
+
+    # Check it marked correctly
+    if target.pointings[4].status_at_time(now) != 'expired':
+        raise ValueError
+    # it's now too late to do any more Pointings for this Target
+    if target.status_at_time(now) != 'expired':
+        raise ValueError
+    if target.num_completed != 1:
+        raise ValueError

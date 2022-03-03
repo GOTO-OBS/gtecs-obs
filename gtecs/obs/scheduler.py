@@ -16,12 +16,11 @@ from astropy.time import Time
 
 from erfa import ErfaWarning
 
-from gtecs.obs import database as db
-
 import numpy as np
 
 from scipy import interpolate
 
+from . import database as db
 from . import params
 from .astronomy import time_to_set
 from .html import write_queue_page

@@ -146,21 +146,15 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
     >>> current_job, pending_jobs = get_filtered_queue(session, limit_results=100)
 
     """
-    queue = session.query(Pointing)
-
-    # only get pending pointings
-    queue = queue.filter(Pointing.status == 'pending')
-
     if time is None:
         time = Time.now()
-    now = time.iso
 
-    # are we after the start time?
-    queue = queue.filter(Pointing.start_time < now)
-    # are we before the stop time (if any)?
-    queue = queue.filter(or_(Pointing.stop_time > now, Pointing.stop_time == None))  # noqa: E711
+    queue = session.query(Pointing)
 
-    # now limit by RA and Dec
+    # only get pending pointings (will account for start/stop times)
+    queue = queue.filter(Pointing.status_at_time(time) == 'pending')
+
+    # limit by RA and Dec
     if location is not None:
         # local sidereal time, units of degrees
         lst = time.sidereal_time('mean', location.lon)
@@ -198,7 +192,9 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
     pending_pointings = queue.all()
 
     # find the current pointing too, with a separate query
-    current_pointing = session.query(Pointing).filter(Pointing.status == 'running').one_or_none()
+    current_pointing = session.query(Pointing)\
+                              .filter(Pointing.status_at_time(time) == 'running')\
+                              .one_or_none()
 
     return current_pointing, pending_pointings
 

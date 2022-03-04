@@ -28,7 +28,7 @@ from .html import write_queue_page
 warnings.simplefilter('ignore', ErfaWarning)
 
 
-MOON_PHASES = {'B': 1, 'G': 0.65, 'D': 0.25}
+MOON_PHASES = {'B': 1, 'G': 0.65, 'D': 0.25}  # Should be in params?
 
 
 def apply_constraints(constraints, observer, targets, times):
@@ -80,6 +80,53 @@ class ArtificialHorizonConstraint(Constraint):
         altaz = _get_altaz(times, observer, targets)['altaz']
         alt_limit = self.get_alt_limit(altaz.az) * u.deg
         return altaz.alt > alt_limit
+
+
+class TelescopeConstraint:
+    """Ensure a Pointing is valid for the given telescope."""
+
+    def __init__(self, telescope_id):
+        self.telescope_id = telescope_id
+
+    def compute_constraint(self, pointing):
+        """Compute the constraint."""
+        if pointing.valid_telescopes is None:
+            # Doesn't have a restriction
+            return True
+        if self.telescope_id in pointing.valid_telescopes:
+            # The telescope is valid
+            return True
+        return False
+
+
+class TemplateConstraint:
+    """Ensure a Pointing has a valid template."""
+
+    def __init__(self, telescope_id, telescopes_at_site=None, requirement='ANY'):
+        self.telescope_id = telescope_id
+        self.telescopes_at_site = telescopes_at_site
+        if self.telescopes_at_site is None:
+            self.telescopes_at_site = [telescope_id]
+        if requirement not in ['ANY', 'TELESCOPE', 'SITE']:
+            raise ValueError('Invalid template requirement: {}'.format(requirement))
+        self.requirement = requirement
+
+    def compute_constraint(self, pointing):
+        """Compute the constraint."""
+        if pointing.template_telescopes is None:
+            # Doesn't need a template
+            return True
+        if self.requirement == 'ANY' and len(pointing.template_telescopes) > 0:
+            # At least one template has been observed for this tile
+            return True
+        if self.requirement == 'TELESCOPE' and self.telescope_id in pointing.template_telescopes:
+            # A template has been observed by the given telescope
+            return True
+        if self.requirement == 'SITE' and any(t in pointing.template_telescopes
+                                              for t in self.telescopes_at_site):
+            # A template has been observed by a telescope at the correct site
+            return True
+        return False
 
 
 class Pointing:
@@ -216,6 +263,9 @@ class PointingQueue:
         with db.open_session() as session:
             telescope = db.get_telescope_by_id(session, telescope_id)
             self.observer = Observer(telescope.site.location)
+            self.telescopes_at_site = [t.db_id for t in telescope.site.telescopes]
+            if self.telescope_id not in self.telescopes_at_site:
+                raise ValueError('Telescope is not correctly linked to Site')
 
     def __len__(self):
         return len(self.pointings)
@@ -289,7 +339,7 @@ class PointingQueue:
                        for p in self.pointings]
         self.finish_times = self.time + u.Quantity(obstime_arr, unit=u.s)
 
-    def apply_constraints(self, horizon):
+    def apply_constraints(self, horizon, template_requirement):
         """Check if the pointings are valid, both at start and end of expected observing period."""
         # Create Constraints
         self.constraints = {}
@@ -322,6 +372,14 @@ class PointingQueue:
                      scale='utc', format='datetime')
         self.constraints['Time'] = TimeConstraint(starts, stops)
 
+        # Telescope
+        self.constraints['Telescope'] = TelescopeConstraint(self.telescope_id)
+
+        # Template
+        self.constraints['Template'] = TemplateConstraint(self.telescope_id,
+                                                          self.telescopes_at_site,
+                                                          template_requirement)
+
         # Apply constraints at the start time (now)
         start_cons = ['SunAlt', 'MinAlt', 'ArtHoriz', 'Moon', 'MoonSep']
         start_cons_valid_arr = apply_constraints([self.constraints[name] for name in start_cons],
@@ -340,10 +398,8 @@ class PointingQueue:
 
         # Calculate telescope constraints
         telescope_cons = ['Telescope', 'Template']
-        telescope_cons_valid_arr = [[self.telescope_id in p.valid_telescopes
-                                     if p.valid_telescopes is not None else True,
-                                     self.telescope_id in p.template_telescopes
-                                     if p.template_telescopes is not None else True]
+        telescope_cons_valid_arr = [[self.constraints['Telescope'].compute_constraint(p),
+                                     self.constraints['Template'].compute_constraint(p)]
                                     for p in self.pointings]
         telescope_cons_valid_arr = np.array(telescope_cons_valid_arr)
 
@@ -422,13 +478,13 @@ class PointingQueue:
             pointing.tts = tts_arr[i]
             pointing.tiebreaker = tiebreak_arr[i]
 
-    def calculate(self, horizon, readout_time):
+    def calculate(self, horizon, readout_time, template_requirement):
         """Calculate pointing validities at the given time."""
         # Calculate the expected needed time to observe each Pointing
         self.calculate_times(readout_time)
 
         # Apply constraints to all Pointings
-        self.apply_constraints(horizon)
+        self.apply_constraints(horizon, template_requirement)
 
         # Calculate tiebreaker values for all Pointings
         self.calculate_tiebreakers()
@@ -676,7 +732,7 @@ def check_queue(telescope_id, time=None, horizon=None, readout_time=10,
         return None
 
     # Calculate pointing validity at the given time
-    queue.calculate(horizon, readout_time)
+    queue.calculate(horizon, params.READOUT_TIME, params.TEMPLATE_REQUIREMENT)
 
     # Get the current pointing and the highest priority pointing
     current_pointing = queue.get_current_pointing()

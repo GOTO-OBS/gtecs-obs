@@ -10,12 +10,13 @@ from astropy.time import Time
 
 from gtecs.common.style import boldtxt, gtxt, rtxt, ytxt
 from gtecs.obs import database as db
+from gtecs.obs import params
 from gtecs.obs.scheduler import PointingQueue
 
 import numpy as np
 
 
-def run(telescope_id, time, horizon, readout_time, limit=None):
+def run(telescope_id, time, horizon, readout_time, template_requirement, limit=None):
     """Print the current queue."""
     print(boldtxt('Pointings queue for Telescope {}'.format(telescope_id)), end='')
     print(boldtxt(' at {} UTC'.format(time.iso)), end='')
@@ -28,7 +29,7 @@ def run(telescope_id, time, horizon, readout_time, limit=None):
         return
 
     # Calculate pointing validity at the given time
-    queue.calculate(horizon, readout_time)
+    queue.calculate(horizon, readout_time, template_requirement)
 
     # Get the pointings, now with extra infomation
     pointing_list = list(queue.pointings)
@@ -100,8 +101,10 @@ if __name__ == '__main__':
                             help='Sun altitude to check the queue at (next)')
     parser.add_argument('-l', '--horizon-limit', type=int, default=30,
                         help='Telescope horizon limit (default=30 degrees)')
-    parser.add_argument('-r', '--readout-time', type=int, default=10,
-                        help='The expected time between each exposure (default=10 seconds)')
+    parser.add_argument('-r', '--readout-time', type=int, default=params.READOUT_TIME,
+                        help='The expected time between each exposure')
+    parser.add_argument('-p', '--templates', type=str, default=params.TEMPLATE_REQUIREMENT,
+                        help='Requirement for templates (ANY/SITE/TELESCOPE)')
     lines_group = parser.add_mutually_exclusive_group()
     lines_group.add_argument('-n', '--lines', type=int,
                              help='Number of lines to print (default=20)')
@@ -139,6 +142,7 @@ if __name__ == '__main__':
     min_alt = args.horizon_limit
     horizon = ([0, 90, 180, 270, 360], [min_alt, min_alt, min_alt, min_alt, min_alt])
     readout_time = args.readout_time
+    template_requirement = args.templates
 
     if args.all:
         limit = -1
@@ -148,4 +152,4 @@ if __name__ == '__main__':
         limit = int(20 / len(telescopes))
 
     for telescope_id in telescopes:
-        run(telescope_id, time, horizon, readout_time, limit)
+        run(telescope_id, time, horizon, readout_time, template_requirement, limit)

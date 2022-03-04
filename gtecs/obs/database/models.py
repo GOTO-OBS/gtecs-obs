@@ -618,6 +618,8 @@ class Pointing(Base):
     @hybrid_method
     def status_at_time(self, time):
         """Return a string giving the status at the given time (for testing and simulations)."""
+        if time is None:
+            return self.status
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
@@ -650,6 +652,8 @@ class Pointing(Base):
 
     @status_at_time.expression
     def status_at_time(self, time):
+        if time is None:
+            return self.status
         if isinstance(time, str):
             time = Time(time)
         if isinstance(time, Time):
@@ -1035,10 +1039,14 @@ class Strategy(Base):
     @hybrid_method
     def num_completed_at_time(self, time):
         """Return the number of Pointings successfully completed at the given time."""
+        if time is None:
+            return self.num_completed
         return sum(p.status_at_time(time) == 'completed' for p in self.pointings)
 
     @num_completed_at_time.expression
     def num_completed_at_time(self, time):
+        if time is None:
+            return self.num_completed
         return select([func.count(Pointing.db_id)]).\
             where(and_(Pointing.strategy_id == self.db_id,
                        Pointing.status_at_time(time) == 'completed',
@@ -1063,6 +1071,8 @@ class Strategy(Base):
     @hybrid_method
     def num_remaining_at_time(self, time):
         """Return the number of observations remaining at the given time."""
+        if time is None:
+            return self.num_remaining
         if self.infinite:
             return -1
         else:
@@ -1070,6 +1080,8 @@ class Strategy(Base):
 
     @num_remaining_at_time.expression
     def num_remaining_at_time(self, time):
+        if time is None:
+            return self.num_remaining
         return case([(self.infinite, -1)],
                     else_=self.num_todo - self.num_completed_at_time(time))
 
@@ -1100,6 +1112,8 @@ class Strategy(Base):
     @hybrid_method
     def finished_at_time(self, time):
         """Return True if this Strategy is was completed or expired at the given time."""
+        if time is None:
+            return self.finished
         if self.num_remaining_at_time(time) == 0:
             return True
         elif self.stop_time is not None and time >= Time(self.stop_time):
@@ -1109,6 +1123,8 @@ class Strategy(Base):
 
     @finished_at_time.expression
     def finished_at_time(self, time):
+        if time is None:
+            return self.finished
         if isinstance(time, str):
             time = Time(time)
         if isinstance(time, Time):
@@ -1602,11 +1618,15 @@ class Target(Base):
     @hybrid_method
     def scheduled_at_time(self, time):
         """Return True if linked to a pending or running Pointing at the given time."""
+        if time is None:
+            return self.scheduled
         return any(p.status_at_time(time) in ['upcoming', 'pending', 'running']
                    for p in self.pointings)
 
     @scheduled_at_time.expression
     def scheduled_at_time(self, time):
+        if time is None:
+            return self.scheduled
         return exists().where(and_(Pointing.target_id == self.db_id,
                                    or_(Pointing.status_at_time(time) == 'upcoming',
                                        Pointing.status_at_time(time) == 'pending',
@@ -1631,10 +1651,14 @@ class Target(Base):
     @hybrid_method
     def num_completed_at_time(self, time):
         """Return the number of Pointings successfully completed at the given time."""
+        if time is None:
+            return self.num_completed
         return sum(p.status_at_time(time) == 'completed' for p in self.pointings)
 
     @num_completed_at_time.expression
     def num_completed_at_time(self, time):
+        if time is None:
+            return self.num_completed
         return select([func.count(Pointing.db_id)]).\
             where(and_(Pointing.target_id == self.db_id,
                        Pointing.status_at_time(time) == 'completed',
@@ -1658,10 +1682,14 @@ class Target(Base):
     @hybrid_method
     def completed_at_time(self, time):
         """Were all Strategies linked to this Target completed (or expired) at the given time."""
+        if time is None:
+            return self.completed
         return all(strategy.finished_at_time(time) for strategy in self.strategies)
 
     @completed_at_time.expression
     def completed_at_time(self, time):
+        if time is None:
+            return self.completed
         return ~exists().where(and_(Strategy.target_id == self.db_id,
                                     Strategy.finished_at_time(time).is_(False)
                                     ))
@@ -1723,6 +1751,8 @@ class Target(Base):
     @hybrid_method
     def status_at_time(self, time):
         """Return a string giving the status at the given time (for testing and simulations)."""
+        if time is None:
+            return self.status
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
@@ -1746,6 +1776,8 @@ class Target(Base):
 
     @status_at_time.expression
     def status_at_time(self, time):
+        if time is None:
+            return self.status
         if isinstance(time, str):
             time = Time(time)
         if isinstance(time, Time):
@@ -1816,6 +1848,8 @@ class Target(Base):
         If False then it's just the Target's rank.
 
         """
+        if time is None:
+            return self.current_rank
         if self.rank is not None and self.rank_decay:
             return self.rank + 10 * self.num_completed_at_time(time)
         else:
@@ -1823,6 +1857,8 @@ class Target(Base):
 
     @current_rank_at_time.expression
     def current_rank_at_time(self, time):
+        if time is None:
+            return self.current_rank
         if isinstance(time, str):
             time = Time(time)
         if isinstance(time, Time):
@@ -2475,6 +2511,8 @@ class GridTile(Base):
 
     def get_templates_at_time(self, time, telescope_id=None):
         """Return any completed template Pointings for this tile at the given time."""
+        if time is None:
+            return self.get_templates(telescope_id)
         if telescope_id is None:
             return [p for p in self.pointings
                     if (p.is_template is True and
@@ -2493,6 +2531,8 @@ class GridTile(Base):
 
     def has_template_at_time(self, time, telescope_id=None):
         """Return True if this tile has any completed template Pointings at the given time."""
+        if time is None:
+            return self.has_template
         return len(self.get_templates_at_time(time, telescope_id)) >= 1
 
     def get_template_telescopes(self):
@@ -2502,6 +2542,8 @@ class GridTile(Base):
 
     def get_template_telescopes_at_time(self, time):
         """Return a list of Telescope IDs with completed template Pointings at the given time."""
+        if time is None:
+            return self.get_template_telescopes()
         pointings = self.get_templates_at_time(time, telescope_id=None)
         return sorted({p.telescope.db_id for p in pointings})
 

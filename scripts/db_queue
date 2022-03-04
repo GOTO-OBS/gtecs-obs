@@ -6,7 +6,6 @@ import argparse
 from astroplan import Observer
 
 from astropy import units as u
-from astropy.coordinates import EarthLocation
 from astropy.time import Time
 
 from gtecs.common.style import boldtxt, gtxt, rtxt, ytxt
@@ -16,26 +15,29 @@ from gtecs.obs.scheduler import PointingQueue
 import numpy as np
 
 
-def run(time, observer, telescope_id, horizon, readout_time, limit=None):
+def run(telescope_id, time, horizon, readout_time, limit=None):
     """Print the current queue."""
     print(boldtxt('Pointings queue for Telescope {}'.format(telescope_id)), end='')
     print(boldtxt(' at {} UTC'.format(time.iso)), end='')
     print(': ')
 
     # Create Queue from DB
-    queue = PointingQueue.from_database(time, observer, telescope_id)
+    queue = PointingQueue.from_database(telescope_id, time)
     if len(queue) == 0:
         print('No pointings in queue')
         return
 
     # Calculate pointing validity at the given time
-    queue.calculate(time, observer, telescope_id, horizon, readout_time)
+    queue.calculate(horizon, readout_time)
 
     # Get the pointings, now with extra infomation
     pointing_list = list(queue.pointings)
     pointing_list.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
     n_pointings = len(pointing_list)
     n_valid = len([p for p in pointing_list if p.valid])
+    print('{} pointings, {} valid'.format(n_pointings, n_valid))
+
+    # Limit to the given limit
     pointing_list = pointing_list[:limit]
 
     # Get the max name length, for nicer formatting
@@ -43,7 +45,6 @@ def run(time, observer, telescope_id, horizon, readout_time, limit=None):
 
     # Print the pointings
     all_cons = {}
-    print('{} pointings, {} valid'.format(n_pointings, n_valid))
     print('  db_id | {: >{w}} | Vld | Rnk | ToO | Nobs | TieBrk | Constraints'.format(
           'Object name', w=name_len))
     for pointing in pointing_list[:limit]:
@@ -97,8 +98,6 @@ if __name__ == '__main__':
                             help='Time to check the queue at (default=Now)')
     time_group.add_argument('-s', '--sunalt', default=None,
                             help='Sun altitude to check the queue at (next)')
-    parser.add_argument('-S', '--site', type=str, default='lapalma',
-                        help='Site to observe from (default="LaPalma")')
     parser.add_argument('-l', '--horizon-limit', type=int, default=30,
                         help='Telescope horizon limit (default=30 degrees)')
     parser.add_argument('-r', '--readout-time', type=int, default=10,
@@ -111,24 +110,28 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.telescope is not None:
-        telescope = int(args.telescope)
+        telescopes = [int(args.telescope)]
     else:
-        telescope = None
-
-    location = EarthLocation.of_site(args.site)
-    observer = Observer(location)
+        with db.open_session() as session:
+            all_telescopes = session.query(db.Telescope).all()
+            telescopes = [t.db_id for t in all_telescopes]
 
     if args.time is not None:
         time = Time(args.time)
     elif args.sunalt:
         sunalt = float(args.sunalt) * u.deg
-        time = Time.now()
-        if observer.sun_altaz(time).alt > sunalt:
-            # Sun is above, get next time it sets below
-            time = observer.sun_set_time(time, which='next', horizon=sunalt)
-        else:
-            # Sun is below, get next time it rises above
-            time = observer.sun_rise_time(time, which='next', horizon=sunalt)
+        now = Time.now()
+        if len(telescopes) > 1:
+            raise ValueError('Cannot use --sunalt flag with multiple telescopes')
+        with db.open_session() as session:
+            t = db.get_telescope_by_id(telescopes[0])
+            observer = Observer(t.site.location)
+            if observer.sun_altaz(now).alt > sunalt:
+                # Sun is above, get next time it sets below
+                time = observer.sun_set_time(now, which='next', horizon=sunalt)
+            else:
+                # Sun is below, get next time it rises above
+                time = observer.sun_rise_time(now, which='next', horizon=sunalt)
     else:
         time = Time.now()
     time.precision = 0
@@ -141,17 +144,8 @@ if __name__ == '__main__':
         limit = -1
     elif args.lines:
         limit = args.lines
-    elif telescope is None:
-        limit = 5
     else:
-        limit = 20
+        limit = int(20 / len(telescopes))
 
-    if telescope is not None:
-        # Just a single telescope ID
-        run(time, observer, telescope, horizon, readout_time, limit)
-    else:
-        # Want to get queue for all telescopes in the DB
-        with db.open_session() as session:
-            all_telescopes = session.query(db.Telescope).all()
-            for telescope in all_telescopes:
-                run(time, observer, telescope.db_id, horizon, readout_time, limit)
+    for telescope_id in telescopes:
+        run(telescope_id, time, horizon, readout_time, limit)

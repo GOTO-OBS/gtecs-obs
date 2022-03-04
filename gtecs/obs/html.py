@@ -146,7 +146,7 @@ def write_exp_file(db_id, exposure_sets):
             f.write("</table></body></html>")
 
 
-def write_queue_page(observer):
+def write_queue_page(queue):
     """Write the GOTO queue page."""
     # load any needed infomation saved by the scheduler
     time, all_constraint_names, pointing_list = import_queue_file()
@@ -183,10 +183,10 @@ def write_queue_page(observer):
         f.write('LST: ')
         import warnings
         warnings.simplefilter("ignore", UnicodeWarning)
-        lst = time.sidereal_time('mean', longitude=observer.location.lon)
+        lst = time.sidereal_time('mean', longitude=queue.observer.location.lon)
         f.write(lst.to_string(sep=':', precision=2))
 
-        altaz_frame = AltAz(obstime=time, location=observer.location)
+        altaz_frame = AltAz(obstime=time, location=queue.observer.location)
 
         f.write('  SunAlt: ')
         sun = get_sun(time)

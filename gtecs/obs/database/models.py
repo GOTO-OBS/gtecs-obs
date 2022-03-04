@@ -2101,7 +2101,9 @@ class Site(Base):
     @property
     def location(self):
         """Return an Astropy EarthLocation for this Site."""
-        return EarthLocation(self.latitude * u.deg, self.longitude * u.deg, self.height * u.m)
+        return EarthLocation.from_geodetic(lat=self.latitude * u.deg,
+                                           lon=self.longitude * u.deg,
+                                           height=self.height * u.m)
 
     @property
     def tel_mask(self):

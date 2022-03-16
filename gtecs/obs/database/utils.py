@@ -524,7 +524,7 @@ def mark_completed(pointing_id, schedule_next=True, time=None):
                 s.add(next_pointing)
 
 
-def mark_interrupted(pointing_id, schedule_next=True, time=None):
+def mark_interrupted(pointing_id, schedule_next=True, delay=None, time=None):
     """Update the given pointing's status to 'interrupted'.
 
     A utility function that creates its own session.
@@ -537,6 +537,11 @@ def mark_interrupted(pointing_id, schedule_next=True, time=None):
     schedule_next : bool, default=True
         If True, automatically create the next Pointing for the Target
         (unless it has no more to do).
+    delay : float, default=None
+        Time (in seconds) to delay the validity of the next Pointing from the time
+        the previous Pointing (i.e. the one we're marking) finished.
+        If None, the new Pointing takes the same start_time as the interrupted one.
+        Only relevant if schedule_next=True.
     time : str, `datetime.datetime`, `astropy.time.Time`, optional
         If given, the time to mark the Pointing as interrupted at.
 
@@ -547,7 +552,7 @@ def mark_interrupted(pointing_id, schedule_next=True, time=None):
         s.commit()
 
         if schedule_next:
-            next_pointing = pointing.target.get_next_pointing(time=time)
+            next_pointing = pointing.target.get_next_pointing(time=time, reschedule_delay=delay)
             if next_pointing is not None:
                 s.add(next_pointing)
 
@@ -593,7 +598,7 @@ def mark_confirmed(pointing_id, time=None):
         pointing.mark_validated(good=True, time=time)
 
 
-def mark_failed(pointing_id, schedule_next=True, time=None):
+def mark_failed(pointing_id, schedule_next=True, delay=None, time=None):
     """Validate the given pointing's data quality as poor, and needs re-observing.
 
     A utility function that creates its own session.
@@ -606,8 +611,13 @@ def mark_failed(pointing_id, schedule_next=True, time=None):
     schedule_next : bool, default=True
         If True, automatically create the next Pointing for the Target
         (unless it has no more to do).
+    delay : float, default=None
+        Time (in seconds) to delay the validity of the next Pointing from the time
+        the previous Pointing (i.e. the one we're marking) finished.
+        If None, the new Pointing takes the same start_time as the failed one.
+        Only relevant if schedule_next=True.
     time : str, `datetime.datetime`, `astropy.time.Time`, optional
-        If given, the time to mark the Pointing as interrupted at.
+        If given, the time to mark the Pointing as failed at.
 
     """
     with open_session() as s:
@@ -623,6 +633,6 @@ def mark_failed(pointing_id, schedule_next=True, time=None):
                     p.mark_deleted(time)
             s.commit()
 
-            next_pointing = pointing.target.get_next_pointing(time=time)
+            next_pointing = pointing.target.get_next_pointing(time=time, reschedule_delay=delay)
             if next_pointing is not None:
                 s.add(next_pointing)

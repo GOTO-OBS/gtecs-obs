@@ -381,9 +381,9 @@ with db.open_session() as session:
         raise ValueError
 
 # ~~~~~~~~~~~
-# Now let's wait 5 minutes and mark the previous pointing as failed
+# Now let's wait 5 minutes and mark the previous pointing as failed, and delay the new one by 1h
 now = Time('2020-01-01 01:35')
-db.mark_failed(pointing_id, time=now)
+db.mark_failed(pointing_id, time=now, delay=3600)
 
 with db.open_session() as session:
     target = db.get_target_by_id(session, target_id)
@@ -398,14 +398,14 @@ with db.open_session() as session:
     # The previously pending pointing should have been deleted
     if target.pointings[3].status_at_time(now) != 'deleted':
         raise ValueError
-    # And a new pointing should have been created, re-using the previous start time
-    if len(target.pointings) != 5 or target.pointings[4].status_at_time(now) != 'pending':
+    # And a new pointing should have been created, with the start time 1h after the last finished
+    if len(target.pointings) != 5 or target.pointings[4].status_at_time(now) != 'upcoming':
         raise ValueError
-    if target.pointings[4].start_time != Time('2020-01-01 01:15'):
+    if target.pointings[4].start_time != Time('2020-01-01 02:30'):
         raise ValueError
 
 # ~~~~~~~~~~~
-# Finally let's wait for a day so the Target should have expired
+# Finally let's wait for a day so the last Target should have expired
 now = Time('2020-01-02 01:35')
 
 with db.open_session() as session:

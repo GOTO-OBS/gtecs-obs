@@ -1904,12 +1904,15 @@ class Target(Base):
         """
         self.strategies = [strategy]
 
-    def get_next_pointing(self, time=None):
+    def get_next_pointing(self, time=None, reschedule_delay=None):
         """Retrieve the next Pointing which needs to be scheduled.
 
         The start and stop times of the Pointing are determined from
         the status of the previous Pointing and the TimeBlocks attached
         to the current Strategy.
+
+        If the previous Pointing was interupted or failed you can add an optional
+        delay (in seconds) to stop repeatedly observing poor patches of the sky.
 
         Assumes this object is still associated with an active session.
 
@@ -1969,9 +1972,15 @@ class Target(Base):
         elif latest_pointing.status_at_time(time) in ['interrupted', 'failed']:
             # The Pointing was interrupted before it could complete or expire,
             # or it completed but was validated as bad and needs to be re-observed.
-            # Need to re-create the Pointing starting from the same time, using the same
-            # time block and try again.
-            start_time = latest_pointing.start_time
+            if reschedule_delay is None:
+                # Re-create the Pointing starting from the same time and try again.
+                start_time = latest_pointing.start_time
+            else:
+                # We want to delay the Pointing becoming valid.
+                # So we'll take this delay from the time the Pointing was finished
+                # (interrupted sets finish_time, failed implies it was completed).
+                start_time = Time(latest_pointing.finished_time) + reschedule_delay * u.s
+            # Use the block as the previous Pointing
             next_block = latest_pointing.time_block
         else:
             # We go onto the next block if the previous pointing was completed,

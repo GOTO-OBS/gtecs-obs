@@ -77,8 +77,8 @@ with db.open_session() as session:
     G = db.ExposureSet(num_exp=3, exptime=120, filt='G')
     B = db.ExposureSet(num_exp=3, exptime=120, filt='B')
     strategy = db.Strategy(num_todo=5,
-                           wait_time=[60, 120],
-                           valid_time=[None, 60, -1, 1],
+                           wait_time=[1 * u.hour, 120 * u.min],
+                           valid_time=[None, 1 * u.hour, -1, 60],
                            )
     target = db.Target(name='M31',
                        ra=10.685,
@@ -229,7 +229,7 @@ with db.open_session() as session:
     # Let's make an Target with ExposureSets in different filters
     exps = db.ExposureSet(num_exp=3, exptime=120, filt='L')
     strategy = db.Strategy(num_todo=5,
-                           wait_time=60,
+                           wait_time=1 * u.hour,
                            valid_time=None,
                            )
     target = db.Target(name='TEST',

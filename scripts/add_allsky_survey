@@ -3,13 +3,15 @@
 
 import time
 
+import astropy.units as u
+
 from gtecs.obs import database as db
 
 
 TARGET_PARAMS = {'rank': None,  # Infinite rank == queue fillers
                  }
 STRATEGY_PARAMS = {'num_todo': -1,
-                   'wait_time': 4320,
+                   'wait_time': 72 * u.hour,
                    }
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]
 

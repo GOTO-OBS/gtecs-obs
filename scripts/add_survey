@@ -63,7 +63,7 @@ def fill_target():
                      }
     strategy_params = {'num_todo': None,
                        'wait_time': None,
-                       'valid_time': -1,  # Rarely ever not infinitely valid
+                       'valid_time': None,  # Rarely ever not infinitely valid
                        'too': False,  # Never ToO
                        'min_alt': None,
                        'max_sunalt': None,
@@ -95,9 +95,9 @@ def fill_target():
             print('Invalid input')
 
     while strategy_params['wait_time'] is None:
-        wait_time = input('Delay between observations (in days): ')
+        wait_time = input('Delay between observations (in hours): ')
         try:
-            strategy_params['wait_time'] = float(wait_time) * 24 * 60  # in minutes
+            strategy_params['wait_time'] = float(wait_time) * u.hour
         except Exception:
             print('Invalid input')
 

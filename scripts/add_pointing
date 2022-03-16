@@ -288,20 +288,20 @@ def fill_target(session):
     while daily not in ['y', 'n', 'Y', 'N']:
         daily = input('Use default cadence (once a night)? [y/n]: ')
     if daily in ['y', 'Y']:
-        strategy_params['valid_time'] = -1
-        strategy_params['wait_time'] = 1000  # ensures once a night
+        strategy_params['valid_time'] = None
+        strategy_params['wait_time'] = 16 * u.hour  # ensures once a night
     else:
         while strategy_params['valid_time'] is None:
-            valid_time = input('Time for the pointing to be valid for (minutes, -1=infinite): ')
+            valid_time = input('Time for the pointing to be valid for (hours, -1=infinite): ')
             try:
-                strategy_params['valid_time'] = int(valid_time)
+                strategy_params['valid_time'] = float(valid_time) * u.hour
             except Exception:
                 print('Invalid input')
 
         while strategy_params['wait_time'] is None:
-            wait_time = input('Time between visits (minutes, can be array, 0=no wait): ')
+            wait_time = input('Time(s) between visits (hours, split by ",", 0=no wait): ')
             try:
-                strategy_params['wait_time'] = [int(i) for i in wait_time.split(',')]
+                strategy_params['wait_time'] = [float(i) * u.hour for i in wait_time.split(',')]
             except Exception:
                 print('Invalid input')
 

@@ -828,17 +828,20 @@ class Strategy(Base):
         if not given then the Strategy is always valid (until it's completed)
         default = None
 
-    wait_time : float or list of float, optional
-        minimum time to wait between completed Pointings, in minutes.
+    wait_time : float, `astropy.units.Quantity` or list of same, optional
+        minimum time to wait between completed Pointings.
+        if a Quantity it should have units of time, if a float assume in seconds.
         if the given `num_todo` is greater than times given the list will be looped.
         default = 0 (no delay)
-    valid_time : float or list of float or None, optional
-        the amount of time Pointing should reamin valid in the queue, in minutes.
+    valid_time : float, `astropy.units.Quantity`, list of same, or None, optional
+        the amount of time Pointing should reamin valid in the queue.
+        if a Quantity it should have units of time, if a float assume in seconds.
         less than zero or None means valid indefinitely
         if the given `num_todo` is greater than times given the list will be looped.
         default = None (indefinitely valid)
-    min_time : float, optional
-        minimum time desired when observing a Pointing, in seconds.
+    min_time : float or `astropy.units.Quantity`, optional
+        minimum time desired when observing a Pointing.
+        if a Quantity it should have units of time, if a float assume in seconds.
         if a Pointing is interrupted after observing for this time then it is marked as complete
         instead of interrupted.
         default = None
@@ -961,10 +964,14 @@ class Strategy(Base):
     def __init__(self, **kwargs):
         # Get extra arguments (need to remove from kwargs before super init)
         wait_times = kwargs.pop('wait_time') if 'wait_time' in kwargs else 0
-        if not isinstance(wait_times, list):
-            wait_times = [wait_times]
         valid_times = kwargs.pop('valid_time') if 'valid_time' in kwargs else None
-        if not isinstance(valid_times, list):
+        try:
+            len(wait_times)
+        except TypeError:
+            wait_times = [wait_times]
+        try:
+            len(valid_times)
+        except TypeError:
             valid_times = [valid_times]
 
         # Init base class
@@ -972,15 +979,15 @@ class Strategy(Base):
 
         # Create TimeBlocks (if none were given)
         if len(self.time_blocks) == 0:
-            for i in range(max(len(valid_times), len(wait_times))):
+            for i in range(max(len(wait_times), len(valid_times))):
                 # Loop through lists to get values
-                valid = valid_times[i % len(valid_times)]
                 wait = wait_times[i % len(wait_times)]
+                valid = valid_times[i % len(valid_times)]
                 # Allow negative values as None
                 if valid is not None and valid < 0:
                     valid = None
                 # Create the block and add to list
-                block = TimeBlock(block_num=i + 1, valid_time=valid, wait_time=wait)
+                block = TimeBlock(block_num=i + 1, wait_time=wait, valid_time=valid)
                 self.time_blocks.append(block)
 
     def __repr__(self):
@@ -1014,6 +1021,21 @@ class Strategy(Base):
         else:
             # just hope the string works!
             value = str(field)
+
+        return value
+
+    @validates('min_time')
+    def validate_durations(self, key, field):
+        """Use validators to allow various types of input for time periods."""
+        if isinstance(field, u.Quantity):
+            # Should have units of time
+            if field.unit not in u.s.find_equivalent_units():
+                raise ValueError('{} does not have valid units of time: {}'.format(key, field.unit))
+            # Convert to seconds when storing in DB
+            value = float(field.to(u.s).value)
+        else:
+            # Assume it is already in seconds
+            value = float(field)
 
         return value
 
@@ -1225,11 +1247,15 @@ class TimeBlock(Base):
     ----------
     block_num : int
         an integer indicating which block in a sequence this is
-    valid_time : float or None
-        amount of time a pointing in this block should stay valid in the queue, in minutes.
+    wait_time : float or `astropy.units.Quantity`
+        time to wait after this block before allowing the next pointing.
+        if a Quantity it should have units of time, if a float assume in seconds.
+        default = 0 (no delay)
+    valid_time : float, `astropy.units.Quantity`, or None
+        amount of time a pointing in this block should stay valid in the queue.
+        if a Quantity it should have units of time, if a float assume in seconds.
         less than zero or None means valid indefinitely.
-    wait_time : float
-        time to wait after this block before allowing the next pointing, in minutes
+        default = None (indefinitely valid)
 
     When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
@@ -1263,8 +1289,8 @@ class TimeBlock(Base):
 
     # Columns
     block_num = Column(Integer, nullable=False, index=True)
-    valid_time = Column(Float, nullable=True)
     wait_time = Column(Float, nullable=False)
+    valid_time = Column(Float, nullable=True)
 
     # Foreign keys
     strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
@@ -1280,11 +1306,30 @@ class TimeBlock(Base):
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
                    'block_num={}'.format(self.block_num),
-                   'valid_time={}'.format(self.valid_time),
                    'wait_time={}'.format(self.wait_time),
+                   'valid_time={}'.format(self.valid_time),
                    'strategy_id={}'.format(self.strategy_id),
                    ]
         return 'TimeBlock({})'.format(', '.join(strings))
+
+    @validates('wait_time', 'valid_time')
+    def validate_durations(self, key, field):
+        """Use validators to allow various types of input for time periods."""
+        if key == 'valid_time' and field is None:
+            # valid_time is nullable, wait_time isn't
+            return None
+
+        if isinstance(field, u.Quantity):
+            # Should have units of time
+            if field.unit not in u.s.find_equivalent_units():
+                raise ValueError('{} does not have valid units of time: {}'.format(key, field.unit))
+            # Convert to seconds when storing in DB
+            value = float(field.to(u.s).value)
+        else:
+            # Assume it is already in seconds
+            value = float(field)
+
+        return value
 
 
 class Target(Base):
@@ -1992,15 +2037,15 @@ class Target(Base):
                 # take the previous Pointing's start_time, add the valid time (if it has one) to
                 # get its nominal stop_time, then add the wait time.
                 start_time = (Time(latest_pointing.start_time) +
-                              latest_pointing.time_block.valid_time * u.min +
-                              latest_pointing.time_block.wait_time * u.min)
+                              latest_pointing.time_block.valid_time * u.s +
+                              latest_pointing.time_block.wait_time * u.s)
             else:
                 # There was no set "block" for this Pointing, since it had no valid_time.
                 # Note in this case it's impossible for the Pointing to be expired,
                 # so it must have been completed and we want to start "wait_time" after
                 # the time it was completed.
                 start_time = (Time(latest_pointing.finished_time) +
-                              latest_pointing.time_block.wait_time * u.minute)
+                              latest_pointing.time_block.wait_time * u.s)
 
             # Get the next TimeBlock after the one this Pointing used
             next_block = strategy.get_next_block(latest_pointing.time_block)
@@ -2008,7 +2053,7 @@ class Target(Base):
         # Find the Pointing stop_time
         if next_block.valid_time is not None:
             # The stop_time is calculated by adding the valid_time to the start_time.
-            stop_time = Time(start_time) + next_block.valid_time * u.minute
+            stop_time = Time(start_time) + next_block.valid_time * u.s
             if self.stop_time and stop_time > self.stop_time:
                 # The Pointing stop_time would overrun past when this Target is valid for,
                 # so we force it to stop at the earlier time.

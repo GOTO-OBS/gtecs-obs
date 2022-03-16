@@ -10,6 +10,7 @@ import argparse
 import os
 import time
 
+import astropy.units as u
 from astropy.time import Time
 
 from gototile.skymap import SkyMap
@@ -20,7 +21,7 @@ from gtecs.obs import database as db
 TARGET_PARAMS = {'rank': 2,
                  }
 STRATEGY_PARAMS = {'num_todo': 5,
-                   'wait_time': 1440,
+                   'wait_time': 24 * u.hour,
                    }
 EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]
 

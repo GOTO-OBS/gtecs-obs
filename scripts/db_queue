@@ -11,7 +11,7 @@ from astropy.time import Time
 from gtecs.common.style import boldtxt, gtxt, rtxt, ytxt
 from gtecs.obs import database as db
 from gtecs.obs import params
-from gtecs.obs.scheduler import PointingQueue
+from gtecs.obs.scheduling import PointingQueue
 
 import numpy as np
 

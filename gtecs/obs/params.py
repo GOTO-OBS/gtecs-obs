@@ -19,6 +19,7 @@ if FILE_PATH in ['path_not_set', '/path/goes/here/']:
     raise ValueError('FILE_PATH not set, check config file ({})'.format(CONFIG_FILE))
 QUEUE_PATH = os.path.join(FILE_PATH, 'queue')
 HTML_PATH = os.path.join(FILE_PATH, 'html')
+LOG_PATH = os.path.join(FILE_PATH, 'logs')
 
 ############################################################
 # Database parameters

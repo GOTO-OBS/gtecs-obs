@@ -9,6 +9,8 @@ from astropy.time import Time
 
 from gototile.grid import SkyGrid
 
+import numpy as np
+
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.mysql import TIMESTAMP
@@ -2217,6 +2219,11 @@ class Telescope(Base):
     name : str
         name of this telescope (must be unique)
 
+    horizon : str, optional
+        local path to file containing the telescope artificial horizon
+        multiple paths can be included, separated by a ";"
+        default = None
+
     When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
 
@@ -2246,6 +2253,10 @@ class Telescope(Base):
         the binary telescope mask for this Telescope, based on the db_id
         only populated when the instance is added to the database
 
+    Methods
+    -------
+    get_horizon() : 2-tuple of lists, or list of same
+        get this Telescope's artificial horizon(s)
     """
 
     # Set corresponding SQL table name
@@ -2256,6 +2267,7 @@ class Telescope(Base):
 
     # Columns
     name = Column(String(255), nullable=False, unique=True, index=True)
+    horizon = Column(Text, nullable=True)
 
     # Foreign keys
     site_id = Column(Integer, ForeignKey('sites.id'), nullable=False)
@@ -2301,6 +2313,17 @@ class Telescope(Base):
         if self.db_id is None:
             raise ValueError('Telescope needs to be added to database to assign ID')
         return 2 ** (self.db_id - 1)
+
+    def get_horizon(self):
+        """Get the az/alt values of this Telescope's artificial horizon(s)."""
+        paths = self.horizon.split(';')
+        horizons = []
+        for path in paths:
+            azs, alts = np.loadtxt(path, usecols=(0, 1)).T
+            horizons.append((azs, alts))
+        if len(horizons) == 1:
+            return horizons[0]
+        return horizons
 
 
 class Grid(Base):

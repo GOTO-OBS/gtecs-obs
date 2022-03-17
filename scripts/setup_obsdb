@@ -2,10 +2,13 @@
 """Create a blank observing database."""
 
 import argparse
+import os
+import shutil
 
 from gototile.grid import SkyGrid
 
 from gtecs.obs import database as db
+from gtecs.obs import params
 
 
 def run(overwrite=False, add_defaults=False, verbose=False):
@@ -47,10 +50,23 @@ def run(overwrite=False, add_defaults=False, verbose=False):
                                     grid=grid)
             grid.grid_tiles.append(grid_tile)
 
-        goto1 = db.Telescope(name='GOTO-1', site=site1, grid=grid)
-        goto2 = db.Telescope(name='GOTO-2', site=site1, grid=grid)
-        goto3 = db.Telescope(name='GOTO-3', site=site2, grid=grid)
-        goto4 = db.Telescope(name='GOTO-4', site=site2, grid=grid)
+        # Copy default horizon files for each (if they don't already exist)
+        horizons = []
+        for tel_id in [1, 2, 3, 4]:
+            horizon_paths = []
+            for filename in ['horizon', 'horizon_shielding']:
+                default_file = os.path.join(params.FILE_PATH, filename + '_default')
+                new_file = os.path.join(params.FILE_PATH, filename + f'_{tel_id}')
+                if not os.path.exists(new_file):
+                    shutil.copy(default_file, new_file)
+                horizon_paths.append((new_file))
+            horizons.append(';'.join(horizon_paths))
+
+        # Create the telescopes
+        goto1 = db.Telescope(name='GOTO-1', horizon=horizons[0], site=site1, grid=grid)
+        goto2 = db.Telescope(name='GOTO-2', horizon=horizons[1], site=site1, grid=grid)
+        goto3 = db.Telescope(name='GOTO-3', horizon=horizons[2], site=site2, grid=grid)
+        goto4 = db.Telescope(name='GOTO-4', horizon=horizons[3], site=site2, grid=grid)
 
         # We need to be specific about the order for the IDs to be correct...
         for tel in [goto1, goto2, goto3, goto4]:

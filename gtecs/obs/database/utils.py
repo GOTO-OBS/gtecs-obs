@@ -17,7 +17,7 @@ __all__ = ['get_user', 'validate_user',
            'get_pointings', 'get_pointing_by_id',
            'get_targets', 'get_target_by_id',
            'get_exposure_set_by_id',
-           'get_telescope_by_id',
+           'get_telescope_by_id', 'get_telescopes',
            'get_current_grid', 'get_grid_tile_by_name',
            'get_events', 'delete_event_pointings',
            'insert_items',
@@ -386,6 +386,28 @@ def get_telescope_by_id(session, telescope_id):
     if not telescope:
         raise ValueError('No matching Telescope found')
     return telescope
+
+
+def get_telescopes():
+    """Get the key info on all the telescopes defined in the database.
+
+    A utility function that creates its own session.
+    """
+    data = {}
+    with open_session() as s:
+        telescopes = s.query(Telescope).all()
+        for telescope in telescopes:
+            tel_data = {}
+            tel_data['name'] = telescope.name
+            tel_data['status'] = telescope.status
+            if telescope.current_pointing is not None:
+                tel_data['current_pointing'] = telescope.current_pointing.db_id
+            else:
+                tel_data['current_pointing'] = None
+            tel_data['horizon'] = telescope.get_horizon()
+            tel_data['location'] = telescope.site.location
+            data[telescope.db_id] = tel_data
+    return data
 
 
 def get_current_grid(session):

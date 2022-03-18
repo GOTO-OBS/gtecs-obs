@@ -3,12 +3,13 @@
 import warnings
 
 from astropy import units as u
-from astropy.coordinates import GCRS, Longitude, get_sun
+from astropy.coordinates import AltAz, GCRS, Longitude, SkyCoord, get_sun
 from astropy.time import Time
-
 
 import numpy as np
 from numpy.polynomial.polynomial import polyval
+
+from scipy import interpolate
 
 
 def _equation_of_time(time):
@@ -150,3 +151,39 @@ def time_to_set(observer, targets, now):
     set_times = _rise_set_trig(now, targets, observer.location, 'next', 'setting')
     seconds_until_set = (set_times - now).to(u.s)
     return seconds_until_set
+
+
+def above_horizon(ra_deg, dec_deg, location, time=None, horizon=30):
+    """Check if the given coordinates are above the artificial horizon.
+
+    Parameters
+    ----------
+    ra_deg : float or numpy.ndarray
+        right ascension in degrees
+    dec_deg : float or numpy.ndarray
+        declination in degrees
+    location : `astropy.coordinates.EarthLocation`
+        location of the Observer
+    time : `~astropy.time.Time`, optional
+        time(s) to calculate at
+        default is `Time.now()`
+    horizon : float or tuple of (azs, alts), optional
+        artificial horizon, either a flat value or varying with azimuth.
+        default is a flat horizon of 30 deg
+
+    """
+    # Create a flat horizon if not given
+    if isinstance(horizon, (int, float)):
+        horizon = ([0, 90, 180, 270, 360], [horizon, horizon, horizon, horizon, horizon])
+
+    # Get current altaz
+    coord = SkyCoord(ra_deg * u.deg, dec_deg * u.deg)
+    frame = AltAz(obstime=time, location=location)
+    altaz = coord.transform_to(frame)
+
+    # Check if the altitude is above the horizon
+    get_alt_limit = interpolate.interp1d(*horizon,
+                                         bounds_error=False,
+                                         fill_value='extrapolate')
+    alt_limit = get_alt_limit(altaz.az) * u.deg
+    return altaz.alt > alt_limit

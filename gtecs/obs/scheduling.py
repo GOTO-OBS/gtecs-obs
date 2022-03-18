@@ -673,7 +673,8 @@ def what_to_do_next(current_pointing, highest_pointing, log=None):
     return new_pointing
 
 
-def check_queue(telescope_id, time=None, horizon=None, readout_time=10,
+def check_queue(telescope_id, time=None, horizon=None,
+                readout_time=10, template_requirement='ANY',
                 write_file=True, write_html=False, log=None):
     """Check the queue and decide what to do.
 
@@ -697,6 +698,11 @@ def check_queue(telescope_id, time=None, horizon=None, readout_time=10,
     readout_time : float, optional
         The time per exposure to add when calculating the expected time to observe a pointing.
         Default is 10 seconds.
+
+    template_requirement : string, optional
+        How strict to be when checking if templates exist.
+        Options are 'ANY', 'TELESCOPE' or 'SITE'.
+        Default is 'ANY'.
 
     write_file : bool, optional
         Should the scheduler write out the queue to a file?
@@ -732,7 +738,7 @@ def check_queue(telescope_id, time=None, horizon=None, readout_time=10,
         return None
 
     # Calculate pointing validity at the given time
-    queue.calculate(horizon, params.READOUT_TIME, params.TEMPLATE_REQUIREMENT)
+    queue.calculate(horizon, readout_time, template_requirement)
 
     # Get the current pointing and the highest priority pointing
     current_pointing = queue.get_current_pointing()

@@ -24,7 +24,7 @@ Once you've downloaded or cloned the repository, in the base directory run:
 
 You should then be able to import the module from within Python.
 
-Several scripts from the `scripts` folder should also be added to your path.
+Several scripts from the `scripts` folder should also be added to your path, in particular the `scheduler` script which will monitor the database and determine which pointings to observe (see **Usage** below).
 
 ### Setting up the database
 
@@ -48,4 +48,17 @@ Note this script assumes you start from a completely clean, empty database.
 
 ## Usage
 
-TODO
+To run the scheduler after the package is installed the script can be started with
+
+    scheduler start
+
+For a list of arguments use `scheduler help`.
+
+To have the scheduler run continuously as a system service edit the `scheduler.service` file to add your username (the default is `goto`, note you need to edit both the `User=` and `ExecStart=` entries), then copy it to the right location with
+
+    sudo cp scheduler.service /etc/systemd/system/
+
+Then enable and start the service with
+
+    sudo systemctl enable scheduler
+    sudo systemctl start scheduler

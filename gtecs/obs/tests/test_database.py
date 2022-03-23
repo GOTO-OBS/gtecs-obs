@@ -142,7 +142,7 @@ with db.open_session() as session:
 time.sleep(2)
 
 print('-------')
-with db.open_session() as s:
+with db.open_session() as session:
     def print_summary(target, now):
         """Print a summary of the database."""
         print(now, end=' ')
@@ -155,12 +155,12 @@ with db.open_session() as s:
         #     print('                    \t', (block.block_num, block.valid_time, block.wait_time,
         #                                      block.current))
 
-    target = db.get_target_by_id(s, 1)
+    target = db.get_target_by_id(session, 1)
     print(target)
     print(target.pointings, end='\n\n')
 
     # lets pretend we're observing with a telescope to check the triggers
-    t = db.get_telescope_by_id(s, 1)
+    t = db.get_telescope_by_id(session, 1)
     now = Time(target.start_time)
     print_summary(target, now)
     print()
@@ -177,7 +177,7 @@ with db.open_session() as s:
 
         print(now, f'Marking Pointing {next_pointing.db_id} as running')
         next_pointing.mark_running(telescope=t, time=now)
-        s.commit()
+        session.commit()
         print_summary(target, now)
         time.sleep(1)
         print()
@@ -187,7 +187,7 @@ with db.open_session() as s:
 
         print(now, f'Marking Pointing {next_pointing.db_id} as completed')
         next_pointing.mark_finished(completed=True, time=now)
-        s.commit()
+        session.commit()
         print_summary(target, now)
         time.sleep(1)
         print()
@@ -198,8 +198,8 @@ with db.open_session() as s:
             break
 
         print(now, 'Creating new Pointing')
-        s.add(next_pointing)
-        s.commit()
+        session.add(next_pointing)
+        session.commit()
         print_summary(target, now)
         time.sleep(1)
         print()
@@ -208,7 +208,7 @@ with db.open_session() as s:
         now = now + 30 * u.s
 
     # check the list of target to schedule is empty
-    targets_to_schedule = db.get_targets(s, status='unscheduled')
+    targets_to_schedule = db.get_targets(session, status='unscheduled')
     print('There are {} Targets to schedule'.format(len(targets_to_schedule)))
 
     n_pointings = len(db.get_pointings(session))

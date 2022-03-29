@@ -15,6 +15,7 @@ from .models import Event, ExposureSet, Grid, GridTile, Pointing, Target, Telesc
 __all__ = ['get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
+           'get_pointing_status', 'set_pointing_status',
            'get_targets', 'get_target_by_id',
            'get_exposure_set_by_id',
            'get_telescope_by_id', 'get_telescopes',
@@ -279,6 +280,19 @@ def get_pointing_by_id(session, pointing_id):
     if not pointing:
         raise ValueError('No matching Pointing found')
     return pointing
+
+
+def get_pointing_status(session, pointing_id):
+    """Get the status of a Pointing."""
+    pointing = get_pointing_by_id(session, pointing_id)
+    return pointing.status
+
+
+def set_pointing_status(session, pointing_id, status):
+    """Set the status of a Pointing."""
+    pointing = get_pointing_by_id(session, pointing_id)
+    pointing.status = status
+    return pointing.status
 
 
 def get_targets(session, target_ids=None, status=None):

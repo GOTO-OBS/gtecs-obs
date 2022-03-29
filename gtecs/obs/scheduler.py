@@ -223,6 +223,34 @@ class Scheduler:
         except AttributeError:
             return None
 
+    def get_pointing_status(self, pointing_id):
+        """Get the current status from the database.
+
+        This can be used by the remote pilots which can't otherwise access the database.
+
+        """
+        with db.open_session() as session:
+            return db.get_pointing_status(session, pointing_id)
+
+    def set_pointing_status(self, pointing_id, status):
+        """Set the status of the given pointing.
+
+        This can be used by the remote pilots which can't otherwise access the database.
+
+        """
+        with db.open_session() as session:
+            # Check if the status is already correct
+            current_status = db.get_pointing_status(session, pointing_id)
+            if current_status != status:
+                # Set the status, and return any errors
+                db.set_pointing_status(session, pointing_id, status)
+
+                # Force the queue to update
+                # Needed so that the next schedule check takes the update into account
+                self.force_check_flag = True
+                while self.check_time < self.loop_time:
+                    time.sleep(0.01)
+
 
 def run():
     """Start the scheduler."""

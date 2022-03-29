@@ -120,6 +120,8 @@ class Scheduler:
                 check_time = Time(self.check_time, format='unix')
                 new_pointings = self._get_pointings(check_time)
 
+                # TODO: send database reports to Slack every day?
+
                 # Write debug log line (TODO: improve, only log if something changed)
                 try:
                     self.log.debug(new_pointings)
@@ -191,7 +193,7 @@ class Scheduler:
 
     # Functions
     def check_queue(self, telescope_id, horizon=0, force_update=False):
-        """Return the current highest priority pointing for the given telescope.
+        """Return the ID of the current highest priority pointing for the given telescope.
 
         Note this returns immediately with what's been previously calculated by the scheduler,
         unless the `force_update` flag is set to True.
@@ -215,9 +217,11 @@ class Scheduler:
             while self.check_time < self.loop_time:
                 time.sleep(0.01)
 
-        # TODO: should this return the Pointing object, or some sort of dict?
-        #       could we return pointings for all horizons and let the user/pilot chose?
-        return self.latest_pointings[telescope_id][horizon]
+        pointing = self.latest_pointings[telescope_id][horizon]
+        try:
+            return pointing.db_id
+        except AttributeError:
+            return None
 
 
 def run():

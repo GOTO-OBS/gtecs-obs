@@ -5,6 +5,7 @@ import os
 from collections import Counter
 
 import astropy.units as u
+from astropy.coordinates import EarthLocation
 from astropy.time import Time
 
 from gtecs.common.slack import send_message
@@ -117,12 +118,12 @@ def send_database_report(slack_channel=None):
                 len(objects_counter), 's' if len(objects_counter) != 1 else '')
             # Print info for all objects
             text = '\n'
-            for object, count in objects_counter.most_common():
-                text += '- `{}`'.format(object)
+            for obj, count in objects_counter.most_common():
+                text += '- `{}`'.format(obj)
                 text += ' (_'
                 text += '{} pointing{}'.format(count, 's' if count != 1 else '')
                 object_pointings = [pointing for pointing in pointings
-                                    if pointing.object_name == object]
+                                    if pointing.object_name == obj]
                 ranks = sorted({p.rank for p in object_pointings})
                 text += ', rank={}{}'.format(ranks[0], '+' if len(ranks) > 1 else '')
                 text += '_)\n'
@@ -137,10 +138,16 @@ def send_database_report(slack_channel=None):
     send_slack_msg(msg, attachments=attachments, channel=slack_channel)
 
 
-def send_observation_report(date=None, alt_limit=30, sun_limit=-12, slack_channel=None):
+def send_observation_report(date=None, location=None, alt_limit=30, sun_limit=-12,
+                            slack_channel=None):
     """Send a Slack message containing last night's observation plots."""
     if date is None:
-        date = night_startdate()
+        now = datetime.datetime.utcnow()
+        if now.hour < 12:
+            now = now - datetime.timedelta(days=1)
+        date = now.strftime('%Y-%m-%d')
+    if location is None:
+        location = EarthLocation.of_site('lapalma')
 
     plot_direc = os.path.join(params.FILE_PATH, 'plots')
     if not os.path.exists(plot_direc):
@@ -156,7 +163,7 @@ def send_observation_report(date=None, alt_limit=30, sun_limit=-12, slack_channe
         grid = db_grid.get_skygrid()
 
         # Use Astroplan to get all the tiles that would have been visible last night
-        visible_tiles = grid.get_visible_tiles(observatory_location(),
+        visible_tiles = grid.get_visible_tiles(location,
                                                time_range=(Time(midday_yesterday),
                                                            Time(midday_today)),
                                                alt_limit=alt_limit,

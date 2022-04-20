@@ -14,6 +14,7 @@ from . import database as db
 from . import params
 from .astronomy import above_horizon
 from .scheduling import check_queue
+from .slack import send_slack_msg
 
 
 Pyro4.config.SERIALIZER = 'pickle'  # IMPORTANT - Can serialize Pointing objects
@@ -278,7 +279,7 @@ class Scheduler:
 def run():
     """Start the scheduler."""
     try:
-        # send_slack_msg('Scheduler started')
+        send_slack_msg('Scheduler started')
         scheduler = Scheduler()
         scheduler.run(params.PYRO_HOST, params.PYRO_PORT, params.PYRO_TIMEOUT)
     except Exception:
@@ -289,5 +290,5 @@ def run():
     finally:
         scheduler.shutdown()
         time.sleep(1)  # wait to stop threads
-        # send_slack_msg('Scheduler shutdown')
+        send_slack_msg('Scheduler shutdown')
         print('Scheduler done')

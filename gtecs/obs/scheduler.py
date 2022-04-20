@@ -114,7 +114,8 @@ class Scheduler:
                 self.check_time = self.loop_time
                 self.force_check_flag = False
 
-                # TODO: deal with expired Targets (and any other checks?)
+                # Caretaker step to deal with any unscheduled Targets with expired Pointings
+                self._caretaker()
 
                 # Get the queue and find highest priority Pointings for each telescope
                 check_time = Time(self.check_time, format='unix')
@@ -136,6 +137,17 @@ class Scheduler:
         return
 
     # Internal functions
+    def _caretaker(self):
+        """Schedule new Pointings for any unscheduled Targets."""
+        with db.open_session() as session:
+            unscheduled_targets = db.get_targets(session, status='unscheduled')
+            if len(unscheduled_targets) > 0:
+                self.log.info('Rescheduling {} unscheduled Targets'.format(
+                              len(unscheduled_targets)))
+                pointings = [target.get_next_pointing() for target in unscheduled_targets]
+                pointings = [p for p in pointings if p is not None]
+                db.insert_items(session, pointings)
+
     def _get_pointings(self, check_time):
         """Calculate what to observe for each telescope in the database."""
         tel_pointings = {tel_id: [None] for tel_id in self.tel_data}

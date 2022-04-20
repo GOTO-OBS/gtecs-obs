@@ -212,44 +212,55 @@ class Scheduler:
             default = False
 
         """
-        if force_update:
+        if force_update or self.force_check_flag:  # we might be waiting for a forced update
             self.force_check_flag = True
             while self.check_time < self.loop_time:
                 time.sleep(0.01)
 
         pointing = self.latest_pointings[telescope_id][horizon]
         try:
-            return pointing.db_id
+            pointing_id = pointing.db_id
+            pointing_info = db.get_pointing_info(pointing_id)
+            # Add any useful scheduling info
+            pointing_info['obstime'] = pointing.get_obstime(self.readout_time)
+
         except AttributeError:
             return None
 
-    def get_pointing_status(self, pointing_id):
-        """Get the current status from the database.
+    def get_pointing_info(self, pointing_id):
+        """Get info from the database for a given pointing.
 
-        This can be used by the remote pilots which can't otherwise access the database.
-
-        """
-        with db.open_session() as session:
-            return db.get_pointing_status(session, pointing_id)
-
-    def set_pointing_status(self, pointing_id, status):
-        """Set the status of the given pointing.
-
-        This can be used by the remote pilots which can't otherwise access the database.
+        This can be used by the remote clients which can't otherwise access the database.
 
         """
-        with db.open_session() as session:
-            # Check if the status is already correct
-            current_status = db.get_pointing_status(session, pointing_id)
-            if current_status != status:
-                # Set the status, and return any errors
-                db.set_pointing_status(session, pointing_id, status)
+        return db.get_pointing_info(pointing_id)
 
-                # Force the queue to update
-                # Needed so that the next schedule check takes the update into account
-                self.force_check_flag = True
-                while self.check_time < self.loop_time:
-                    time.sleep(0.01)
+    def mark_pointing_running(self, pointing_id, telescope_id):
+        """Mark the given pointing as running on the given telescope.
+
+        This can be used by the remote clients which can't otherwise access the database.
+
+        """
+        db.mark_pointing_running(pointing_id, telescope_id)
+        self.force_check_flag = True
+
+    def mark_pointing_completed(self, pointing_id):
+        """Mark the given pointing as completed.
+
+        This can be used by the remote clients which can't otherwise access the database.
+
+        """
+        db.mark_pointing_completed(pointing_id, schedule_next=True)
+        self.force_check_flag = True
+
+    def mark_pointing_interrupted(self, pointing_id):
+        """Mark the given pointing as interrupted.
+
+        This can be used by the remote clients which can't otherwise access the database.
+
+        """
+        db.mark_pointing_interrupted(pointing_id, schedule_next=True, delay=None)
+        self.force_check_flag = True
 
 
 def run():

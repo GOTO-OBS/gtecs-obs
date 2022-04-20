@@ -15,14 +15,14 @@ from .models import Event, ExposureSet, Grid, GridTile, Pointing, Target, Telesc
 __all__ = ['get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
            'get_pointings', 'get_pointing_by_id',
-           'get_pointing_status', 'set_pointing_status',
+           'mark_pointing_running', 'mark_pointing_completed', 'mark_pointing_interrupted',
+           'mark_pointing_confirmed', 'mark_pointing_failed',
            'get_targets', 'get_target_by_id',
            'get_exposure_set_by_id',
            'get_telescope_by_id', 'get_telescopes',
            'get_current_grid', 'get_grid_tile_by_name',
            'get_events', 'delete_event_pointings',
            'insert_items',
-           'mark_completed', 'mark_interrupted', 'mark_running', 'mark_confirmed', 'mark_failed',
            ]
 
 
@@ -282,17 +282,142 @@ def get_pointing_by_id(session, pointing_id):
     return pointing
 
 
-def get_pointing_status(session, pointing_id):
-    """Get the status of a Pointing."""
-    pointing = get_pointing_by_id(session, pointing_id)
-    return pointing.status
+def mark_pointing_running(pointing_id, telescope_id, time=None):
+    """Update the given pointing's status to 'running'.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+    telescope_id : int
+        the id number of the telescope the pointing is running on
+
+    time : str, `datetime.datetime`, `astropy.time.Time`, optional
+        If given, the time to mark the Pointing as interrupted at.
+
+    """
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
+        telescope = get_telescope_by_id(session, telescope_id)
+        pointing.mark_running(telescope, time=time)
+        session.commit()
 
 
-def set_pointing_status(session, pointing_id, status):
-    """Set the status of a Pointing."""
-    pointing = get_pointing_by_id(session, pointing_id)
-    pointing.status = status
-    return pointing.status
+def mark_pointing_completed(pointing_id, schedule_next=True, time=None):
+    """Update the given pointing's status to 'completed'.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    schedule_next : bool, optional
+        If True, automatically create the next Pointing for the Target
+        (unless it has no more to do).
+        default = True
+    time : str, `datetime.datetime`, `astropy.time.Time`, optional
+        If given, the time to mark the Pointing as completed at.
+
+    """
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
+        pointing.mark_finished(completed=True, time=time)
+        session.commit()
+
+        if schedule_next:
+            next_pointing = pointing.target.get_next_pointing(time=time)
+            if next_pointing is not None:
+                session.add(next_pointing)
+                session.commit()
+
+
+def mark_pointing_interrupted(pointing_id, schedule_next=True, delay=None, time=None):
+    """Update the given pointing's status to 'interrupted'.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    schedule_next : bool, default=True
+        If True, automatically create the next Pointing for the Target
+        (unless it has no more to do).
+    delay : float, default=None
+        Time (in seconds) to delay the validity of the next Pointing from the time
+        the previous Pointing (i.e. the one we're marking) finished.
+        If None, the new Pointing takes the same start_time as the interrupted one.
+        Only relevant if schedule_next=True.
+    time : str, `datetime.datetime`, `astropy.time.Time`, optional
+        If given, the time to mark the Pointing as interrupted at.
+
+    """
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
+        pointing.mark_finished(completed=False, time=time)
+        session.commit()
+
+        if schedule_next:
+            next_pointing = pointing.target.get_next_pointing(time=time, reschedule_delay=delay)
+            if next_pointing is not None:
+                session.add(next_pointing)
+                session.commit()
+
+
+def mark_pointing_confirmed(pointing_id, time=None):
+    """Validate the given pointing's data as confirmed to be good quality.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    time : str, `datetime.datetime`, `astropy.time.Time`, optional
+        If given, the time to mark the Pointing as interrupted at.
+
+    """
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
+        pointing.mark_validated(good=True, time=time)
+        session.commit()
+
+
+def mark_pointing_failed(pointing_id, schedule_next=True, delay=None, time=None):
+    """Validate the given pointing's data quality as poor, and needs re-observing.
+
+    Parameters
+    ----------
+    pointing_id : int
+        the id number of the pointing
+
+    schedule_next : bool, default=True
+        If True, automatically create the next Pointing for the Target
+        (unless it has no more to do).
+    delay : float, default=None
+        Time (in seconds) to delay the validity of the next Pointing from the time
+        the previous Pointing (i.e. the one we're marking) finished.
+        If None, the new Pointing takes the same start_time as the failed one.
+        Only relevant if schedule_next=True.
+    time : str, `datetime.datetime`, `astropy.time.Time`, optional
+        If given, the time to mark the Pointing as failed at.
+
+    """
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
+        pointing.mark_validated(good=False, time=time)
+        session.commit()
+
+        if schedule_next:
+            # There might be an upcoming pointing already, we'll need to delete it first
+            # Although we don't want to interrupt if it's running
+            for p in pointing.target.pointings:
+                if p.status_at_time(time) in ['upcoming', 'pending']:
+                    p.mark_deleted(time)
+            session.commit()
+
+            next_pointing = pointing.target.get_next_pointing(time=time, reschedule_delay=delay)
+            if next_pointing is not None:
+                session.add(next_pointing)
+                session.commit()
 
 
 def get_targets(session, target_ids=None, status=None):
@@ -529,151 +654,3 @@ def insert_items(session, items):
         session.add(item)
         if i % 1000 == 0:
             session.flush()
-
-
-def mark_completed(pointing_id, schedule_next=True, time=None):
-    """Update the given pointing's status to 'completed'.
-
-    A utility function that creates its own session.
-
-    Parameters
-    ----------
-    pointing_id : int
-        the id number of the pointing
-
-    schedule_next : bool, optional
-        If True, automatically create the next Pointing for the Target
-        (unless it has no more to do).
-        default = True
-    time : str, `datetime.datetime`, `astropy.time.Time`, optional
-        If given, the time to mark the Pointing as completed at.
-
-    """
-    with open_session() as session:
-        pointing = get_pointing_by_id(session, pointing_id)
-        pointing.mark_finished(completed=True, time=time)
-        session.commit()
-
-        if schedule_next:
-            next_pointing = pointing.target.get_next_pointing(time=time)
-            if next_pointing is not None:
-                session.add(next_pointing)
-                session.commit()
-
-
-def mark_interrupted(pointing_id, schedule_next=True, delay=None, time=None):
-    """Update the given pointing's status to 'interrupted'.
-
-    A utility function that creates its own session.
-
-    Parameters
-    ----------
-    pointing_id : int
-        the id number of the pointing
-
-    schedule_next : bool, default=True
-        If True, automatically create the next Pointing for the Target
-        (unless it has no more to do).
-    delay : float, default=None
-        Time (in seconds) to delay the validity of the next Pointing from the time
-        the previous Pointing (i.e. the one we're marking) finished.
-        If None, the new Pointing takes the same start_time as the interrupted one.
-        Only relevant if schedule_next=True.
-    time : str, `datetime.datetime`, `astropy.time.Time`, optional
-        If given, the time to mark the Pointing as interrupted at.
-
-    """
-    with open_session() as session:
-        pointing = get_pointing_by_id(session, pointing_id)
-        pointing.mark_finished(completed=False, time=time)
-        session.commit()
-
-        if schedule_next:
-            next_pointing = pointing.target.get_next_pointing(time=time, reschedule_delay=delay)
-            if next_pointing is not None:
-                session.add(next_pointing)
-                session.commit()
-
-
-def mark_running(pointing_id, telescope_id, time=None):
-    """Update the given pointing's status to 'running'.
-
-    A utility function that creates its own session.
-
-    Parameters
-    ----------
-    pointing_id : int
-        the id number of the pointing
-    telescope_id : int
-        the id number of the telescope the pointing is running on
-
-    time : str, `datetime.datetime`, `astropy.time.Time`, optional
-        If given, the time to mark the Pointing as interrupted at.
-
-    """
-    with open_session() as session:
-        pointing = get_pointing_by_id(session, pointing_id)
-        telescope = get_telescope_by_id(session, telescope_id)
-        pointing.mark_running(telescope, time=time)
-        session.commit()
-
-
-def mark_confirmed(pointing_id, time=None):
-    """Validate the given pointing's data as confirmed to be good quality.
-
-    A utility function that creates its own session.
-
-    Parameters
-    ----------
-    pointing_id : int
-        the id number of the pointing
-
-    time : str, `datetime.datetime`, `astropy.time.Time`, optional
-        If given, the time to mark the Pointing as interrupted at.
-
-    """
-    with open_session() as session:
-        pointing = get_pointing_by_id(session, pointing_id)
-        pointing.mark_validated(good=True, time=time)
-        session.commit()
-
-
-def mark_failed(pointing_id, schedule_next=True, delay=None, time=None):
-    """Validate the given pointing's data quality as poor, and needs re-observing.
-
-    A utility function that creates its own session.
-
-    Parameters
-    ----------
-    pointing_id : int
-        the id number of the pointing
-
-    schedule_next : bool, default=True
-        If True, automatically create the next Pointing for the Target
-        (unless it has no more to do).
-    delay : float, default=None
-        Time (in seconds) to delay the validity of the next Pointing from the time
-        the previous Pointing (i.e. the one we're marking) finished.
-        If None, the new Pointing takes the same start_time as the failed one.
-        Only relevant if schedule_next=True.
-    time : str, `datetime.datetime`, `astropy.time.Time`, optional
-        If given, the time to mark the Pointing as failed at.
-
-    """
-    with open_session() as session:
-        pointing = get_pointing_by_id(session, pointing_id)
-        pointing.mark_validated(good=False, time=time)
-        session.commit()
-
-        if schedule_next:
-            # There might be an upcoming pointing already, we'll need to delete it first
-            # Although we don't want to interrupt if it's running
-            for p in pointing.target.pointings:
-                if p.status_at_time(time) in ['upcoming', 'pending']:
-                    p.mark_deleted(time)
-            session.commit()
-
-            next_pointing = pointing.target.get_next_pointing(time=time, reschedule_delay=delay)
-            if next_pointing is not None:
-                session.add(next_pointing)
-                session.commit()

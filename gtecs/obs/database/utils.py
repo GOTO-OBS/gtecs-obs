@@ -408,8 +408,8 @@ def get_telescopes():
     A utility function that creates its own session.
     """
     data = {}
-    with open_session() as s:
-        telescopes = s.query(Telescope).all()
+    with open_session() as session:
+        telescopes = session.query(Telescope).all()
         for telescope in telescopes:
             tel_data = {}
             tel_data['name'] = telescope.name
@@ -549,15 +549,16 @@ def mark_completed(pointing_id, schedule_next=True, time=None):
         If given, the time to mark the Pointing as completed at.
 
     """
-    with open_session() as s:
-        pointing = get_pointing_by_id(s, pointing_id)
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
         pointing.mark_finished(completed=True, time=time)
-        s.commit()
+        session.commit()
 
         if schedule_next:
             next_pointing = pointing.target.get_next_pointing(time=time)
             if next_pointing is not None:
-                s.add(next_pointing)
+                session.add(next_pointing)
+                session.commit()
 
 
 def mark_interrupted(pointing_id, schedule_next=True, delay=None, time=None):
@@ -582,15 +583,16 @@ def mark_interrupted(pointing_id, schedule_next=True, delay=None, time=None):
         If given, the time to mark the Pointing as interrupted at.
 
     """
-    with open_session() as s:
-        pointing = get_pointing_by_id(s, pointing_id)
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
         pointing.mark_finished(completed=False, time=time)
-        s.commit()
+        session.commit()
 
         if schedule_next:
             next_pointing = pointing.target.get_next_pointing(time=time, reschedule_delay=delay)
             if next_pointing is not None:
-                s.add(next_pointing)
+                session.add(next_pointing)
+                session.commit()
 
 
 def mark_running(pointing_id, telescope_id, time=None):
@@ -609,10 +611,11 @@ def mark_running(pointing_id, telescope_id, time=None):
         If given, the time to mark the Pointing as interrupted at.
 
     """
-    with open_session() as s:
-        pointing = get_pointing_by_id(s, pointing_id)
-        telescope = get_telescope_by_id(s, telescope_id)
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
+        telescope = get_telescope_by_id(session, telescope_id)
         pointing.mark_running(telescope, time=time)
+        session.commit()
 
 
 def mark_confirmed(pointing_id, time=None):
@@ -629,9 +632,10 @@ def mark_confirmed(pointing_id, time=None):
         If given, the time to mark the Pointing as interrupted at.
 
     """
-    with open_session() as s:
-        pointing = get_pointing_by_id(s, pointing_id)
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
         pointing.mark_validated(good=True, time=time)
+        session.commit()
 
 
 def mark_failed(pointing_id, schedule_next=True, delay=None, time=None):
@@ -656,10 +660,10 @@ def mark_failed(pointing_id, schedule_next=True, delay=None, time=None):
         If given, the time to mark the Pointing as failed at.
 
     """
-    with open_session() as s:
-        pointing = get_pointing_by_id(s, pointing_id)
+    with open_session() as session:
+        pointing = get_pointing_by_id(session, pointing_id)
         pointing.mark_validated(good=False, time=time)
-        s.commit()
+        session.commit()
 
         if schedule_next:
             # There might be an upcoming pointing already, we'll need to delete it first
@@ -667,8 +671,9 @@ def mark_failed(pointing_id, schedule_next=True, delay=None, time=None):
             for p in pointing.target.pointings:
                 if p.status_at_time(time) in ['upcoming', 'pending']:
                     p.mark_deleted(time)
-            s.commit()
+            session.commit()
 
             next_pointing = pointing.target.get_next_pointing(time=time, reschedule_delay=delay)
             if next_pointing is not None:
-                s.add(next_pointing)
+                session.add(next_pointing)
+                session.commit()

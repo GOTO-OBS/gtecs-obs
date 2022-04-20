@@ -63,3 +63,9 @@ PYRO_TIMEOUT = config['PYRO_TIMEOUT']
 SCHEDULER_CHECK_PERIOD = config['SCHEDULER_CHECK_PERIOD']
 WRITE_QUEUE_FILE = config['WRITE_QUEUE_FILE']
 WRITE_QUEUE_PAGE = config['WRITE_QUEUE_PAGE']
+
+############################################################
+# Slack bot parameters
+ENABLE_SLACK = config['ENABLE_SLACK']
+SLACK_BOT_TOKEN = config['SLACK_BOT_TOKEN']
+SLACK_DEFAULT_CHANNEL = config['SLACK_DEFAULT_CHANNEL']

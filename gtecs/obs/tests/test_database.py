@@ -320,7 +320,7 @@ with db.open_session() as session:
         raise ValueError
 
 # ~~~~~~~~~~~
-# Wait 3 minutes, mark it as interupted
+# Wait 3 minutes, mark it as interrupted
 now = Time('2020-01-01 01:23')
 db.mark_interrupted(pointing_id, time=now)
 

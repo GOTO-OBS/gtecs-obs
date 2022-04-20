@@ -849,7 +849,7 @@ class Strategy(Base):
         default = None
     too : bool, optional
         indicates if Pointings should be considered Targets of Opportunity (ToO) or not.
-        Pointings which are ToOs can interupt lower-(or equal-) ranked Pointings in the scheduler
+        Pointings which are ToOs can interrupt lower-(or equal-) ranked Pointings in the scheduler
         queue.
         default = False
     requires_template : bool, optional
@@ -1958,7 +1958,7 @@ class Target(Base):
         the status of the previous Pointing and the TimeBlocks attached
         to the current Strategy.
 
-        If the previous Pointing was interupted or failed you can add an optional
+        If the previous Pointing was interrupted or failed you can add an optional
         delay (in seconds) to stop repeatedly observing poor patches of the sky.
 
         Assumes this object is still associated with an active session.

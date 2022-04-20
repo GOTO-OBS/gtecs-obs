@@ -260,7 +260,7 @@ def fill_target(session):
     # ToO & Rank
     too = None
     while too not in ['y', 'n', 'Y', 'N']:
-        too = input('Is the target a ToO (can interupt)? [y/n]: ')
+        too = input('Is the target a ToO (can interrupt)? [y/n]: ')
     if too in ['y', 'Y']:
         strategy_params['too'] = 1
         rank_zero = 'None'

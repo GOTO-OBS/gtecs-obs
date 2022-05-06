@@ -77,7 +77,7 @@ def run(overwrite=False, add_defaults=False, verbose=False):
 
 
 if __name__ == '__main__':
-    description = """Fill the GOTO observation database with survey tiles."""
+    description = """Create the G-TeCS observing database."""
 
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)

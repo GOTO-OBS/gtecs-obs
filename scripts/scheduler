@@ -60,28 +60,24 @@ def query(command, args):
     elif command == 'info':
         tel_data = db.get_telescopes()
         for telescope_id in tel_data:
+            # Print Pointing (or None) for each telescope
             print(tel_data[telescope_id]['name'], end=': ')
-            with Pyro4.Proxy(params.PYRO_URI) as proxy:
-                pointing = proxy.check_queue(telescope_id)
-            if pointing is not None:
-                print(f'Pointing ID={pointing.db_id} ({pointing.name})')
-            else:
-                print('None')
-            # TODO: Print higher horizon if shielding?
+            try:
+                with Pyro4.Proxy(params.PYRO_URI) as proxy:
+                    pointing_info = proxy.check_queue(telescope_id)
+                if pointing_info is not None:
+                    print(f'Pointing ID={pointing_info["id"]} ({pointing_info["name"]})')
+                else:
+                    print('None')
+                # TODO: Print higher horizon if shielding?
+                # TODO: Print what it's current'y observing?
+                # TODO: Verbose Pointing info?
+            except Exception:
+                print('ERROR')
 
     else:
         print('ERROR: Unrecognized command "{}"'.format(command))
         print_instructions()
-
-
-def print_pointings(info):
-    """Print the currently scheduled pointings."""
-    print('SCHEDULER:')
-    if info['pointing'] is not None:
-        new_id = info['pointing'].db_id
-        print('  ID: {}'.format(new_id))
-    else:
-        print('  ID: None')
 
 
 def print_instructions():

@@ -119,9 +119,10 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
 
     Returns
     -------
-    current_pointing : `Pointing`
+    current_pointings : `Pointing` or list of `Pointing`
         Pointing being observed now
-    pending_pointings : `Pointing`
+        Either a list for all telescopes or the one given by `telescope_id`
+    pending_pointings : list of `Pointing`
         all current pending Pointings, after filtering
 
     Examples
@@ -193,11 +194,18 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
     pending_pointings = queue.all()
 
     # find the current pointing too, with a separate query
-    current_pointing = session.query(Pointing)\
-                              .filter(Pointing.status_at_time(time) == 'running')\
-                              .one_or_none()
+    # TODO: maybe this should just be a separate function?
+    if telescope_id is not None:
+        current_pointings = session.query(Pointing)\
+                                   .filter(Pointing.status_at_time(time) == 'running')\
+                                   .filter(Pointing.telescope_id == telescope_id)\
+                                   .one_or_none()
+    else:
+        current_pointings = session.query(Pointing)\
+                                   .filter(Pointing.status_at_time(time) == 'running')\
+                                   .all()
 
-    return current_pointing, pending_pointings
+    return current_pointings, pending_pointings
 
 
 def get_queue(session, time=None):

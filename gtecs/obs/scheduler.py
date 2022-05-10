@@ -229,16 +229,15 @@ class Scheduler:
             self.force_check_flag = True
             while self.check_time < self.loop_time:
                 time.sleep(0.01)
-
+        self.log.info('CHECKING QUEUE FOR TELESCOPE {}'.format(telescope_id))
         pointing = self.latest_pointings[telescope_id][horizon]
-        try:
-            pointing_id = pointing.db_id
-            pointing_info = db.get_pointing_info(pointing_id)
+        if pointing is None:
+            return None
+        else:
+            pointing_info = db.get_pointing_info(pointing.db_id)
             # Add any useful scheduling info
             pointing_info['obstime'] = pointing.get_obstime(self.readout_time)
-
-        except AttributeError:
-            return None
+            return pointing_info
 
     def get_pointing_info(self, pointing_id):
         """Get info from the database for a given pointing.

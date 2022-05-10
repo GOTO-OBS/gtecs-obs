@@ -14,7 +14,7 @@ from .models import Event, ExposureSet, Grid, GridTile, Pointing, Target, Telesc
 
 __all__ = ['get_user', 'validate_user',
            'get_filtered_queue', 'get_queue',
-           'get_pointings', 'get_pointing_by_id',
+           'get_pointings', 'get_pointing_by_id', 'get_pointing_info',
            'mark_pointing_running', 'mark_pointing_completed', 'mark_pointing_interrupted',
            'mark_pointing_confirmed', 'mark_pointing_failed',
            'get_targets', 'get_target_by_id',
@@ -501,99 +501,102 @@ def get_exposure_set_by_id(session, expset_id):
     return exposure_set
 
 
-def get_pointing_info(session, pointing_id):
+def get_pointing_info(pointing_id):
     """Get a dictionary of info for the given Pointing.
 
     This should contain all the infomation needed for an image FITS header.
     """
     pointing_info = {}
 
-    # Get Pointing info
-    pointing = get_pointing_by_id(session, pointing_id)
-    pointing_info['id'] = pointing.db_id
-    # pointing_info['status'] = pointing.status  # Don't include anything time-dependent
-    pointing_info['rank'] = pointing.rank
-    pointing_info['start_time'] = pointing.start_time
-    pointing_info['stop_time'] = pointing.stop_time
+    with open_session() as session:
+        # Get the Pointing from the database
+        pointing = get_pointing_by_id(session, pointing_id)
 
-    # Get Target info
-    target = pointing.target
-    pointing_info['target_id'] = target.db_id
-    pointing_info['name'] = target.name
-    pointing_info['ra'] = target.ra.deg
-    pointing_info['dec'] = target.dec.deg
-    pointing_info['start_rank'] = target.rank
-    pointing_info['rank_decay'] = target.rank_decay
-    pointing_info['weight'] = target.weight
-    pointing_info['is_template'] = target.is_template
-    pointing_info['num_completed'] = target.num_completed
-    pointing_info['target_start_time'] = target.start_time
-    pointing_info['target_stop_time'] = target.stop_time
+        # Get Pointing info
+        pointing_info['id'] = pointing.db_id
+        # pointing_info['status'] = pointing.status  # Don't include anything time-dependent
+        pointing_info['rank'] = pointing.rank
+        pointing_info['start_time'] = pointing.start_time
+        pointing_info['stop_time'] = pointing.stop_time
 
-    # Get Strategy info
-    strategy = pointing.strategy
-    pointing_info['strategy_id'] = strategy.db_id
-    pointing_info['infinite'] = strategy.infinite
-    pointing_info['min_time'] = strategy.min_time
-    pointing_info['too'] = strategy.too
-    pointing_info['requires_template'] = strategy.requires_template
-    pointing_info['min_alt'] = strategy.min_alt
-    pointing_info['max_sunalt'] = strategy.max_sunalt
-    pointing_info['max_moon'] = strategy.max_moon
-    pointing_info['min_moonsep'] = strategy.min_moonsep
-    pointing_info['tel_mask'] = strategy.tel_mask
+        # Get Target info
+        target = pointing.target
+        pointing_info['target_id'] = target.db_id
+        pointing_info['name'] = target.name
+        pointing_info['ra'] = target.ra
+        pointing_info['dec'] = target.dec
+        pointing_info['start_rank'] = target.rank
+        pointing_info['rank_decay'] = target.rank_decay
+        pointing_info['weight'] = target.weight
+        pointing_info['is_template'] = target.is_template
+        pointing_info['num_completed'] = target.num_completed
+        pointing_info['target_start_time'] = target.start_time
+        pointing_info['target_stop_time'] = target.stop_time
 
-    # Get TimeBlock info
-    time_block = pointing.time_block
-    pointing_info['time_block_id'] = time_block.db_id
-    pointing_info['block_num'] = time_block.block_num
-    pointing_info['wait_time'] = time_block.wait_time
-    pointing_info['valid_time'] = time_block.valid_time
+        # Get Strategy info
+        strategy = pointing.strategy
+        pointing_info['strategy_id'] = strategy.db_id
+        pointing_info['infinite'] = strategy.infinite
+        pointing_info['min_time'] = strategy.min_time
+        pointing_info['too'] = strategy.too
+        pointing_info['requires_template'] = strategy.requires_template
+        pointing_info['min_alt'] = strategy.min_alt
+        pointing_info['max_sunalt'] = strategy.max_sunalt
+        pointing_info['max_moon'] = strategy.max_moon
+        pointing_info['min_moonsep'] = strategy.min_moonsep
+        pointing_info['tel_mask'] = strategy.tel_mask
 
-    # Get User info
-    user = target.user
-    pointing_info['user_id'] = user.db_id
-    pointing_info['user_name'] = user.username
-    pointing_info['user_fullname'] = user.full_name
+        # Get TimeBlock info
+        time_block = pointing.time_block
+        pointing_info['time_block_id'] = time_block.db_id
+        pointing_info['block_num'] = time_block.block_num
+        pointing_info['wait_time'] = time_block.wait_time
+        pointing_info['valid_time'] = time_block.valid_time
 
-    # Get Grid info
-    grid_tile = pointing.grid_tile
-    if grid_tile is not None:
-        pointing_info['grid_id'] = grid_tile.grid.db_id
-        pointing_info['grid_name'] = grid_tile.grid.name
-        pointing_info['tile_id'] = grid_tile.db_id
-        pointing_info['tile_name'] = grid_tile.name
-    else:
-        pointing_info['grid_id'] = None
-        pointing_info['grid_name'] = None
-        pointing_info['tile_id'] = None
-        pointing_info['tile_name'] = None
+        # Get User info
+        user = target.user
+        pointing_info['user_id'] = user.db_id
+        pointing_info['user_name'] = user.username
+        pointing_info['user_fullname'] = user.full_name
 
-    # Get Survey info
-    survey = pointing.survey
-    if survey is not None:
-        pointing_info['survey_id'] = survey.db_id
-        pointing_info['survey_name'] = survey.name
-        pointing_info['skymap'] = survey.skymap
-    else:
-        pointing_info['survey_id'] = None
-        pointing_info['survey_name'] = None
-        pointing_info['skymap'] = None
+        # Get Grid info
+        grid_tile = pointing.grid_tile
+        if grid_tile is not None:
+            pointing_info['grid_id'] = grid_tile.grid.db_id
+            pointing_info['grid_name'] = grid_tile.grid.name
+            pointing_info['tile_id'] = grid_tile.db_id
+            pointing_info['tile_name'] = grid_tile.name
+        else:
+            pointing_info['grid_id'] = None
+            pointing_info['grid_name'] = None
+            pointing_info['tile_id'] = None
+            pointing_info['tile_name'] = None
 
-    # Get Event info
-    event = pointing.event
-    if event is not None:
-        pointing_info['event_id'] = event.db_id
-        pointing_info['event_name'] = event.name
-        pointing_info['event_source'] = event.source
-        pointing_info['event_type'] = event.type
-        pointing_info['event_time'] = event.time
-    else:
-        pointing_info['event_id'] = None
-        pointing_info['event_name'] = None
-        pointing_info['event_source'] = None
-        pointing_info['event_type'] = None
-        pointing_info['event_time'] = None
+        # Get Survey info
+        survey = pointing.survey
+        if survey is not None:
+            pointing_info['survey_id'] = survey.db_id
+            pointing_info['survey_name'] = survey.name
+            pointing_info['skymap'] = survey.skymap
+        else:
+            pointing_info['survey_id'] = None
+            pointing_info['survey_name'] = None
+            pointing_info['skymap'] = None
+
+        # Get Event info
+        event = pointing.event
+        if event is not None:
+            pointing_info['event_id'] = event.db_id
+            pointing_info['event_name'] = event.name
+            pointing_info['event_source'] = event.source
+            pointing_info['event_type'] = event.type
+            pointing_info['event_time'] = event.time
+        else:
+            pointing_info['event_id'] = None
+            pointing_info['event_name'] = None
+            pointing_info['event_source'] = None
+            pointing_info['event_type'] = None
+            pointing_info['event_time'] = None
 
     return pointing_info
 

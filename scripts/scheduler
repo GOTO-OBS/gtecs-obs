@@ -58,7 +58,7 @@ def query(command, args):
         misc.execute_long_command(tail_command)
 
     elif command == 'info':
-        tel_data = db.get_telescopes()
+        tel_data = db.get_telescope_info()
         for telescope_id in tel_data:
             # Print Pointing (or None) for each telescope
             print(tel_data[telescope_id]['name'], end=': ')

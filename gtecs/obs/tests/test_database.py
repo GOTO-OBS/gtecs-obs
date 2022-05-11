@@ -21,7 +21,7 @@ with db.open_session() as session:
     print(user, end='\n\n')
 
     # check the password was stored correctly
-    if not db.validate_user(session, username='test_user', password='password'):
+    if not db.validate_user('test_user', 'password'):
         raise ValueError('Failed to validate user')
 
 print('-------')

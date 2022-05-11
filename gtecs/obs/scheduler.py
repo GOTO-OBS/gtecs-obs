@@ -46,7 +46,7 @@ class Scheduler:
         self.write_html = params.WRITE_QUEUE_PAGE
 
         # Get telescope data (only once, on init)
-        self.tel_data = db.get_telescopes()
+        self.tel_data = db.get_telescope_info()
         self.latest_pointings = {tel_id: [None] for tel_id in self.tel_data}
 
     def __del__(self):

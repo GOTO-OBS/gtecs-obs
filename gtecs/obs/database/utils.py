@@ -1,4 +1,14 @@
-"""Utility functions for using the database."""
+"""Utility functions for using the database.
+
+Functions that return database ORM model classes (e.g. `get_user` -> `User`,
+`get_pointing_by_id` -> `Pointing` etc) require a session to be passed as their first argument.
+The returned classes are then linked to this session, so any changes will have to be committed
+manually (if using `load_session`) or when the session is closed (if using `open_session`).
+
+Functions that either act on the database and return nothing (e.g. `mark_pointing_running`)
+or that query the database and return infomation instead of classes (e.g. `validate_user` -> bool,
+`get_pointing_info` -> dict) do not require a session (they create their own internally).
+"""
 
 import hashlib
 
@@ -19,9 +29,9 @@ __all__ = ['get_user', 'validate_user',
            'mark_pointing_confirmed', 'mark_pointing_failed',
            'get_targets', 'get_target_by_id',
            'get_exposure_set_by_id',
-           'get_telescope_by_id', 'get_telescopes',
+           'get_telescope_by_id', 'get_telescope_info',
            'get_current_grid', 'get_grid_tile_by_name',
-           'get_events', 'delete_event_pointings',
+           'get_events',
            'insert_items',
            ]
 
@@ -52,13 +62,11 @@ def get_user(session, username):
     return user
 
 
-def validate_user(session, username, password):
-    """Check user exists and password is correct.
+def validate_user(username, password):
+    """Check that the user with the given name exists and their password is correct.
 
     Parameters
     ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session`
     username : string
         short name of user
     password : string
@@ -67,15 +75,12 @@ def validate_user(session, username, password):
     Returns
     -------
     passed : bool
-        True if user exists and password is correct
-
-    Raises
-    ------
-    ValueError : if username is not found in DB
+        True if the user exists and the password is correct
 
     """
-    user = get_user(session, username)
-    return user.password_hash == hashlib.sha512(password.encode()).hexdigest()
+    with open_session() as session:
+        user = get_user(session, username)
+        return user.password_hash == hashlib.sha512(password.encode()).hexdigest()
 
 
 def get_filtered_queue(session, time=None, rank_limit=None, location=None, telescope_id=None,
@@ -249,7 +254,7 @@ def get_pointings(session, pointing_ids=None, status=None):
 
     Returns
     -------
-    pointings : list
+    pointings : list of `Pointing`
         a list of all matching Pointings
 
     """
@@ -278,10 +283,6 @@ def get_pointing_by_id(session, pointing_id):
     -------
     pointing : `Pointing`
         the matching Pointing
-
-    Raises
-    ------
-    ValueError : if no matching Pointing is found in the database
 
     """
     pointing = session.query(Pointing).filter(Pointing.db_id == pointing_id).one_or_none()
@@ -554,7 +555,7 @@ def get_targets(session, target_ids=None, status=None):
 
     Returns
     -------
-    targets : list
+    targets : list of `Target`
         a list of all matching Targets
 
     """
@@ -584,10 +585,6 @@ def get_target_by_id(session, target_id):
     target : `Target`
         the matching Target
 
-    Raises
-    ------
-    ValueError : if no matching Target is found in the database
-
     """
     target = session.query(Target).filter(Target.db_id == target_id).one_or_none()
     if not target:
@@ -609,10 +606,6 @@ def get_exposure_set_by_id(session, expset_id):
     -------
     exposure_set : `ExposureSet`
         the matching Exposure Set
-
-    Raises
-    ------
-    ValueError : if no matching Exposure Set is found in the database
 
     """
     exposure_set = session.query(ExposureSet).filter(ExposureSet.db_id == expset_id).one_or_none()
@@ -636,10 +629,6 @@ def get_telescope_by_id(session, telescope_id):
     telescope : `Telescope`
         the matching Telescope
 
-    Raises
-    ------
-    ValueError : if no matching Telescope is found in the database
-
     """
     telescope = session.query(Telescope).filter(Telescope.db_id == telescope_id).one_or_none()
     if not telescope:
@@ -647,11 +636,8 @@ def get_telescope_by_id(session, telescope_id):
     return telescope
 
 
-def get_telescopes():
-    """Get the key info on all the telescopes defined in the database.
-
-    A utility function that creates its own session.
-    """
+def get_telescope_info():
+    """Get the key info on all the telescopes defined in the database."""
     data = {}
     with open_session() as session:
         telescopes = session.query(Telescope).all()
@@ -696,10 +682,6 @@ def get_grid_tile_by_name(session, grid_name, tile_name):
     grid_tile : `GridTile`
         the matching Grid Tile
 
-    Raises
-    ------
-    ValueError : if no matching Grid or Grid Tile is found in the database
-
     """
     grid = session.query(Grid).filter(Grid.name == grid_name).one_or_none()
     if not grid:
@@ -726,7 +708,7 @@ def get_events(session, event_type=None, source=None):
 
     Returns
     -------
-    events : list
+    events : list of `Event`
         a list of all matching Events
 
     """
@@ -741,18 +723,6 @@ def get_events(session, event_type=None, source=None):
         query = query.filter(Event.source.in_(source))
     events = query.all()
     return events
-
-
-def delete_event_pointings(session, event):
-    """Set all the Targets and Pointings associated with the given Event to deleted.
-
-    Note this doesn't physically delete the rows from the database tables,
-    it just sets the statuses to 'deleted'.
-    """
-    for target in event.targets:
-        target.status = 'deleted'
-        if target.pointings[-1].status == 'pending':
-            target.pointings[-1].status = 'deleted'
 
 
 def insert_items(session, items):

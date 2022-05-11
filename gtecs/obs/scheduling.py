@@ -310,17 +310,22 @@ class PointingQueue:
             telescope = db.get_telescope_by_id(session, telescope_id)
             location = telescope.site.location
 
-            current, pending = db.get_filtered_queue(session,
-                                                     time=time,
-                                                     location=location,
-                                                     telescope_id=telescope_id,
-                                                     altitude_limit=altitude_limit,
-                                                     hourangle_limit=hourangle_limit,
-                                                     )
+            # Get pending pointings
+            db_pointings = db.get_filtered_queue(session,
+                                                 time=time,
+                                                 location=location,
+                                                 telescope_id=telescope_id,
+                                                 altitude_limit=altitude_limit,
+                                                 hourangle_limit=hourangle_limit,
+                                                 )
+            pointings = [Pointing.from_database(db_pointing) for db_pointing in db_pointings]
 
-            pointings = [Pointing.from_database(db_pointing) for db_pointing in pending]
-            if current:
-                pointings.append(Pointing.from_database(current))
+            # Also get the current pointing, if any
+            current_pointing = db.get_current_pointing(session, telescope_id, time=time)
+            if current_pointing is not None:
+                pointings.append(Pointing.from_database(current_pointing))
+
+            # Create the Queue class
             queue = cls(np.array(pointings), telescope_id, time)
         return queue
 

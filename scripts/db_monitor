@@ -33,11 +33,11 @@ else:
 with db.open_session() as session:
     all_pointings = db.get_pointings(session)
     n_all = len(all_pointings)
-    print("{} points in database".format(n_all))
+    print('{} points in database'.format(n_all))
 
-    running, _ = db.get_queue(session)
-    if running:
-        print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running.db_id))
+    running = db.get_pointings(session, status='running')
+    if len(running) > 0:
+        print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running[0].db_id))
     else:
         print('\n')
 
@@ -66,4 +66,4 @@ with db.open_session() as session:
                 status = pointing.status
             print(status, end='\n')
 
-    print("{} points in database".format(n_all))
+    print('{} points in database'.format(n_all))

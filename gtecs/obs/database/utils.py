@@ -363,6 +363,18 @@ def get_pointing_info(pointing_id):
         pointing_info['wait_time'] = time_block.wait_time
         pointing_info['valid_time'] = time_block.valid_time
 
+        # Get ExposureSet info
+        pointing_info['exposure_sets'] = []
+        for exposure_set in pointing.exposure_sets:
+            expset_info = {}
+            expset_info['id'] = exposure_set.db_id
+            expset_info['num_exp'] = exposure_set.num_exp
+            expset_info['exptime'] = exposure_set.exptime
+            expset_info['filt'] = exposure_set.filt
+            expset_info['binning'] = exposure_set.binning
+            expset_info['ut_mask'] = exposure_set.ut_mask
+            pointing_info['exposure_sets'].append(expset_info)
+
         # Get User info
         user = target.user
         pointing_info['user_id'] = user.db_id

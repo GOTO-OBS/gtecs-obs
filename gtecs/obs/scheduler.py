@@ -1,8 +1,8 @@
 """Class for monitoring the obs database and finding pointings to observe."""
 
-import sys
 import threading
 import time
+import traceback
 
 import Pyro4
 
@@ -283,11 +283,15 @@ def run():
         scheduler.run(params.PYRO_HOST, params.PYRO_PORT, params.PYRO_TIMEOUT)
     except Exception:
         print('Error detected, shutting down')
-        print(sys.exc_info())
+        traceback.print_exc()
     except KeyboardInterrupt:
         print('Interrupt detected, shutting down')
     finally:
-        scheduler.shutdown()
+        try:
+            scheduler.shutdown()
+        except UnboundLocalError:
+            # class was never created
+            pass
         time.sleep(1)  # wait to stop threads
         send_slack_msg('Scheduler shutdown')
         print('Scheduler done')

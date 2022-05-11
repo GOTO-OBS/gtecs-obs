@@ -1,5 +1,6 @@
 """Class for monitoring the obs database and finding pointings to observe."""
 
+import os
 import threading
 import time
 import traceback
@@ -13,7 +14,8 @@ from gtecs.common.logging import get_logger
 from . import database as db
 from . import params
 from .astronomy import above_horizon
-from .scheduling import check_queue
+from .html import write_queue_page
+from .scheduling import PointingQueue
 from .slack import send_slack_msg
 
 
@@ -43,6 +45,7 @@ class Scheduler:
         self.readout_time = params.READOUT_TIME
         self.template_requirement = params.TEMPLATE_REQUIREMENT
         self.write_file = params.WRITE_QUEUE_FILE
+        self.queue_file = os.path.join(params.QUEUE_PATH, 'queue_info')
         self.write_html = params.WRITE_QUEUE_PAGE
 
         # Get telescope data (only once, on init)
@@ -156,16 +159,25 @@ class Scheduler:
             try:
                 pointings = []
 
-                # Start with the first horizon, find the highest priority Pointing
-                pointing, reason = check_queue(telescope_id,
-                                               time=check_time,
-                                               horizon=self.tel_data[telescope_id]['horizon'][0],
-                                               readout_time=self.readout_time,
-                                               template_requirement=self.template_requirement,
-                                               write_file=self.write_file,
-                                               write_html=self.write_html,
-                                               return_reason=True,
-                                               )
+                # Import the queue for this telescope from the database
+                queue = PointingQueue.from_database(telescope_id, check_time)
+
+                # Start with the first horizon, calculate pointing validity
+                queue.calculate_priorities(horizon=self.tel_data[telescope_id]['horizon'][0],
+                                           readout_time=self.readout_time,
+                                           template_requirement=self.template_requirement,
+                                           )
+
+                # Write out the queue file and web pages
+                # TODO: These are only for one telescope/horizon?
+                if self.write_file:
+                    queue_file = os.path.join(params.QUEUE_PATH, 'queue_info')
+                    queue.write_to_file(queue_file)
+                if self.write_html:
+                    write_queue_page(queue)
+
+                # Find what to do next
+                pointing, reason = queue.what_to_do_next(return_reason=True)
                 pointings.append(pointing)
                 self.log.debug(f'Telescope {telescope_id}: {reason}')
 
@@ -181,18 +193,14 @@ class Scheduler:
                         # This should be fairly rare, if it's just for wind shielding.
                         # There might be a more efficient way to do this,
                         # here we just recalculate using the higher horizon.
-                        # A better solution might be for check_queue() to take multiple
+                        # A better solution might be for calculate_priorities() to take multiple
                         # horizons and evaluate each pointing based on both, but that's
                         # probably a waste of time (even if altaz is cached).
-                        pointing, reason = check_queue(telescope_id,
-                            time=check_time,
-                            horizon=horizon,
-                            readout_time=self.readout_time,
-                            template_requirement=self.template_requirement,
-                            write_file=self.write_file,
-                            write_html=self.write_html,
-                            return_reason=True,
-                            )
+                        queue.calculate_priorities(horizon=horizon,
+                                                   readout_time=self.readout_time,
+                                                   template_requirement=self.template_requirement,
+                                                   )
+                        pointing, reason = queue.what_to_do_next(return_reason=True)
                         pointings.append(pointing)
                         self.log.debug(f'Telescope {telescope_id}-{i+1}: {reason}')
                     else:

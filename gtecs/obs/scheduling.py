@@ -1,7 +1,6 @@
 """Robotic queue scheduler functions."""
 
 import json
-import os
 import warnings
 
 from astroplan import (AltitudeConstraint, AtNightConstraint,
@@ -22,7 +21,6 @@ from scipy import interpolate
 from . import database as db
 from . import params
 from .astronomy import time_to_set
-from .html import write_queue_page
 
 warnings.simplefilter('ignore', ErfaWarning)
 
@@ -663,84 +661,3 @@ class PointingQueue:
                            ],
                           f)
                 f.write('\n')
-
-
-def check_queue(telescope_id, time=None, horizon=None,
-                readout_time=10, template_requirement='ANY',
-                write_file=True, write_html=False, return_reason=False):
-    """Check the queue and decide what to do.
-
-    Check the current pointings in the queue, find the highest priority at
-    the given time and decide whether to slew to it, stay on the current target
-    or park the telescope.
-
-    Parameters
-    ----------
-    telescope_id : int
-        The ID number for the Telescope to fetch the queue for.
-
-    time : `~astropy.time.Time`, optional
-        The time to calculate the priorities at.
-        Default is `astropy.time.Time.now()`.
-
-    horizon : float, or tuple of (azs, alts), optional
-        The horizon limits at the given site, either a flat value or varying with azimuth.
-        Default is a flat horizon of 30 deg.
-
-    readout_time : float, optional
-        The time per exposure to add when calculating the expected time to observe a pointing.
-        Default is 10 seconds.
-
-    template_requirement : string, optional
-        How strict to be when checking if templates exist.
-        Options are 'ANY', 'TELESCOPE' or 'SITE'.
-        Default is 'ANY'.
-
-    write_file : bool, optional
-        Should the scheduler write out the queue to a file?
-        Default is True.
-
-    write_html : bool, optional
-        Should the scheduler write the HTML queue webpage?
-        Default is False.
-
-    return_reason: bool, default=False
-        if True, return a string explaining why the result was chosen
-
-    Returns
-    -------
-    new_pointing : `Pointing`
-        The pointing to send to the pilot.
-        Could be a new pointing, the current pointing or 'None' (park).
-    reason : str
-        Returns if return_reason is True.
-
-    """
-    # Use current time if not given
-    if time is None:
-        time = Time.now()
-
-    # Create a horizon file if not given
-    if horizon is None:
-        horizon = 30
-    if isinstance(horizon, (int, float)):
-        horizon = ([0, 90, 180, 270, 360], [horizon, horizon, horizon, horizon, horizon])
-
-    # Import the queue from the database
-    queue = PointingQueue.from_database(telescope_id, time)
-    if len(queue) == 0:
-        return None
-
-    # Calculate pointing validity at the given time
-    queue.calculate_priorities(horizon, readout_time, template_requirement)
-
-    # Write out the queue file and web pages
-    if write_file:
-        queue_file = os.path.join(params.QUEUE_PATH, 'queue_info')
-        queue.write_to_file(queue_file)
-    if write_html:
-        # TODO this could be run from elsewhere
-        write_queue_page(queue)
-
-    # Work out what to do next
-    return queue.what_to_do_next(return_reason)

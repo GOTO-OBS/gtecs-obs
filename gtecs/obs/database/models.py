@@ -2316,6 +2316,8 @@ class Telescope(Base):
 
     def get_horizon(self):
         """Get the az/alt values of this Telescope's artificial horizon(s)."""
+        if self.horizon is None:
+            return None
         paths = self.horizon.split(';')
         horizons = []
         for path in paths:

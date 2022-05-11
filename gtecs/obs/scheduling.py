@@ -1,7 +1,6 @@
 """Robotic queue scheduler functions."""
 
 import json
-import logging
 import os
 import warnings
 
@@ -267,6 +266,9 @@ class PointingQueue:
             if self.telescope_id not in self.telescopes_at_site:
                 raise ValueError('Telescope is not correctly linked to Site')
 
+        # Mark that this queue has not been processed yet
+        self.priorities_calculated = False
+
     def __len__(self):
         return len(self.pointings)
 
@@ -321,15 +323,8 @@ class PointingQueue:
                 pointings.append(Pointing.from_database(current_pointing))
 
             # Create the Queue class
-            queue = cls(np.array(pointings), telescope_id, time)
+            queue = cls(pointings, telescope_id, time)
         return queue
-
-    def get_current_pointing(self):
-        """Return the current pointing from the queue."""
-        for p in self.pointings:
-            if p.current:
-                return p
-        return None
 
     def calculate_times(self, readout_time):
         """Calculate the finish times for all pointings."""
@@ -478,8 +473,8 @@ class PointingQueue:
             pointing.tts = tts_arr[i]
             pointing.tiebreaker = tiebreak_arr[i]
 
-    def calculate(self, horizon, readout_time, template_requirement):
-        """Calculate pointing validities at the given time."""
+    def calculate_priorities(self, horizon, readout_time, template_requirement):
+        """Calculate pointing validities and priorities at the given time."""
         # Calculate the expected needed time to observe each Pointing
         self.calculate_times(readout_time)
 
@@ -489,7 +484,13 @@ class PointingQueue:
         # Calculate tiebreaker values for all Pointings
         self.calculate_tiebreakers()
 
-    def get_sorted_queue(self):
+        # Sort the pointings
+        self.sort_pointings()
+
+        # Mark the queue as processed
+        self.priorities_calculated = True
+
+    def sort_pointings(self):
         """Sort all the pointings.
 
         Sorting metrics
@@ -499,35 +500,139 @@ class PointingQueue:
             - Then by number of times already observed
             - Finally use the tiebreaker
         """
-        pointings = list(self.pointings)  # make a copy
-        pointings.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
-        return pointings
+        self.pointings.sort(key=lambda p: (not p.valid,
+                                           p.rank,
+                                           not p.too,
+                                           p.num_obs,
+                                           p.tiebreaker))
 
-    def get_highest_priority_pointing(self):
+    @property
+    def highest_priority_pointing(self):
         """Return the pointing with the highest priority."""
-        # If there are no pointings, return None
         if len(self.pointings) == 0:
             return None
+        elif not self.priorities_calculated:
+            raise ValueError('Queue has not yet been processed')
+        else:
+            return self.pointings[0]
 
-        # Sort the pointings
-        sorted_pointings = self.get_sorted_queue()
+    @property
+    def current_pointing(self):
+        """Return the current pointing from the queue (there should only be one)."""
+        for p in self.pointings:
+            if p.current:
+                return p
+        return None
 
-        # Return the highest
-        return sorted_pointings[0]
+    def what_to_do_next(self, return_reason=False):
+        """Decide what to do based on the current queue.
 
-    def get_highest_priority_pointings(self, number=1):
-        """Return the top X highest priority pointings."""
-        # If there are no pointings, return None
-        if len(self.pointings) == 0:
-            return [None] * number
+        Options are to slew to a new target, remain on the current target, or park the telescope.
 
-        # Sort the pointings
-        sorted_pointings = self.get_sorted_queue()
+        Parameters
+        ----------
+        return_reason: bool, default=False
+            if True, return a string explaining why the result was chosen
 
-        # Return the top X pointings as requested
-        if len(sorted_pointings) < number:
-            sorted_pointings += [None] * (number - len(sorted_pointings))
-        return sorted_pointings[0:number]
+        Returns
+        -------
+        new_pointing : `Pointing` or None
+            The new pointing to send to the pilot
+            Could be either:
+            current_pointing (remain on current target),
+            highest_pointing (slew to new target) or
+            `None`           (nothing to do, park).
+        reason : str
+            Returns if return_reason is True.
+
+        """
+        # Get pointings (this will also ensure the priorities have been calculated)
+        current_pointing = self.current_pointing
+        highest_pointing = self.highest_priority_pointing
+
+        # Deal with either being missing (telescope is idle or queue is empty)
+        if current_pointing is None and highest_pointing is None:
+            reason = 'Not doing anything; Nothing to do => Do nothing'
+            new_pointing = None
+        elif current_pointing is None:
+            if highest_pointing.valid:
+                reason = 'Not doing anything; HP valid => Do HP'
+                new_pointing = highest_pointing
+            else:
+                reason = 'Not doing anything; HP invalid => Do nothing'
+                new_pointing = None
+        elif highest_pointing is None:
+            if not current_pointing.valid:
+                reason = 'CP invalid; Nothing to do => Do nothing'
+                new_pointing = None
+            else:
+                reason = 'CP valid; Nothing to do => Do CP'  # TODO - is that right?
+                new_pointing = current_pointing
+
+        elif current_pointing == highest_pointing:
+            if not current_pointing.valid or not highest_pointing.valid:
+                reason = 'CP==HP and invalid => Do nothing'
+                new_pointing = None  # it's either finished or is now illegal
+            else:
+                reason = 'CP==HP and valid => Do HP'
+                new_pointing = highest_pointing
+
+        elif not current_pointing.valid:  # current pointing is illegal (finished)
+            if highest_pointing.valid:  # new pointing is legal
+                reason = 'CP invalid; HP valid => Do HP'
+                new_pointing = highest_pointing
+            else:
+                reason = 'CP invalid; HP invalid => Do nothing'
+                new_pointing = None
+        else:  # telescope is observing legally
+            if not highest_pointing.valid:  # no legal pointings
+                reason = 'CP valid; HP invalid => Do nothing'
+                new_pointing = None
+            else:  # both are legal
+                if highest_pointing.too:  # slew to a ToO, unless now is also a ToO
+                    if not current_pointing.too:
+                        reason = 'CP < HP; CP is not ToO and HP is => Do HP'
+                        new_pointing = highest_pointing
+                    else:
+                        reason = 'CP < HP; CP is is ToO and HP is ToO => Do CP'
+                        new_pointing = current_pointing
+                else:  # stay for normal pointings
+                    reason = 'CP < HP; but not a ToO => Do CP'
+                    new_pointing = current_pointing
+
+        if not return_reason:
+            return new_pointing
+
+        # Log decision
+        if current_pointing:
+            current_str = '{}'.format(current_pointing.db_id)
+            if not current_pointing.valid:
+                current_str = '*' + current_str
+            if current_pointing.too:
+                current_str = current_str + '!'
+        else:
+            current_str = 'None'
+
+        if highest_pointing:
+            highest_str = '{}'.format(highest_pointing.db_id)
+            if not highest_pointing.valid:
+                highest_str = '*' + highest_str
+            if highest_pointing.too:
+                highest_str = highest_str + '!'
+        else:
+            highest_str = 'None'
+
+        if new_pointing:
+            new_str = '{}'.format(new_pointing.db_id)
+            if not new_pointing.valid:
+                new_str = '*' + new_str
+            if new_pointing.too:
+                new_str = new_str + '!'
+        else:
+            new_str = 'None'
+
+        log_str = 'CP={} HP={}: NP={} ({})'.format(current_str, highest_str, new_str, reason)
+        return new_pointing, log_str
 
     def write_to_file(self, filename):
         """Write any time-dependent pointing infomation to a file."""
@@ -560,122 +665,9 @@ class PointingQueue:
                 f.write('\n')
 
 
-def what_to_do_next(current_pointing, highest_pointing, log=None):
-    """Decide whether to slew to a new target, remain on the current target or park the telescope.
-
-    Parameters
-    ----------
-    current_pointing : `Pointing`
-        The current pointing.
-        `None` if the telescope is idle.
-    highest_pointing : `Pointing`
-        The current highest priority pointing from the queue.
-        `None` if the queue is empty.
-
-    log: `logging.Logger`, optional
-        log object to direct output to
-
-    Returns
-    -------
-    new_pointing : `Pointing`
-        The new pointing to send to the pilot
-        Could be either:
-          current_pointing (remain on current target),
-          highest_pointing (slew to new target) or
-          `None`           (nothing to do, park).
-
-    """
-    # Create a logger if one isn't given
-    if log is None:
-        logging.basicConfig(level=logging.DEBUG)
-        log = logging.getLogger('scheduler')
-
-    # Deal with either being missing (telescope is idle or queue is empty)
-    if current_pointing is None and highest_pointing is None:
-        reason = 'Not doing anything; Nothing to do => Do nothing'
-        new_pointing = None
-    elif current_pointing is None:
-        if highest_pointing.valid:
-            reason = 'Not doing anything; HP valid => Do HP'
-            new_pointing = highest_pointing
-        else:
-            reason = 'Not doing anything; HP invalid => Do nothing'
-            new_pointing = None
-    elif highest_pointing is None:
-        if not current_pointing.valid:
-            reason = 'CP invalid; Nothing to do => Do nothing'
-            new_pointing = None
-        else:
-            reason = 'CP valid; Nothing to do => Do CP'  # TODO - is that right?
-            new_pointing = current_pointing
-
-    elif current_pointing == highest_pointing:
-        if not current_pointing.valid or not highest_pointing.valid:
-            reason = 'CP==HP and invalid => Do nothing'
-            new_pointing = None  # it's either finished or is now illegal
-        else:
-            reason = 'CP==HP and valid => Do HP'
-            new_pointing = highest_pointing
-
-    elif not current_pointing.valid:  # current pointing is illegal (finished)
-        if highest_pointing.valid:  # new pointing is legal
-            reason = 'CP invalid; HP valid => Do HP'
-            new_pointing = highest_pointing
-        else:
-            reason = 'CP invalid; HP invalid => Do nothing'
-            new_pointing = None
-    else:  # telescope is observing legally
-        if not highest_pointing.valid:  # no legal pointings
-            reason = 'CP valid; HP invalid => Do nothing'
-            new_pointing = None
-        else:  # both are legal
-            if highest_pointing.too:  # slew to a ToO, unless now is also a ToO
-                if not current_pointing.too:
-                    reason = 'CP < HP; CP is not ToO and HP is => Do HP'
-                    new_pointing = highest_pointing
-                else:
-                    reason = 'CP < HP; CP is is ToO and HP is ToO => Do CP'
-                    new_pointing = current_pointing
-            else:  # stay for normal pointings
-                reason = 'CP < HP; but not a ToO => Do CP'
-                new_pointing = current_pointing
-
-    # Log decision
-    if current_pointing:
-        current_str = '{}'.format(current_pointing.db_id)
-        if not current_pointing.valid:
-            current_str = '*' + current_str
-        if current_pointing.too:
-            current_str = current_str + '!'
-    else:
-        current_str = 'None'
-
-    if highest_pointing:
-        highest_str = '{}'.format(highest_pointing.db_id)
-        if not highest_pointing.valid:
-            highest_str = '*' + highest_str
-        if highest_pointing.too:
-            highest_str = highest_str + '!'
-    else:
-        highest_str = 'None'
-
-    if new_pointing:
-        new_str = '{}'.format(new_pointing.db_id)
-        if not new_pointing.valid:
-            new_str = '*' + new_str
-        if new_pointing.too:
-            new_str = new_str + '!'
-    else:
-        new_str = 'None'
-
-    log.debug('CP={} HP={}: NP={} ({})'.format(current_str, highest_str, new_str, reason))
-
-    return new_pointing
-
-
 def check_queue(telescope_id, time=None, horizon=None,
                 readout_time=10, template_requirement='ANY',
-                write_file=True, write_html=False, log=None):
+                write_file=True, write_html=False, return_reason=False):
     """Check the queue and decide what to do.
 
     Check the current pointings in the queue, find the highest priority at
@@ -712,14 +704,16 @@ def check_queue(telescope_id, time=None, horizon=None,
         Should the scheduler write the HTML queue webpage?
         Default is False.
 
-    log: `logging.Logger`, optional
-        log object to direct output to
+    return_reason: bool, default=False
+        if True, return a string explaining why the result was chosen
 
     Returns
     -------
     new_pointing : `Pointing`
         The pointing to send to the pilot.
         Could be a new pointing, the current pointing or 'None' (park).
+    reason : str
+        Returns if return_reason is True.
 
     """
     # Use current time if not given
@@ -738,11 +732,7 @@ def check_queue(telescope_id, time=None, horizon=None,
         return None
 
     # Calculate pointing validity at the given time
-    queue.calculate(horizon, readout_time, template_requirement)
-
-    # Get the current pointing and the highest priority pointing
-    current_pointing = queue.get_current_pointing()
-    highest_pointing = queue.get_highest_priority_pointing()
+    queue.calculate_priorities(horizon, readout_time, template_requirement)
 
     # Write out the queue file and web pages
     if write_file:
@@ -753,5 +743,4 @@ def check_queue(telescope_id, time=None, horizon=None,
         write_queue_page(queue)
 
     # Work out what to do next
-    new_pointing = what_to_do_next(current_pointing, highest_pointing, log)
-    return new_pointing
+    return queue.what_to_do_next(return_reason)

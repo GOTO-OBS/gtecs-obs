@@ -157,20 +157,21 @@ class Scheduler:
                 pointings = []
 
                 # Start with the first horizon, find the highest priority Pointing
-                pointing = check_queue(telescope_id,
-                                       time=check_time,
-                                       horizon=self.tel_data[telescope_id]['horizon'][0],
-                                       readout_time=self.readout_time,
-                                       template_requirement=self.template_requirement,
-                                       write_file=self.write_file,
-                                       write_html=self.write_html,
-                                       log=self.log,
-                                       )
+                pointing, reason = check_queue(telescope_id,
+                                               time=check_time,
+                                               horizon=self.tel_data[telescope_id]['horizon'][0],
+                                               readout_time=self.readout_time,
+                                               template_requirement=self.template_requirement,
+                                               write_file=self.write_file,
+                                               write_html=self.write_html,
+                                               return_reason=True,
+                                               )
                 pointings.append(pointing)
+                self.log.debug(f'Telescope {telescope_id}: {reason}')
 
                 # Now check if it's above each horizon, and if not find the next best Pointing
                 # TODO: AltAz is stored on the pointing, there should be a quicker way to check
-                for horizon in self.tel_data[telescope_id]['horizon'][1:]:
+                for i, horizon in enumerate(self.tel_data[telescope_id]['horizon'][1:]):
                     if pointing is not None and not above_horizon(
                             pointing.ra, pointing.dec,
                             self.tel_data[telescope_id]['location'],
@@ -183,16 +184,17 @@ class Scheduler:
                         # A better solution might be for check_queue() to take multiple
                         # horizons and evaluate each pointing based on both, but that's
                         # probably a waste of time (even if altaz is cached).
-                        pointing = check_queue(telescope_id,
-                                               time=check_time,
-                                               horizon=horizon,
-                                               readout_time=self.readout_time,
-                                               template_requirement=self.template_requirement,
-                                               write_file=self.write_file,
-                                               write_html=self.write_html,
-                                               log=self.log,
-                                               )
+                        pointing, reason = check_queue(telescope_id,
+                            time=check_time,
+                            horizon=horizon,
+                            readout_time=self.readout_time,
+                            template_requirement=self.template_requirement,
+                            write_file=self.write_file,
+                            write_html=self.write_html,
+                            return_reason=True,
+                            )
                         pointings.append(pointing)
+                        self.log.debug(f'Telescope {telescope_id}-{i+1}: {reason}')
                     else:
                         # This Pointing is fine
                         pointings.append(pointing)

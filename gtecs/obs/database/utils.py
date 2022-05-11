@@ -23,8 +23,7 @@ from .models import Event, ExposureSet, Grid, GridTile, Pointing, Target, Telesc
 
 
 __all__ = ['get_user', 'validate_user',
-           'get_pointings', 'get_pointing_by_id',
-           'get_filtered_queue', 'get_queue', 'get_current_pointing',
+           'get_pointings', 'get_pointing_by_id', 'get_pending_pointings', 'get_current_pointing',
            'mark_pointing_running', 'mark_pointing_completed', 'mark_pointing_interrupted',
            'mark_pointing_confirmed', 'mark_pointing_failed',
            'get_pointing_info',
@@ -135,12 +134,13 @@ def get_pointing_by_id(session, pointing_id):
     return pointing
 
 
-def get_filtered_queue(session, time=None, rank_limit=None, location=None, telescope_id=None,
-                       altitude_limit=20, hourangle_limit=6, limit_number=None):
-    """Get the queue of pending Pointings, and filter against visibility and rank.
+def get_pending_pointings(session, telescope_id, time=None, rank_limit=None,
+                          altitude_limit=20, hourangle_limit=6, limit_number=None):
+    """Get the queue of pending Pointings for the given telescope.
 
     The queue is defined as all pending pointings with a valid date range. We then filter
-    out pointings that are not visible, order by rank and limit by rank if requested.
+    out pointings that are not visible from the telescope site, as well as ordering and limiting
+    by rank if requested.
 
     Note that rank limits are designed to not return low rank pointings, but *only* if higher
     ranked pointings exist. If all pointings are below the rank limit, all pointings are returned.
@@ -150,19 +150,16 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
 
+    telescope_id : int
+        The telescope to fetch the queue for.
+
     time : `~astropy.time.Time`
-        If given, the time to fetch the queue for.
+        If given, the time to fetch the queue at.
         Defaults to Time.now().
 
     rank_limit: int or None, default None
         Only return pointings with rank greater than given value.
         If all pointings are below the rank limit, all pointings are returned.
-
-    location : `~astropy.coordinates.EarthLocation`
-        Location of observatory. If provided, only visible pointings are returned.
-
-    telescope_id : int or None
-        If given, only pointings set for the given telescope are returned.
 
     altitude_limit : float
         If filtering by visibility, only pointings which ever rise above this altitude are returned
@@ -186,7 +183,7 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
     database.
 
     >>> with open_session() as session:
-    >>>     pointings = get_filtered_queue(session, limit_results=100)
+    >>>     pointings = get_pending_pointings(session, telescope_id=1, limit_results=100)
     >>>     n_pointings = len(pointings)
     >>>     exposure_list = pointings[0].exposure_sets
     >>> pointings[0]
@@ -199,7 +196,7 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
     `load_session` for more details.
 
     >>> session = load_session()
-    >>> pointings = get_filtered_queue(session, limit_results=100)
+    >>> pointings = get_pending_pointings(session, telescope_id=1, limit_results=100)
 
     """
     if time is None:
@@ -210,9 +207,16 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
     # only get pending pointings (will account for start/stop times)
     query = query.filter(Pointing.status_at_time(time) == 'pending')
 
+    # limit by telescope ID
+    query = query.filter(Pointing.tel_is_valid(telescope_id))
+
+    # get the telescope site location
+    if altitude_limit is not None or hourangle_limit is not None:
+        telescope = get_telescope_by_id(session, telescope_id)
+        location = telescope.site.location
+
     # limit by RA and Dec
-    if location is not None:
-        # local sidereal time, units of degrees
+    if hourangle_limit is not None:
         lst = time.sidereal_time('mean', location.lon)
         lo_lim = Longitude(lst - hourangle_limit * u.hourangle).deg
         up_lim = Longitude(lst + hourangle_limit * u.hourangle).deg
@@ -223,21 +227,16 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
             query = query.filter(or_(Pointing.ra < up_lim,
                                      Pointing.ra > lo_lim))
 
-        # is latitude ever greater than limit?
+    # is latitude ever greater than limit?
+    if altitude_limit is not None:
         lat = location.lat.deg
         query = query.filter(Pointing.dec > lat - 90 + altitude_limit,
                              Pointing.dec < lat + 90 - altitude_limit)
 
-    # limit by telescope ID
-    if telescope_id is not None:
-        query = query.filter(Pointing.tel_is_valid(telescope_id))
-
     query = query.order_by('rank')
-
     if rank_limit:
-        number_passing_rank = query.filter(Pointing.rank < rank_limit).count()
-
         # if there are results which pass the rank limit, filter by rank
+        number_passing_rank = query.filter(Pointing.rank < rank_limit).count()
         if number_passing_rank > 0:
             query = query.filter(Pointing.rank < rank_limit)
 
@@ -247,30 +246,6 @@ def get_filtered_queue(session, time=None, rank_limit=None, location=None, teles
     # make the query and return
     pointings = query.all()
     return pointings
-
-
-def get_queue(session, time=None):
-    """Get the currently valid queue.
-
-    The queue is defined as all pending pointings with a valid date range.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
-
-    time : `~astropy.time.Time`
-        If given, the time to fetch the queue for.
-        Defaults to the current time.
-
-    Returns
-    -------
-    pending_pointings : `Pointing`
-        all current pending Pointings
-
-    """
-    # call get_filtered_queue with no filtering
-    return get_filtered_queue(session, time)
 
 
 def get_current_pointing(session, telescope_id=None, time=None):

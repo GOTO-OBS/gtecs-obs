@@ -307,18 +307,13 @@ class PointingQueue:
             hourangle_limit = params.HARD_HA_LIM
 
         with db.open_session() as session:
-            telescope = db.get_telescope_by_id(session, telescope_id)
-            location = telescope.site.location
-
             # Get pending pointings
-            db_pointings = db.get_filtered_queue(session,
-                                                 time=time,
-                                                 location=location,
-                                                 telescope_id=telescope_id,
-                                                 altitude_limit=altitude_limit,
-                                                 hourangle_limit=hourangle_limit,
-                                                 )
-            pointings = [Pointing.from_database(db_pointing) for db_pointing in db_pointings]
+            pending_pointings = db.get_pending_pointings(session, telescope_id,
+                                                         time=time,
+                                                         altitude_limit=altitude_limit,
+                                                         hourangle_limit=hourangle_limit,
+                                                         )
+            pointings = [Pointing.from_database(db_pointing) for db_pointing in pending_pointings]
 
             # Also get the current pointing, if any
             current_pointing = db.get_current_pointing(session, telescope_id, time=time)

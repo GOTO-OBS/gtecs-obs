@@ -257,7 +257,7 @@ with db.open_session() as session:
 # Let's go on 10 minutes, then mark it as running
 # now += 10 * u.minute  # We can't keep adding, the floating point errors add up too quickly
 now = Time('2020-01-01 00:10')
-db.mark_running(pointing_id, telescope_id=1, time=now)
+db.mark_pointing_running(pointing_id, telescope_id=1, time=now)
 
 with db.open_session() as session:
     target = db.get_target_by_id(session, target_id)
@@ -273,7 +273,7 @@ with db.open_session() as session:
 # ~~~~~~~~~~~
 # Wait 5 minutes, mark it as completed
 now = Time('2020-01-01 00:15')
-db.mark_completed(pointing_id, time=now)
+db.mark_pointing_completed(pointing_id, time=now)
 
 with db.open_session() as session:
     target = db.get_target_by_id(session, target_id)
@@ -297,7 +297,7 @@ with db.open_session() as session:
 # ~~~~~~~~~~~
 # Let's go on 65 minutes until after it's valid, then mark it as running
 now = Time('2020-01-01 01:20')
-db.mark_running(pointing_id, telescope_id=1, time=now)
+db.mark_pointing_running(pointing_id, telescope_id=1, time=now)
 
 with db.open_session() as session:
     target = db.get_target_by_id(session, target_id)
@@ -313,7 +313,7 @@ with db.open_session() as session:
 # ~~~~~~~~~~~
 # Wait 3 minutes, mark it as interrupted
 now = Time('2020-01-01 01:23')
-db.mark_interrupted(pointing_id, time=now)
+db.mark_pointing_interrupted(pointing_id, time=now)
 
 with db.open_session() as session:
     target = db.get_target_by_id(session, target_id)
@@ -337,7 +337,7 @@ with db.open_session() as session:
 # ~~~~~~~~~~~
 # Let's wait for 2 minutes, then mark it as running
 now = Time('2020-01-01 01:25')
-db.mark_running(pointing_id, telescope_id=1, time=now)
+db.mark_pointing_running(pointing_id, telescope_id=1, time=now)
 
 with db.open_session() as session:
     target = db.get_target_by_id(session, target_id)
@@ -353,7 +353,7 @@ with db.open_session() as session:
 # ~~~~~~~~~~~
 # Wait another 5 minutes, mark it as completed
 now = Time('2020-01-01 01:30')
-db.mark_completed(pointing_id, time=now)
+db.mark_pointing_completed(pointing_id, time=now)
 
 with db.open_session() as session:
     target = db.get_target_by_id(session, target_id)
@@ -374,7 +374,7 @@ with db.open_session() as session:
 # ~~~~~~~~~~~
 # Now let's wait 5 minutes and mark the previous pointing as failed, and delay the new one by 1h
 now = Time('2020-01-01 01:35')
-db.mark_failed(pointing_id, time=now, delay=3600)
+db.mark_pointing_failed(pointing_id, time=now, delay=3600)
 
 with db.open_session() as session:
     target = db.get_target_by_id(session, target_id)

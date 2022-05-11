@@ -23,10 +23,11 @@ from .models import Event, ExposureSet, Grid, GridTile, Pointing, Target, Telesc
 
 
 __all__ = ['get_user', 'validate_user',
+           'get_pointings', 'get_pointing_by_id',
            'get_filtered_queue', 'get_queue', 'get_current_pointing',
-           'get_pointings', 'get_pointing_by_id', 'get_pointing_info',
            'mark_pointing_running', 'mark_pointing_completed', 'mark_pointing_interrupted',
            'mark_pointing_confirmed', 'mark_pointing_failed',
+           'get_pointing_info',
            'get_targets', 'get_target_by_id',
            'get_exposure_set_by_id',
            'get_telescope_by_id', 'get_telescope_info',
@@ -81,6 +82,57 @@ def validate_user(username, password):
     with open_session() as session:
         user = get_user(session, username)
         return user.password_hash == hashlib.sha512(password.encode()).hexdigest()
+
+
+def get_pointings(session, pointing_ids=None, status=None):
+    """Get pointings, filtered by ID or status.
+
+    Parameters
+    ----------
+    session : `sqlalchemy.Session.session`
+        a session object - see `load_session` or `open_session` for details
+    pointing_ids : int or list
+        supply a pointing ID or list of IDs to filter by id
+    status : string or list
+        supply a status or list of statuses to filter by status
+
+    Returns
+    -------
+    pointings : list of `Pointing`
+        a list of all matching Pointings
+
+    """
+    query = session.query(Pointing)
+    if pointing_ids is not None:
+        query = query.filter(Pointing.db_id.in_(list(pointing_ids)))
+    if status is not None:
+        if isinstance(status, str):
+            status = [status]
+        query = query.filter(Pointing.status.in_(status))
+    pointings = query.all()
+    return pointings
+
+
+def get_pointing_by_id(session, pointing_id):
+    """Get a single Pointing, filtered by ID.
+
+    Parameters
+    ----------
+    session : `sqlalchemy.Session.session`
+        a session object - see `load_session` or `open_session` for details
+    pointing_id : int
+        the id number of the pointing
+
+    Returns
+    -------
+    pointing : `Pointing`
+        the matching Pointing
+
+    """
+    pointing = session.query(Pointing).filter(Pointing.db_id == pointing_id).one_or_none()
+    if not pointing:
+        raise ValueError('No matching Pointing found')
+    return pointing
 
 
 def get_filtered_queue(session, time=None, rank_limit=None, location=None, telescope_id=None,
@@ -252,57 +304,6 @@ def get_current_pointing(session, telescope_id=None, time=None):
         return pointings
 
 
-def get_pointings(session, pointing_ids=None, status=None):
-    """Get pointings, filtered by ID or status.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
-    pointing_ids : int or list
-        supply a pointing ID or list of IDs to filter by id
-    status : string or list
-        supply a status or list of statuses to filter by status
-
-    Returns
-    -------
-    pointings : list of `Pointing`
-        a list of all matching Pointings
-
-    """
-    query = session.query(Pointing)
-    if pointing_ids is not None:
-        query = query.filter(Pointing.db_id.in_(list(pointing_ids)))
-    if status is not None:
-        if isinstance(status, str):
-            status = [status]
-        query = query.filter(Pointing.status.in_(status))
-    pointings = query.all()
-    return pointings
-
-
-def get_pointing_by_id(session, pointing_id):
-    """Get a single Pointing, filtered by ID.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
-    pointing_id : int
-        the id number of the pointing
-
-    Returns
-    -------
-    pointing : `Pointing`
-        the matching Pointing
-
-    """
-    pointing = session.query(Pointing).filter(Pointing.db_id == pointing_id).one_or_none()
-    if not pointing:
-        raise ValueError('No matching Pointing found')
-    return pointing
-
-
 def mark_pointing_running(pointing_id, telescope_id, time=None):
     """Update the given pointing's status to 'running'.
 
@@ -322,118 +323,6 @@ def mark_pointing_running(pointing_id, telescope_id, time=None):
         telescope = get_telescope_by_id(session, telescope_id)
         pointing.mark_running(telescope, time=time)
         session.commit()
-
-
-def get_pointing_info(pointing_id):
-    """Get a dictionary of info for the given Pointing.
-
-    This should contain all the infomation needed for an image FITS header.
-    """
-    pointing_info = {}
-
-    with open_session() as session:
-        # Get the Pointing from the database
-        pointing = get_pointing_by_id(session, pointing_id)
-
-        # Get Pointing info
-        pointing_info['id'] = pointing.db_id
-        # pointing_info['status'] = pointing.status  # Don't include anything time-dependent
-        pointing_info['rank'] = pointing.rank
-        pointing_info['start_time'] = pointing.start_time
-        pointing_info['stop_time'] = pointing.stop_time
-
-        # Get Target info
-        target = pointing.target
-        pointing_info['target_id'] = target.db_id
-        pointing_info['name'] = target.name
-        pointing_info['ra'] = target.ra
-        pointing_info['dec'] = target.dec
-        pointing_info['start_rank'] = target.rank
-        pointing_info['rank_decay'] = target.rank_decay
-        pointing_info['weight'] = target.weight
-        pointing_info['is_template'] = target.is_template
-        pointing_info['num_completed'] = target.num_completed
-        pointing_info['target_start_time'] = target.start_time
-        pointing_info['target_stop_time'] = target.stop_time
-
-        # Get Strategy info
-        strategy = pointing.strategy
-        pointing_info['strategy_id'] = strategy.db_id
-        pointing_info['infinite'] = strategy.infinite
-        pointing_info['min_time'] = strategy.min_time
-        pointing_info['too'] = strategy.too
-        pointing_info['requires_template'] = strategy.requires_template
-        pointing_info['min_alt'] = strategy.min_alt
-        pointing_info['max_sunalt'] = strategy.max_sunalt
-        pointing_info['max_moon'] = strategy.max_moon
-        pointing_info['min_moonsep'] = strategy.min_moonsep
-        pointing_info['tel_mask'] = strategy.tel_mask
-
-        # Get TimeBlock info
-        time_block = pointing.time_block
-        pointing_info['time_block_id'] = time_block.db_id
-        pointing_info['block_num'] = time_block.block_num
-        pointing_info['wait_time'] = time_block.wait_time
-        pointing_info['valid_time'] = time_block.valid_time
-
-        # Get ExposureSet info
-        pointing_info['exposure_sets'] = []
-        for exposure_set in pointing.exposure_sets:
-            expset_info = {}
-            expset_info['id'] = exposure_set.db_id
-            expset_info['num_exp'] = exposure_set.num_exp
-            expset_info['exptime'] = exposure_set.exptime
-            expset_info['filt'] = exposure_set.filt
-            expset_info['binning'] = exposure_set.binning
-            expset_info['ut_mask'] = exposure_set.ut_mask
-            pointing_info['exposure_sets'].append(expset_info)
-
-        # Get User info
-        user = target.user
-        pointing_info['user_id'] = user.db_id
-        pointing_info['user_name'] = user.username
-        pointing_info['user_fullname'] = user.full_name
-
-        # Get Grid info
-        grid_tile = pointing.grid_tile
-        if grid_tile is not None:
-            pointing_info['grid_id'] = grid_tile.grid.db_id
-            pointing_info['grid_name'] = grid_tile.grid.name
-            pointing_info['tile_id'] = grid_tile.db_id
-            pointing_info['tile_name'] = grid_tile.name
-        else:
-            pointing_info['grid_id'] = None
-            pointing_info['grid_name'] = None
-            pointing_info['tile_id'] = None
-            pointing_info['tile_name'] = None
-
-        # Get Survey info
-        survey = pointing.survey
-        if survey is not None:
-            pointing_info['survey_id'] = survey.db_id
-            pointing_info['survey_name'] = survey.name
-            pointing_info['skymap'] = survey.skymap
-        else:
-            pointing_info['survey_id'] = None
-            pointing_info['survey_name'] = None
-            pointing_info['skymap'] = None
-
-        # Get Event info
-        event = pointing.event
-        if event is not None:
-            pointing_info['event_id'] = event.db_id
-            pointing_info['event_name'] = event.name
-            pointing_info['event_source'] = event.source
-            pointing_info['event_type'] = event.type
-            pointing_info['event_time'] = event.time
-        else:
-            pointing_info['event_id'] = None
-            pointing_info['event_name'] = None
-            pointing_info['event_source'] = None
-            pointing_info['event_type'] = None
-            pointing_info['event_time'] = None
-
-    return pointing_info
 
 
 def mark_pointing_completed(pointing_id, schedule_next=True, time=None):
@@ -551,6 +440,118 @@ def mark_pointing_failed(pointing_id, schedule_next=True, delay=None, time=None)
             if next_pointing is not None:
                 session.add(next_pointing)
                 session.commit()
+
+
+def get_pointing_info(pointing_id):
+    """Get a dictionary of info for the given Pointing.
+
+    This should contain all the infomation needed for an image FITS header.
+    """
+    pointing_info = {}
+
+    with open_session() as session:
+        # Get the Pointing from the database
+        pointing = get_pointing_by_id(session, pointing_id)
+
+        # Get Pointing info
+        pointing_info['id'] = pointing.db_id
+        # pointing_info['status'] = pointing.status  # Don't include anything time-dependent
+        pointing_info['rank'] = pointing.rank
+        pointing_info['start_time'] = pointing.start_time
+        pointing_info['stop_time'] = pointing.stop_time
+
+        # Get Target info
+        target = pointing.target
+        pointing_info['target_id'] = target.db_id
+        pointing_info['name'] = target.name
+        pointing_info['ra'] = target.ra
+        pointing_info['dec'] = target.dec
+        pointing_info['start_rank'] = target.rank
+        pointing_info['rank_decay'] = target.rank_decay
+        pointing_info['weight'] = target.weight
+        pointing_info['is_template'] = target.is_template
+        pointing_info['num_completed'] = target.num_completed
+        pointing_info['target_start_time'] = target.start_time
+        pointing_info['target_stop_time'] = target.stop_time
+
+        # Get Strategy info
+        strategy = pointing.strategy
+        pointing_info['strategy_id'] = strategy.db_id
+        pointing_info['infinite'] = strategy.infinite
+        pointing_info['min_time'] = strategy.min_time
+        pointing_info['too'] = strategy.too
+        pointing_info['requires_template'] = strategy.requires_template
+        pointing_info['min_alt'] = strategy.min_alt
+        pointing_info['max_sunalt'] = strategy.max_sunalt
+        pointing_info['max_moon'] = strategy.max_moon
+        pointing_info['min_moonsep'] = strategy.min_moonsep
+        pointing_info['tel_mask'] = strategy.tel_mask
+
+        # Get TimeBlock info
+        time_block = pointing.time_block
+        pointing_info['time_block_id'] = time_block.db_id
+        pointing_info['block_num'] = time_block.block_num
+        pointing_info['wait_time'] = time_block.wait_time
+        pointing_info['valid_time'] = time_block.valid_time
+
+        # Get ExposureSet info
+        pointing_info['exposure_sets'] = []
+        for exposure_set in pointing.exposure_sets:
+            expset_info = {}
+            expset_info['id'] = exposure_set.db_id
+            expset_info['num_exp'] = exposure_set.num_exp
+            expset_info['exptime'] = exposure_set.exptime
+            expset_info['filt'] = exposure_set.filt
+            expset_info['binning'] = exposure_set.binning
+            expset_info['ut_mask'] = exposure_set.ut_mask
+            pointing_info['exposure_sets'].append(expset_info)
+
+        # Get User info
+        user = target.user
+        pointing_info['user_id'] = user.db_id
+        pointing_info['user_name'] = user.username
+        pointing_info['user_fullname'] = user.full_name
+
+        # Get Grid info
+        grid_tile = pointing.grid_tile
+        if grid_tile is not None:
+            pointing_info['grid_id'] = grid_tile.grid.db_id
+            pointing_info['grid_name'] = grid_tile.grid.name
+            pointing_info['tile_id'] = grid_tile.db_id
+            pointing_info['tile_name'] = grid_tile.name
+        else:
+            pointing_info['grid_id'] = None
+            pointing_info['grid_name'] = None
+            pointing_info['tile_id'] = None
+            pointing_info['tile_name'] = None
+
+        # Get Survey info
+        survey = pointing.survey
+        if survey is not None:
+            pointing_info['survey_id'] = survey.db_id
+            pointing_info['survey_name'] = survey.name
+            pointing_info['skymap'] = survey.skymap
+        else:
+            pointing_info['survey_id'] = None
+            pointing_info['survey_name'] = None
+            pointing_info['skymap'] = None
+
+        # Get Event info
+        event = pointing.event
+        if event is not None:
+            pointing_info['event_id'] = event.db_id
+            pointing_info['event_name'] = event.name
+            pointing_info['event_source'] = event.source
+            pointing_info['event_type'] = event.type
+            pointing_info['event_time'] = event.time
+        else:
+            pointing_info['event_id'] = None
+            pointing_info['event_name'] = None
+            pointing_info['event_source'] = None
+            pointing_info['event_type'] = None
+            pointing_info['event_time'] = None
+
+    return pointing_info
 
 
 def get_targets(session, target_ids=None, status=None):

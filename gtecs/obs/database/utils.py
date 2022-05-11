@@ -149,25 +149,20 @@ def get_pending_pointings(session, telescope_id, time=None, rank_limit=None,
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-
     telescope_id : int
         The telescope to fetch the queue for.
 
     time : `~astropy.time.Time`
         If given, the time to fetch the queue at.
         Defaults to Time.now().
-
     rank_limit: int or None, default None
         Only return pointings with rank greater than given value.
         If all pointings are below the rank limit, all pointings are returned.
-
     altitude_limit : float
         If filtering by visibility, only pointings which ever rise above this altitude are returned
-
     hourangle_limit : float
         If filtering by visibility, only pointings with hour angles closer to transit than this
         limit are returned.
-
     limit_number : int or None
         If not None, limit the number of results.
 
@@ -248,35 +243,31 @@ def get_pending_pointings(session, telescope_id, time=None, rank_limit=None,
     return pointings
 
 
-def get_current_pointing(session, telescope_id=None, time=None):
-    """Fetch the current Pointing from the database.
+def get_current_pointing(session, telescope_id, time=None):
+    """Fetch the current Pointing from the database for the given telescope.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
+    telescope_id : int
+        The telescope to fetch the pointing for.
 
-    telescope_id : int or None
-        If not given, all current running Pointings are returned.
     time : `~astropy.time.Time` or None
         If given, the time to check the status at (useful for simulations).
         Defaults to Time.now().
 
     Returns
     -------
-    pointings : `Pointing` or list of `Pointing` or None
-        a single Pointing or None (if telescope_id is given) or a list of any/all running Pointings.
+    pointings : `Pointing` or None
+        a single Pointing, or None if the telescope is idle.
 
     """
     query = session.query(Pointing)
     query = query.filter(Pointing.status_at_time(time) == 'running')
-    if telescope_id is not None:
-        # Shouldn't ever be more than one running for a given telescope
-        pointing = query.filter(Pointing.telescope_id == telescope_id).one_or_none()
-        return pointing
-    else:
-        pointings = query.all()
-        return pointings
+    query = query.filter(Pointing.telescope_id == telescope_id)
+    pointing = query.one_or_none()  # Shouldn't ever be more than one running per telescope
+    return pointing
 
 
 def mark_pointing_running(pointing_id, telescope_id, time=None):

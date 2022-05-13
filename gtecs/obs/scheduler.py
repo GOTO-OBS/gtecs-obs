@@ -50,6 +50,8 @@ class Scheduler:
 
         # Get telescope data (only once, on init)
         self.tel_data = db.get_telescope_info()
+
+        self.old_pointings = {tel_id: [None] for tel_id in self.tel_data}
         self.latest_pointings = {tel_id: [None] for tel_id in self.tel_data}
 
     def __del__(self):
@@ -118,6 +120,8 @@ class Scheduler:
                 self.check_time = self.loop_time
                 self.force_check_flag = False
 
+                # TODO: send database reports to Slack every day?
+
                 # Caretaker step to deal with any unscheduled Targets with expired Pointings
                 self._caretaker()
 
@@ -125,15 +129,29 @@ class Scheduler:
                 check_time = Time(self.check_time, format='unix')
                 new_pointings = self._get_pointings(check_time)
 
-                # TODO: send database reports to Slack every day?
+                # Update stored Pointings
+                self.old_pointings = self.latest_pointings
+                self.latest_pointings = new_pointings
 
-                # Write debug log line (TODO: improve, only log if something changed)
+                # Write status log line
+                # TODO: account for horizons?
                 try:
-                    self.log.debug(new_pointings)
+                    old_strs = ['{}:{}'.format(tel_id,
+                                               self.old_pointings[tel_id][0].db_id
+                                               if self.old_pointings[tel_id][0] is not None
+                                               else 'None')
+                                for tel_id in self.old_pointings]
+                    old_str = ' '.join(old_strs)
+                    new_strs = ['{}:{}'.format(tel_id,
+                                               self.latest_pointings[tel_id][0].db_id
+                                               if self.latest_pointings[tel_id][0] is not None
+                                               else 'None')
+                                for tel_id in self.latest_pointings]
+                    new_str = ' '.join(new_strs)
+                    if new_str != old_str:
+                        self.log.info(new_str)
                 except Exception:
                     self.log.error('Could not write current status')
-
-                self.latest_pointings = new_pointings
 
             time.sleep(0.1)
 
@@ -160,6 +178,8 @@ class Scheduler:
                 pointings = []
 
                 # Import the queue for this telescope from the database
+                # TODO: It would be great if this could be per site,
+                #       then evaluating can take the telescope_id (for telescope constraint)
                 queue = PointingQueue.from_database(telescope_id, check_time)
 
                 # Start with the first horizon, calculate pointing validity

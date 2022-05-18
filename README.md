@@ -62,3 +62,5 @@ Then enable and start the service with
 
     sudo systemctl enable scheduler
     sudo systemctl start scheduler
+
+You can use `systemctl status scheduler` to see the status of the service, or `scheduler info` to see what the scheduler currently thinks is the highest-priority pointing. To view the full queue, use the `db_queue` command.

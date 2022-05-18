@@ -29,7 +29,7 @@ def run(telescope_id, time, horizon, readout_time, template_requirement, limit=N
         return
 
     # Calculate pointing validity at the given time
-    queue.calculate(horizon, readout_time, template_requirement)
+    queue.calculate_priorities(horizon, readout_time, template_requirement)
 
     # Get the pointings, now with extra infomation
     pointing_list = list(queue.pointings)

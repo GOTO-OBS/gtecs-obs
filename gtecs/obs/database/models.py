@@ -433,7 +433,7 @@ class Pointing(Base):
                           lazy='joined',
                           secondary='targets',
                           primaryjoin='Pointing.target_id == Target.db_id',
-                          secondaryjoin='Survey.db_id == Target.event_id',
+                          secondaryjoin='Survey.db_id == Target.survey_id',
                           back_populates='pointings',
                           viewonly=True,
                           uselist=False,

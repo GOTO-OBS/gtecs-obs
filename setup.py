@@ -9,6 +9,7 @@ REQUIRES = ['sqlalchemy>=1.4',
             'astroplan',
             'numpy',
             'scipy',
+            'Pyro4',
             ]
 
 setup(name='gtecs-obs',

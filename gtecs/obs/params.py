@@ -63,6 +63,8 @@ PYRO_TIMEOUT = config['PYRO_TIMEOUT']
 SCHEDULER_CHECK_PERIOD = config['SCHEDULER_CHECK_PERIOD']
 WRITE_QUEUE_FILE = config['WRITE_QUEUE_FILE']
 WRITE_QUEUE_PAGE = config['WRITE_QUEUE_PAGE']
+SCHEDULER_SKIP_DAYTIME = config['SCHEDULER_SKIP_DAYTIME']
+SCHEDULER_SUNALT_LIMIT = config['SCHEDULER_SUNALT_LIMIT']
 
 ############################################################
 # Slack bot parameters

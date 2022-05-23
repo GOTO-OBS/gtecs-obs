@@ -7,6 +7,7 @@ import traceback
 
 import Pyro4
 
+from astropy.coordinates import AltAz, get_sun
 from astropy.time import Time
 
 from gtecs.common.logging import get_logger
@@ -172,10 +173,30 @@ class Scheduler:
 
     def _get_pointings(self, check_time):
         """Calculate what to observe for each telescope in the database."""
+        # Get Sun location for checking if it's night
+        sun_coords = get_sun(check_time)
+
+        # Loop through each telescope
+        # TODO: it would be much better to do this per site...
         tel_pointings = {tel_id: [None] for tel_id in self.tel_data}
         for telescope_id in self.tel_data:
             try:
-                pointings = []
+                # Get site location
+                location = self.tel_data[telescope_id]['location']
+
+                if params.SCHEDULER_SKIP_DAYTIME:
+                    # Check if the sun is up, if so we can just return None
+                    # TODO: If we ever want to display the queue on a webpage we'll still need
+                    #       to calculate every time, even during the day.
+                    altaz_frame = AltAz(obstime=check_time, location=location)
+                    altaz_coords = sun_coords.transform_to(altaz_frame)
+                    sunalt = altaz_coords.alt.degree
+                    if sunalt > params.SCHEDULER_SUNALT_LIMIT:
+                        # It's still daytime
+                        self.log.debug(f'Telescope {telescope_id}: Daytime (sunalt={sunalt:.1f})')
+                        pointings = [None for _ in self.tel_data[telescope_id]['horizon']]
+                        tel_pointings[telescope_id] = pointings
+                        continue
 
                 # Import the queue for this telescope from the database
                 # TODO: It would be great if this could be per site,
@@ -198,17 +219,17 @@ class Scheduler:
 
                 # Find what to do next
                 pointing, reason = queue.what_to_do_next(return_reason=True)
-                pointings.append(pointing)
                 self.log.debug(f'Telescope {telescope_id}: {reason}')
+
+                # Add to list
+                pointings = []
+                pointings.append(pointing)
 
                 # Now check if it's above each horizon, and if not find the next best Pointing
                 # TODO: AltAz is stored on the pointing, there should be a quicker way to check
                 for i, horizon in enumerate(self.tel_data[telescope_id]['horizon'][1:]):
                     if pointing is not None and not above_horizon(
-                            pointing.ra, pointing.dec,
-                            self.tel_data[telescope_id]['location'],
-                            check_time,
-                            horizon):
+                            pointing.ra, pointing.dec, location, check_time, horizon):
                         # The Pointing is below this (presumably higher) horizon.
                         # This should be fairly rare, if it's just for wind shielding.
                         # There might be a more efficient way to do this,
@@ -231,7 +252,8 @@ class Scheduler:
             except Exception:
                 self.log.error('Failed to schedule Pointing for Telescope {}'.format(telescope_id))
                 self.log.debug('', exc_info=True)
-                tel_pointings[telescope_id] = [None]
+                pointings = [None for _ in self.tel_data[telescope_id]['horizon']]
+                tel_pointings[telescope_id] = pointings
         return tel_pointings
 
     # Functions

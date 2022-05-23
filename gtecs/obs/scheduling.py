@@ -473,6 +473,9 @@ class PointingQueue:
 
     def calculate_priorities(self, horizon, readout_time, template_requirement):
         """Calculate pointing validities and priorities at the given time."""
+        if len(self.pointings) == 0:
+            return
+
         # Calculate the expected needed time to observe each Pointing
         self.calculate_times(readout_time)
 
@@ -634,6 +637,9 @@ class PointingQueue:
 
     def write_to_file(self, filename):
         """Write any time-dependent pointing infomation to a file."""
+        if len(self.pointings) == 0:
+            return
+
         # The queue should already have priorities calculated
         if not hasattr(self.pointings[0], 'valid') or not hasattr(self.pointings[0], 'tiebreaker'):
             raise ValueError('Queue has not yet had priorities calculated')

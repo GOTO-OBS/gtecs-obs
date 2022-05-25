@@ -58,13 +58,21 @@ def query(command, args):
         misc.execute_long_command(tail_command)
 
     elif command == 'info':
+        # parse arguments
+        if len(args) == 0:
+            force = False
+        elif len(args) == 1 and args[0] in ['f', 'F', '-f', '-F', '--force-update']:
+            force = True
+        else:
+            raise ValueError('Invalid arguments')
+
         tel_data = db.get_telescope_info()
         for telescope_id in tel_data:
             # Print Pointing (or None) for each telescope
             print(tel_data[telescope_id]['name'], end=': ')
             try:
                 with Pyro4.Proxy(params.PYRO_URI) as proxy:
-                    pointing_info = proxy.check_queue(telescope_id)
+                    pointing_info = proxy.check_queue(telescope_id, horizon=0, force_update=force)
                 if pointing_info is not None:
                     print(f'Pointing ID={pointing_info["id"]} ({pointing_info["name"]})')
                 else:
@@ -89,7 +97,7 @@ def print_instructions():
           '   start                  start the scheduler',
           '   ping                   check if the scheduler is running',
           '   shutdown               shut down the scheduler',
-          '   info                   print the latest scheduled pointings',
+          '   info [-f]              print the latest scheduled pointings [force-update]',
           '   log [tail args]        print scheduler log (alias for tail)',
           '   help                   print these instructions',
           sep='\n')

@@ -116,19 +116,21 @@ class Scheduler:
         while self.running:
             self.loop_time = time.time()
 
+            # TODO: send database reports to Slack, once a day?
+
             # Only check on the given period, or if forced
             if self.force_check_flag or (self.loop_time - self.check_time) > self.check_period:
-                self.check_time = self.loop_time
-                self.force_check_flag = False
-
-                # TODO: send database reports to Slack every day?
-
                 # Caretaker step to deal with any unscheduled Targets with expired Pointings
                 self._caretaker()
 
                 # Get the queue and find highest priority Pointings for each telescope
-                check_time = Time(self.check_time, format='unix')
+                check_time = Time(self.loop_time, format='unix')
+                if self.force_check_flag:
+                    self.log.debug('Checking queue (forced update)')
+                else:
+                    self.log.debug('Checking queue')
                 new_pointings = self._get_pointings(check_time)
+                self.log.debug('Queue check complete')
 
                 # Update stored Pointings
                 self.old_pointings = self.latest_pointings
@@ -153,6 +155,10 @@ class Scheduler:
                         self.log.info(new_str)
                 except Exception:
                     self.log.error('Could not write current status')
+
+                # Set these after the check has finished, so the check_queue() function has to wait
+                self.check_time = self.loop_time
+                self.force_check_flag = False
 
             time.sleep(0.1)
 
@@ -277,10 +283,10 @@ class Scheduler:
             default = False
 
         """
-        if force_update or self.force_check_flag:  # we might be waiting for a forced update
+        if force_update or self.force_check_flag:  # we might already be waiting for an update
             self.force_check_flag = True
-            while self.check_time < self.loop_time:
-                time.sleep(0.01)
+            while self.force_check_flag:
+                time.sleep(0.1)
 
         pointing = self.latest_pointings[telescope_id][horizon]
 

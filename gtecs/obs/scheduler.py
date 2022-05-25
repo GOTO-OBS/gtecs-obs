@@ -281,14 +281,20 @@ class Scheduler:
             self.force_check_flag = True
             while self.check_time < self.loop_time:
                 time.sleep(0.01)
-        self.log.info('CHECKING QUEUE FOR TELESCOPE {}'.format(telescope_id))
+
         pointing = self.latest_pointings[telescope_id][horizon]
+
+        msg = f'Checking queue for Telescope {telescope_id}: returns '
         if pointing is None:
+            msg += 'None'
+            self.log.debug(msg)
             return None
         else:
             pointing_info = db.get_pointing_info(pointing.db_id)
             # Add any useful scheduling info
             pointing_info['obstime'] = pointing.get_obstime(self.readout_time)
+            msg += f'Pointing {pointing_info["id"]}'
+            self.log.debug(msg)
             return pointing_info
 
     def get_pointing_info(self, pointing_id):
@@ -306,6 +312,7 @@ class Scheduler:
 
         """
         db.mark_pointing_running(pointing_id, telescope_id)
+        self.log.debug(f'Marked Pointing {pointing_id} as running on Telescope {telescope_id}')
         self.force_check_flag = True
 
     def mark_pointing_completed(self, pointing_id):
@@ -315,6 +322,7 @@ class Scheduler:
 
         """
         db.mark_pointing_completed(pointing_id, schedule_next=True)
+        self.log.debug(f'Marked Pointing {pointing_id} as completed')
         self.force_check_flag = True
 
     def mark_pointing_interrupted(self, pointing_id):
@@ -324,6 +332,7 @@ class Scheduler:
 
         """
         db.mark_pointing_interrupted(pointing_id, schedule_next=True, delay=None)
+        self.log.debug(f'Marked Pointing {pointing_id} as interrupted')
         self.force_check_flag = True
 
 

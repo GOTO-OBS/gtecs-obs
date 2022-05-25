@@ -271,8 +271,8 @@ class Scheduler:
 
         Parameters
         ----------
-        telescope_id : int
-            The ID number for the Telescope to query the queue for.
+        telescope_id : int, or list of int
+            The ID number(s) for the Telescope(s) to query the queue for.
 
         horizon : int, optional
             Which horizon number to apply, based on horizons defined in the database.
@@ -288,20 +288,29 @@ class Scheduler:
             while self.force_check_flag:
                 time.sleep(0.1)
 
-        pointing = self.latest_pointings[telescope_id][horizon]
+        telescope_ids = telescope_id
+        if isinstance(telescope_id, int):
+            telescope_ids = [telescope_id]
 
-        msg = f'Checking queue for Telescope {telescope_id}: returns '
-        if pointing is None:
-            msg += 'None'
-            self.log.debug(msg)
-            return None
-        else:
-            pointing_info = db.get_pointing_info(pointing.db_id)
-            # Add any useful scheduling info
-            pointing_info['obstime'] = pointing.get_obstime(self.readout_time)
-            msg += f'Pointing {pointing_info["id"]}'
-            self.log.debug(msg)
-            return pointing_info
+        pointings = []
+        for telescope_id in telescope_ids:
+            msg = f'Fetching pointing for Telescope {telescope_id}:'
+            pointing = self.latest_pointings[telescope_id][horizon]
+            if pointing is None:
+                msg += ' returns None'
+                self.log.debug(msg)
+                pointings.append(None)
+            else:
+                pointing_info = db.get_pointing_info(pointing.db_id)
+                # Add any useful scheduling info
+                pointing_info['obstime'] = pointing.get_obstime(self.readout_time)
+                msg += f' returns Pointing {pointing_info["id"]}'
+                self.log.debug(msg)
+                pointings.append(pointing_info)
+
+        if len(pointings) == 1:
+            return pointings[0]
+        return pointings
 
     def get_pointing_info(self, pointing_id):
         """Get info from the database for a given pointing.

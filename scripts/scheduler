@@ -66,15 +66,19 @@ def query(command, args):
         else:
             raise ValueError('Invalid arguments')
 
-        tel_data = db.get_telescope_info()
-        for telescope_id in tel_data:
+        telescope_data = db.get_telescope_info()
+        telescope_ids = tuple(telescope_data.keys())  # has to be hashable for Pyro, tuple not list
+
+        # do one query for all telescopes
+        with Pyro4.Proxy(params.PYRO_URI) as proxy:
+            pointings = proxy.check_queue(telescope_ids, horizon=0, force_update=force)
+
+        for i, telescope_id in enumerate(telescope_ids):
             # Print Pointing (or None) for each telescope
-            print(tel_data[telescope_id]['name'], end=': ')
+            print(telescope_data[telescope_id]['name'], end=': ')
             try:
-                with Pyro4.Proxy(params.PYRO_URI) as proxy:
-                    pointing_info = proxy.check_queue(telescope_id, horizon=0, force_update=force)
-                if pointing_info is not None:
-                    print(f'Pointing ID={pointing_info["id"]} ({pointing_info["name"]})')
+                if pointings[i] is not None:
+                    print(f'Pointing ID={pointings[i]["id"]} ({pointings[i]["name"]})')
                 else:
                     print('None')
                 # TODO: Print higher horizon if shielding?

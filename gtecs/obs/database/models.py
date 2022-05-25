@@ -711,14 +711,19 @@ class Pointing(Base):
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
-        if self.status_at_time(time) == 'deleted':
-            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
-        if self.status_at_time(time) == 'expired':
-            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
-        if self.status_at_time(time) == 'running':
-            raise ValueError(f'Pointing is already running (at {self.running_time})')
-        if self.status_at_time(time) in ['completed', 'interrupted', 'failed']:
-            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
+        current_status = self.status_at_time(time)
+        if current_status == 'deleted':
+            msg = f'Pointing {self.db_id} is already deleted (at {self.finished_time})'
+            raise ValueError(msg)
+        elif current_status == 'expired':
+            msg = f'Pointing {self.db_id} is already expired (at {self.stop_time})'
+            raise ValueError(msg)
+        elif current_status == 'running':
+            msg = f'Pointing {self.db_id} is already running (at {self.running_time})'
+            raise ValueError(msg)
+        elif current_status in ['completed', 'interrupted', 'failed']:
+            msg = f'Pointing {self.db_id} is already {current_status} (at {self.finished_time})'
+            raise ValueError(msg)
 
         self.finished_time = time
 
@@ -731,27 +736,39 @@ class Pointing(Base):
         if telescope is None:
             raise ValueError('Pointings must be linked to a Telescope when marked running')
 
-        if self.status_at_time(time) == 'deleted':
-            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
-        if self.status_at_time(time) == 'upcoming':
-            raise ValueError(f'Pointing has not yet reached its start time (at {self.start_time})')
-        if self.status_at_time(time) == 'expired':
-            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
-        if self.status_at_time(time) == 'running':
-            raise ValueError(f'Pointing is already running (at {self.running_time})')
-        if self.status_at_time(time) in ['completed', 'interrupted', 'failed']:
-            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
+        current_status = self.status_at_time(time)
+        if current_status == 'deleted':
+            msg = f'Pointing {self.db_id} is already deleted (at {self.finished_time})'
+            raise ValueError(msg)
+        elif current_status == 'upcoming':
+            msg = f'Pointing {self.db_id} has not yet reached its start time (at {self.start_time})'
+            raise ValueError(msg)
+        elif current_status == 'expired':
+            msg = f'Pointing {self.db_id} is already expired (at {self.stop_time})'
+            raise ValueError(msg)
+        elif current_status == 'running':
+            msg = f'Pointing {self.db_id} is already running (at {self.running_time})'
+            raise ValueError(msg)
+        elif current_status in ['completed', 'interrupted', 'failed']:
+            msg = f'Pointing {self.db_id} is already {current_status} (at {self.finished_time})'
+            raise ValueError(msg)
 
-        if self.telescope is not None or self.telescope_id is not None:
-            raise ValueError(f'Pointing is already linked to a Telescope: {self.telescope}')
+        if self.telescope is not None:
+            msg = f'Pointing {self.db_id} is already linked to Telescope {self.telescope.db_id}'
+            raise ValueError(msg)
+        elif self.telescope_id is not None:
+            msg = f'Pointing {self.db_id} is already linked to Telescope {self.telescope_id}'
+            raise ValueError(msg)
 
         if (self.valid_telescopes is not None and
                 telescope.db_id not in self.valid_telescopes):
-            raise ValueError(f'Telescope ID ({telescope.db_id}) not in '
-                             f'list of valid telescopes ({self.valid_telescopes})')
+            msg = f'Telescope {telescope.db_id} not in list of valid telescopes'
+            msg += f' ({self.valid_telescopes})'
+            raise ValueError(msg)
         if telescope.current_pointing is not None:
             pointing_id = telescope.current_pointing.db_id
-            raise ValueError(f'Telescope is already observing Pointing ID {pointing_id}')
+            msg = f'Telescope {telescope.db_id} is already observing Pointing {pointing_id}'
+            raise ValueError(msg)
 
         self.running_time = time
         self.telescope = telescope
@@ -763,14 +780,19 @@ class Pointing(Base):
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
-        if self.status_at_time(time) == 'deleted':
-            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
-        if self.status_at_time(time) == 'expired':
-            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
-        if self.status_at_time(time) in ['completed', 'interrupted', 'failed']:
-            raise ValueError(f'Pointing is already finished (at {self.finished_time})')
-        if self.status_at_time(time) != 'running':
-            raise ValueError('Pointing is not running (use mark_deleted to stop before running)')
+        current_status = self.status_at_time(time)
+        if current_status == 'deleted':
+            msg = f'Pointing {self.db_id} is already deleted (at {self.finished_time})'
+            raise ValueError(msg)
+        elif current_status == 'expired':
+            msg = f'Pointing {self.db_id} is already expired (at {self.stop_time})'
+            raise ValueError(msg)
+        elif current_status in ['completed', 'interrupted', 'failed']:
+            msg = f'Pointing {self.db_id} is already {current_status} (at {self.finished_time})'
+            raise ValueError(msg)
+        elif current_status != 'running':
+            msg = f'Pointing {self.db_id} is not running (use mark_deleted to stop before running)'
+            raise ValueError(msg)
 
         self.finished_time = time
         self.completed = completed
@@ -782,18 +804,25 @@ class Pointing(Base):
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
-        if self.status_at_time(time) == 'deleted':
-            raise ValueError(f'Pointing is already deleted (at {self.finished_time})')
-        if self.status_at_time(time) == 'expired':
-            raise ValueError(f'Pointing is already expired (at {self.stop_time})')
-        if self.status_at_time(time) == 'running':
-            raise ValueError(f'Pointing is still running (at {self.running_time})')
-        if self.status_at_time(time) == 'interrupted':
-            raise ValueError(f'Pointing was interrupted (at {self.finished_time})')
-        if self.status_at_time(time) != 'completed':
-            raise ValueError('Pointing is not completed (use mark_finished before validating)')
-        if self.validated_time is not None and self.validated_time > time:
-            raise ValueError('Pointing has already been validated (at {self.validated_time})')
+        current_status = self.status_at_time(time)
+        if current_status == 'deleted':
+            msg = f'Pointing {self.db_id} is already deleted (at {self.finished_time})'
+            raise ValueError(msg)
+        elif current_status == 'expired':
+            msg = f'Pointing {self.db_id} is already expired (at {self.stop_time})'
+            raise ValueError(msg)
+        elif current_status == 'running':
+            msg = f'Pointing {self.db_id} is still running (at {self.running_time})'
+            raise ValueError(msg)
+        elif current_status == 'interrupted':
+            msg = f'Pointing {self.db_id} was interrupted (at {self.finished_time})'
+            raise ValueError(msg)
+        elif current_status != 'completed':
+            msg = f'Pointing {self.db_id} is not completed (use mark_finished before validating)'
+            raise ValueError(msg)
+        elif self.validated_time is not None and self.validated_time > time:
+            msg = f'Pointing {self.db_id} has already been validated (at {self.validated_time})'
+            raise ValueError(msg)
 
         self.validated_time = time
         self.valid = good
@@ -836,7 +865,7 @@ class Strategy(Base):
         if the given `num_todo` is greater than times given the list will be looped.
         default = 0 (no delay)
     valid_time : float, `astropy.units.Quantity`, list of same, or None, optional
-        the amount of time Pointing should reamin valid in the queue.
+        the amount of time Pointing should remain valid in the queue.
         if a Quantity it should have units of time, if a float assume in seconds.
         less than zero or None means valid indefinitely
         if the given `num_todo` is greater than times given the list will be looped.
@@ -902,7 +931,7 @@ class Strategy(Base):
         number of Pointings still to do (same as num_todo - num_completed)
         see also the `num_remaining_at_time()` method
     infinite : bool
-        if Pointings will be regenerated infnitely (if num_todo is < 0)
+        if Pointings will be regenerated indefinitely (if num_todo is < 0)
     valid_telescopes : list of int
         a list of valid Telescope IDs, if any, based on the tel_mask
 
@@ -1853,12 +1882,16 @@ class Target(Base):
         if isinstance(time, (str, datetime.datetime)):
             time = Time(time)
 
-        if self.status_at_time(time) == 'deleted':
-            raise ValueError(f'Target is already deleted (at={self.deleted_time})')
-        if self.status_at_time(time) == 'expired':
-            raise ValueError(f'Target is already expired (at {self.stop_time})')
-        if self.status_at_time(time) == 'completed':
-            raise ValueError('Target is already completed')
+        current_status = self.status_at_time(time)
+        if current_status == 'deleted':
+            msg = f'Target {self.db_id}  is already deleted (at={self.deleted_time})'
+            raise ValueError(msg)
+        elif current_status == 'expired':
+            msg = f'Target {self.db_id} is already expired (at {self.stop_time})'
+            raise ValueError(msg)
+        elif current_status == 'completed':
+            msg = f'Target {self.db_id} is already completed'
+            raise ValueError(msg)
 
         # Pointings can use finished_time, but we need an explicit deleted_time
         self.deleted_time = time
@@ -2125,7 +2158,7 @@ class Site(Base):
     db_id : int
         primary database key
         only populated when the instance is added to the database
-    location : `astropy.cooridnates.EarthLocation`
+    location : `astropy.coordinates.EarthLocation`
         Astropy EarthLocation class for this Site
     tel_mask : int
         the binary telescope mask for the telescopes at this site
@@ -2257,6 +2290,7 @@ class Telescope(Base):
     -------
     get_horizon() : 2-tuple of lists, or list of same
         get this Telescope's artificial horizon(s)
+
     """
 
     # Set corresponding SQL table name
@@ -2630,7 +2664,7 @@ class GridTile(Base):
 class Survey(Base):
     """A class to represent a Survey.
 
-    A Survey is a way to group Targets, usually from a paticular Event.
+    A Survey is a way to group Targets, usually from a particular Event.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes

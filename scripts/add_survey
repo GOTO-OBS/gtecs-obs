@@ -69,6 +69,7 @@ def fill_target():
                        'max_sunalt': None,
                        'max_moon': None,
                        'min_moonsep': None,
+                       'tel_mask': None,
                        }
 
     while target_params['rank'] is None:
@@ -144,6 +145,15 @@ def fill_target():
                 strategy_params['min_moonsep'] = float(min_moonsep)
             except Exception:
                 print('Invalid input')
+
+    telescope_data = db.get_telescope_info()
+    tel_mask = 'unknown'  # Can't test on None, since it's a valid mask!
+    while tel_mask == 'unknown':
+        telescope_id = input('Restrict to a single telescope? [<int>/n]: ')
+        if telescope_id in ['n', 'N']:
+            strategy_params['tel_mask'] = None
+        elif int(telescope_id) in telescope_data:
+            strategy_params['tel_mask'] = 2 ** (int(telescope_id) - 1)
 
     return target_params, strategy_params
 

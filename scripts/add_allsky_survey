@@ -75,10 +75,11 @@ def run():
         grid = db.get_current_grid(session)
 
         # Give option to restrict to a specific telescope
+        # We do this here instead of in fill_target() so we can change the survey name
         telescope_data = db.get_telescope_info()
-        tel_mask = 'unknown'
+        tel_mask = 'unknown'  # Can't test on None, since it's a valid mask!
         while tel_mask == 'unknown':
-            telescope_id = input('Restrict to single telescope? [<int>/n]: ')
+            telescope_id = input('Restrict to a single telescope? [<int>/n]: ')
             if telescope_id in ['n', 'N']:
                 telescope_id = None
                 tel_mask = None

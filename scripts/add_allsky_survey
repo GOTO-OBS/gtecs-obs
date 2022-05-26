@@ -8,12 +8,61 @@ import astropy.units as u
 from gtecs.obs import database as db
 
 
-TARGET_PARAMS = {'rank': None,  # Infinite rank == queue fillers
-                 }
-STRATEGY_PARAMS = {'num_todo': -1,
-                   'wait_time': 72 * u.hour,
-                   }
-EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'}]
+DEFAULT_WAIT_TIME = 72  # hours
+
+
+def fill_target():
+    """Fill out a target frame with user input."""
+    target_params = {'rank': None  # Infinite rank == queue fillers
+                     }
+
+    strategy_params = {'num_todo': -1,  # Infinite repeats
+                       'wait_time': None,
+                       }
+
+    default_strategy = None
+    while default_strategy not in ['y', 'n', 'Y', 'N']:
+        string = 'Use default strategy (wait_time={})? [y/n]: '.format(DEFAULT_WAIT_TIME)
+        default_strategy = input(string)
+    if default_strategy in ['y', 'Y']:
+        strategy_params['wait_time'] = DEFAULT_WAIT_TIME * u.hour
+    else:
+        while strategy_params['wait_time'] is None:
+            wait_time = input('Delay between observations (in hours): ')
+            try:
+                strategy_params['wait_time'] = float(wait_time) * u.hour
+            except Exception:
+                print('Invalid input')
+
+    return target_params, strategy_params
+
+
+def fill_exposure_set():
+    """Fill out an exposure set frame with user input."""
+    exps_params = {'num_exp': None, 'exptime': None, 'filt': None}
+
+    while exps_params['num_exp'] is None:
+        num_exp = input('Number of exposures: ')
+        try:
+            exps_params['num_exp'] = int(num_exp)
+        except Exception:
+            print('Invalid input')
+
+    while exps_params['exptime'] is None:
+        exptime = input('Exposure time: ')
+        try:
+            exps_params['exptime'] = int(exptime)
+        except Exception:
+            print('Invalid input')
+
+    while exps_params['filt'] not in ['L', 'R', 'G', 'B']:
+        filt = input('Filter [L/R/G/B]: ')
+        try:
+            exps_params['filt'] = filt.upper()
+        except Exception:
+            print('Invalid input')
+
+    return exps_params
 
 
 def run():
@@ -25,25 +74,62 @@ def run():
         # Get the current grid
         grid = db.get_current_grid(session)
 
+        # Give option to restrict to a specific telescope
+        telescope_data = db.get_telescope_info()
+        tel_mask = 'unknown'
+        while tel_mask == 'unknown':
+            telescope_id = input('Restrict to single telescope? [<int>/n]: ')
+            if telescope_id in ['n', 'N']:
+                telescope_id = None
+                tel_mask = None
+            elif int(telescope_id) in telescope_data:
+                telescope_id = int(telescope_id)
+                tel_mask = 2 ** (telescope_id - 1)
+
+        # Get Survey name
+        if telescope_id is None:
+            survey_name = 'Allsky_survey'
+        else:
+            telescope_name = telescope_data[telescope_id]['name']
+            survey_name = '{}_allsky_survey'.format(telescope_name)
+
+        # Get Target and Strategy params
+        target_params, strategy_params = fill_target()
+        strategy_params['tel_mask'] = tel_mask
+
+        # Get ExposureSet params
+        exposure_sets = []
+        more_exposures = True
+        while more_exposures is True:
+            exps_params = fill_exposure_set()
+            exposure_sets.append(exps_params)
+
+            add_more = None
+            while add_more not in ['y', 'Y', 'n', 'N']:
+                add_more = input('Add another exposure set? [y/n]: ')
+
+            if add_more not in ['y', 'Y']:
+                more_exposures = False
+
         # Create a Survey
         print('Creating survey...')
-        survey = db.Survey(name='Allsky_survey')
+        survey = db.Survey(name=survey_name)
 
         # Create Targets
         targets = []
         print('Creating targets...')
         start = time.time()
         for grid_tile in grid.grid_tiles:
-            target_params = TARGET_PARAMS.copy()
-            target_params['name'] = survey.name + '_' + grid_tile.name
+            name = survey.name + '_' + grid_tile.name
 
-            target = db.Target(**target_params,
+            target = db.Target(name=name,
+                               **target_params,
                                user=user,
-                               strategy=db.Strategy(**STRATEGY_PARAMS.copy()),
+                               strategy=db.Strategy(**strategy_params),
                                grid_tile=grid_tile,
                                survey=survey,
                                )
-            for exps_params in EXPS_PARAMS:
+            for exps_params in exposure_sets:
                 target.exposure_sets.append(db.ExposureSet(**exps_params))
 
             targets.append(target)

@@ -223,7 +223,18 @@ def run(filename, coords_or_tiles='coords', on_grid=True):
         target_params, strategy_params = fill_target()
 
         # Get ExposureSet params
-        exps_params = fill_exposure_set()
+        exposure_sets = []
+        more_exposures = True
+        while more_exposures is True:
+            exps_params = fill_exposure_set()
+            exposure_sets.append(exps_params)
+
+            add_more = None
+            while add_more not in ['y', 'Y', 'n', 'N']:
+                add_more = input('Add another exposure set? [y/n]: ')
+
+            if add_more not in ['y', 'Y']:
+                more_exposures = False
 
         # Get default User
         user = db.get_user(session, username='default')
@@ -273,7 +284,8 @@ def run(filename, coords_or_tiles='coords', on_grid=True):
                                grid_tile=grid_tile,
                                survey=survey,
                                )
-            target.exposure_sets.append(db.ExposureSet(**exps_params))
+            for exps_params in exposure_sets:
+                target.exposure_sets.append(db.ExposureSet(**exps_params))
 
             targets.append(target)
         print('  took {:.2f} secs'.format(time.time() - start))

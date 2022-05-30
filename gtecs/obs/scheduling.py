@@ -496,14 +496,12 @@ class PointingQueue:
         # Calculate tiebreaker values for all Pointings
         self.calculate_tiebreakers()
 
-        # Sort the pointings
-        self.sort_pointings()
-
         # Mark the queue as processed
         self.priorities_calculated = True
 
-    def sort_pointings(self):
-        """Sort all the pointings.
+    @property
+    def sorted_pointings(self):
+        """Return the pointings sorted by priority.
 
         Sorting metrics
             - First is by validity
@@ -512,21 +510,22 @@ class PointingQueue:
             - Then by number of times already observed
             - Finally use the tiebreaker
         """
-        self.pointings.sort(key=lambda p: (not p.valid,
-                                           p.rank,
-                                           not p.too,
-                                           p.num_obs,
-                                           p.tiebreaker))
+        if not self.priorities_calculated:
+            raise ValueError('Queue has not yet been processed')
+        pointings = self.pointings.copy()
+        pointings.sort(key=lambda p: (not p.valid,
+                                      p.rank,
+                                      not p.too,
+                                      p.num_obs,
+                                      p.tiebreaker))
+        return pointings
 
     @property
     def highest_priority_pointing(self):
         """Return the pointing with the highest priority."""
         if len(self.pointings) == 0:
             return None
-        elif not self.priorities_calculated:
-            raise ValueError('Queue has not yet been processed')
-        else:
-            return self.pointings[0]
+        return self.sorted_pointings[0]
 
     @property
     def current_pointing(self):

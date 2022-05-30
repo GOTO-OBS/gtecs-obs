@@ -131,12 +131,11 @@ class TemplateConstraint:
 class Pointing:
     """A class to contain information on each Pointing in the Queue."""
 
-    def __init__(self, db_id, status, name, ra, dec, rank, weight, num_obs, too,
+    def __init__(self, db_id, name, ra, dec, rank, weight, num_obs, too,
                  mintime, maxsunalt, minalt, maxmoon, minmoonsep,
-                 start, stop, current_telescope, valid_telescopes, template_telescopes, exp_sets,
-                 time=None):
+                 start, stop, valid_telescopes, template_telescopes, exp_sets,
+                 time=None, current_telescope=None):
         self.db_id = int(db_id)
-        self.status = status
         self.name = name
         self.ra = float(ra)
         self.dec = float(dec)
@@ -151,10 +150,10 @@ class Pointing:
         self.minmoonsep = minmoonsep
         self.start = start
         self.stop = stop
-        self.current_telescope = current_telescope
         self.valid_telescopes = valid_telescopes
         self.template_telescopes = template_telescopes
         self.exp_sets = exp_sets
+        self.current_telescope = current_telescope
 
         if time is None:
             time = Time.now()
@@ -170,11 +169,11 @@ class Pointing:
         return self != other
 
     def __repr__(self):
-        template = ('<Pointing: db_id={}, time={}, status={}>')
-        return template.format(self.db_id, self.time, self.status)
+        template = ('<Pointing: db_id={}, name="{}">')
+        return template.format(self.db_id, self.name)
 
     @classmethod
-    def from_database(cls, db_pointing, time=None):
+    def from_database(cls, db_pointing, time=None, current_telescope=None):
         """Import a pointing from the database."""
         if time is None:
             time = Time.now()
@@ -184,13 +183,6 @@ class Pointing:
         rank = db_pointing.rank
         start_time = db_pointing.start_time
         stop_time = db_pointing.stop_time
-        status = db_pointing.status_at_time(time)
-        if status == 'running':
-            current_telescope = db_pointing.telescope_id
-            if current_telescope is None:
-                raise ValueError('Pointing {} is running but has Telescope ID'.format(db_id))
-        else:
-            current_telescope = None
 
         # Get linked Target properties
         db_target = db_pointing.target
@@ -221,11 +213,11 @@ class Pointing:
             template_telescopes = None  # no restriction
 
         # Get linked ExposureSet properties
-        exp_sets = [(es.num_exp, es.exptime) for es in db_pointing.exposure_sets]
+        # (from target not pointing, it's much quicker!)
+        exp_sets = [(es.num_exp, es.exptime) for es in db_target.exposure_sets]
 
         # Create Pointing object
         pointing = cls(db_id=db_id,
-                       status=status,
                        name=name,
                        ra=ra,
                        dec=dec,
@@ -240,11 +232,11 @@ class Pointing:
                        minmoonsep=min_moonsep,
                        start=start_time,
                        stop=stop_time,
-                       current_telescope=current_telescope,
                        valid_telescopes=valid_telescopes,
                        template_telescopes=template_telescopes,
                        exp_sets=exp_sets,
                        time=time,
+                       current_telescope=current_telescope,
                        )
         return pointing
 
@@ -333,7 +325,10 @@ class PointingQueue:
             for telescope in site.telescopes:
                 current_pointing = db.get_current_pointing(session, telescope.db_id, time=time)
                 if current_pointing is not None:
-                    pointing = Pointing.from_database(current_pointing, time=time)
+                    # Note we set the current telescope ID here, it's much faster than finding the
+                    # status_at_time for every Pointing.
+                    pointing = Pointing.from_database(current_pointing, time=time,
+                                                      current_telescope=telescope.db_id)
                     pointings.append(pointing)
 
             # Create the Queue class

@@ -6,7 +6,7 @@ The returned classes are then linked to this session, so any changes will have t
 manually (if using `load_session`) or when the session is closed (if using `open_session`).
 
 Functions that either act on the database and return nothing (e.g. `mark_pointing_running`)
-or that query the database and return infomation instead of classes (e.g. `validate_user` -> bool,
+or that query the database and return information instead of classes (e.g. `validate_user` -> bool,
 `get_pointing_info` -> dict) do not require a session (they create their own internally).
 """
 
@@ -19,7 +19,7 @@ from astropy.time import Time
 from sqlalchemy import or_
 
 from .management import open_session
-from .models import Event, ExposureSet, Grid, GridTile, Pointing, Target, Telescope, User
+from .models import Event, ExposureSet, Grid, GridTile, Pointing, Site, Target, Telescope, User
 
 
 __all__ = ['get_user', 'validate_user',
@@ -29,7 +29,7 @@ __all__ = ['get_user', 'validate_user',
            'get_pointing_info',
            'get_targets', 'get_target_by_id',
            'get_exposure_set_by_id',
-           'get_telescope_by_id', 'get_telescope_info',
+           'get_telescope_by_id', 'get_telescope_info', 'get_site_by_id', 'get_site_info',
            'get_current_grid', 'get_grid_tile_by_name',
            'get_events',
            'insert_items',
@@ -134,8 +134,8 @@ def get_pointing_by_id(session, pointing_id):
     return pointing
 
 
-def get_pending_pointings(session, telescope_id, time=None, rank_limit=None,
-                          altitude_limit=20, hourangle_limit=6, limit_number=None):
+def get_pending_pointings(session, time=None, location=None, altitude_limit=20, hourangle_limit=6,
+                          rank_limit=None, limit_number=None):
     """Get the queue of pending Pointings for the given telescope.
 
     The queue is defined as all pending pointings with a valid date range. We then filter
@@ -149,49 +149,32 @@ def get_pending_pointings(session, telescope_id, time=None, rank_limit=None,
     ----------
     session : `sqlalchemy.Session.session`
         a session object - see `load_session` or `open_session` for details
-    telescope_id : int
-        The telescope to fetch the queue for.
 
     time : `~astropy.time.Time`
         If given, the time to fetch the queue at.
         Defaults to Time.now().
-    rank_limit: int or None, default None
-        Only return pointings with rank greater than given value.
-        If all pointings are below the rank limit, all pointings are returned.
+    location : `~astropy.coordinates.EarthLocation`
+        If given, the site location to fetch the queue for.
+        Defaults to None, meaning the queue will not be filtered for visibility.
     altitude_limit : float
-        If filtering by visibility, only pointings which ever rise above this altitude are returned
+        If a location is given, only pointings which ever rise above this altitude are returned.
+        Defaults to 20 degrees.
     hourangle_limit : float
-        If filtering by visibility, only pointings with hour angles closer to transit than this
+        If a location is given, only pointings with hour angles closer to transit than this
         limit are returned.
-    limit_number : int or None
-        If not None, limit the number of results.
+        Defaults to 6 hours.
+    rank_limit: int
+        If given, only return pointings with rank greater than given value.
+        If all pointings are below the rank limit, all pointings are returned.
+        Defaults to None, meaning no rank filtering.
+    limit_number : int
+        If given, limit the number of results.
+        Defaults to None, meaning no limit of the number of pointings to return.
 
     Returns
     -------
     pointings : list of `Pointing`
         all pending Pointings, after filtering
-
-    Examples
-    --------
-    An example using `open_session`. The items retrieved won't function outside the
-    scope of the with block, since they rely on a session to access the underlying
-    database.
-
-    >>> with open_session() as session:
-    >>>     pointings = get_pending_pointings(session, telescope_id=1, limit_results=100)
-    >>>     n_pointings = len(pointings)
-    >>>     exposure_list = pointings[0].exposure_sets
-    >>> pointings[0]
-    DetachedInstanceError: Instance <Pointing at 0x10a00ac50> is not bound to a Session;
-    attribute refresh operation cannot proceed
-
-    An example using `load_session`. This will return a session object. With this method
-    you don't have to worry so about about scope, but you do have to be careful about
-    trapping errors and commiting any changes you make to the database. See the help for
-    `load_session` for more details.
-
-    >>> session = load_session()
-    >>> pointings = get_pending_pointings(session, telescope_id=1, limit_results=100)
 
     """
     if time is None:
@@ -202,31 +185,24 @@ def get_pending_pointings(session, telescope_id, time=None, rank_limit=None,
     # only get pending pointings (will account for start/stop times)
     query = query.filter(Pointing.status_at_time(time) == 'pending')
 
-    # limit by telescope ID
-    query = query.filter(Pointing.tel_is_valid(telescope_id))
+    if location is not None:
+        # limit by hour angle
+        if hourangle_limit is not None:
+            lst = time.sidereal_time('mean', location.lon)
+            lo_lim = Longitude(lst - hourangle_limit * u.hourangle).deg
+            up_lim = Longitude(lst + hourangle_limit * u.hourangle).deg
+            if up_lim > lo_lim:
+                query = query.filter(Pointing.ra < up_lim,
+                                     Pointing.ra > lo_lim)
+            else:
+                query = query.filter(or_(Pointing.ra < up_lim,
+                                         Pointing.ra > lo_lim))
 
-    # get the telescope site location
-    if altitude_limit is not None or hourangle_limit is not None:
-        telescope = get_telescope_by_id(session, telescope_id)
-        location = telescope.site.location
-
-    # limit by RA and Dec
-    if hourangle_limit is not None:
-        lst = time.sidereal_time('mean', location.lon)
-        lo_lim = Longitude(lst - hourangle_limit * u.hourangle).deg
-        up_lim = Longitude(lst + hourangle_limit * u.hourangle).deg
-        if up_lim > lo_lim:
-            query = query.filter(Pointing.ra < up_lim,
-                                 Pointing.ra > lo_lim)
-        else:
-            query = query.filter(or_(Pointing.ra < up_lim,
-                                     Pointing.ra > lo_lim))
-
-    # is latitude ever greater than limit?
-    if altitude_limit is not None:
-        lat = location.lat.deg
-        query = query.filter(Pointing.dec > lat - 90 + altitude_limit,
-                             Pointing.dec < lat + 90 - altitude_limit)
+        # limit by altitude
+        if altitude_limit is not None:
+            lat = location.lat.deg
+            query = query.filter(Pointing.dec > lat - 90 + altitude_limit,
+                                 Pointing.dec < lat + 90 - altitude_limit)
 
     query = query.order_by('rank')
     if rank_limit:
@@ -411,7 +387,7 @@ def mark_pointing_failed(pointing_id, schedule_next=True, delay=None, time=None)
 def get_pointing_info(pointing_id):
     """Get a dictionary of info for the given Pointing.
 
-    This should contain all the infomation needed for an image FITS header.
+    This should contain all the information needed for an image FITS header.
     """
     pointing_info = {}
 
@@ -631,6 +607,54 @@ def get_telescope_info():
             tel_data['horizon'] = telescope.get_horizon()
             tel_data['location'] = telescope.site.location
             data[telescope.db_id] = tel_data
+    return data
+
+
+def get_site_by_id(session, site_id):
+    """Get a single Site, filtered by ID.
+
+    Parameters
+    ----------
+    session : `sqlalchemy.Session.session`
+        a session object - see `load_session` or `open_session` for details
+    site_id : int
+        the id number of the site
+
+    Returns
+    -------
+    site : `Site`
+        the matching site
+
+    """
+    site = session.query(Site).filter(Site.db_id == site_id).one_or_none()
+    if not site:
+        raise ValueError('No matching Site found')
+    return site
+
+
+def get_site_info(site_id=None):
+    """Get the key info on one or all of the sites and telescopes defined in the database."""
+    data = {}
+    with open_session() as session:
+        sites = session.query(Site).all()
+        for site in sites:
+            site_data = {}
+            site_data['name'] = site.name
+            site_data['location'] = site.location
+            site_data['telescopes'] = {}
+            for telescope in site.telescopes:
+                tel_data = {}
+                tel_data['name'] = telescope.name
+                tel_data['status'] = telescope.status
+                if telescope.current_pointing is not None:
+                    tel_data['current_pointing'] = telescope.current_pointing.db_id
+                else:
+                    tel_data['current_pointing'] = None
+                tel_data['horizon'] = telescope.get_horizon()
+                site_data['telescopes'][telescope.db_id] = tel_data
+            data[site.db_id] = site_data
+    if site_id is not None:
+        return data[site_id]
     return data
 
 

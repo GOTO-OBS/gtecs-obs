@@ -52,11 +52,11 @@ def run(overwrite=False, add_defaults=False, verbose=False):
 
         # Copy default horizon files for each (if they don't already exist)
         horizons = []
-        for tel_id in [1, 2, 3, 4]:
+        for telescope_id in [1, 2, 3, 4]:
             horizon_paths = []
             for filename in ['horizon', 'horizon_shielding']:
                 default_file = os.path.join(params.FILE_PATH, filename + '_default')
-                new_file = os.path.join(params.FILE_PATH, filename + f'_{tel_id}')
+                new_file = os.path.join(params.FILE_PATH, filename + f'_{telescope_id}')
                 if not os.path.exists(new_file):
                     shutil.copy(default_file, new_file)
                 horizon_paths.append((new_file))

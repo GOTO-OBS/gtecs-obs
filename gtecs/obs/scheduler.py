@@ -15,7 +15,6 @@ from gtecs.common.logging import get_logger
 from . import database as db
 from . import params
 from .astronomy import above_horizon
-from .html import write_queue_page
 from .scheduling import PointingQueue
 from .slack import send_slack_msg
 
@@ -49,11 +48,15 @@ class Scheduler:
         self.queue_file = os.path.join(params.QUEUE_PATH, 'queue_info')
         self.write_html = params.WRITE_QUEUE_PAGE
 
-        # Get telescope data (only once, on init)
-        self.tel_data = db.get_telescope_info()
+        # Get site data (only once, on init)
+        self.site_data = db.get_site_info()
+        self.telescopes = sorted([telescope_id
+                                  for telescopes in [self.site_data[site_id]['telescopes'].keys()
+                                                     for site_id in self.site_data]
+                                  for telescope_id in telescopes])
 
-        self.old_pointings = {tel_id: [None] for tel_id in self.tel_data}
-        self.latest_pointings = {tel_id: [None] for tel_id in self.tel_data}
+        self.old_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
+        self.latest_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
 
     def __del__(self):
         self.shutdown()
@@ -130,11 +133,10 @@ class Scheduler:
                 else:
                     self.log.debug('Checking queue')
 
-                # Loop through each telescope
-                # TODO: it would be much better to do this per site...
-                new_pointings = {tel_id: [None] for tel_id in self.tel_data}
-                for telescope_id in self.tel_data:
-                    new_pointings[telescope_id] = self._get_pointings(telescope_id, check_time)
+                # Loop through each site
+                new_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
+                for site_id in self.site_data:
+                    new_pointings.update(self._get_pointings(site_id, check_time))
                 self.log.debug('Queue check complete')
 
                 # Update stored Pointings
@@ -144,17 +146,17 @@ class Scheduler:
                 # Write status log line
                 # TODO: account for horizons?
                 try:
-                    old_strs = ['{}:{}'.format(tel_id,
-                                               self.old_pointings[tel_id][0].db_id
-                                               if self.old_pointings[tel_id][0] is not None
+                    old_strs = ['{}:{}'.format(telescope_id,
+                                               self.old_pointings[telescope_id][0].db_id
+                                               if self.old_pointings[telescope_id][0] is not None
                                                else 'None')
-                                for tel_id in self.old_pointings]
+                                for telescope_id in self.old_pointings]
                     old_str = ' '.join(old_strs)
-                    new_strs = ['{}:{}'.format(tel_id,
-                                               self.latest_pointings[tel_id][0].db_id
-                                               if self.latest_pointings[tel_id][0] is not None
+                    new_strs = ['{}:{}'.format(telescope_id,
+                                               self.latest_pointings[telescope_id][0].db_id
+                                               if self.latest_pointings[telescope_id][0] is not None
                                                else 'None')
-                                for tel_id in self.latest_pointings]
+                                for telescope_id in self.latest_pointings]
                     new_str = ' '.join(new_strs)
                     if new_str != old_str:
                         self.log.info(new_str)
@@ -182,14 +184,15 @@ class Scheduler:
                 pointings = [p for p in pointings if p is not None]
                 db.insert_items(session, pointings)
 
-    def _get_pointings(self, telescope_id, check_time):
-        """Calculate what to observe for the given telescope."""
+    def _get_pointings(self, site_id, check_time):
+        """Calculate what to observe for telescopes at the given site."""
         try:
-            # Get site location
-            location = self.tel_data[telescope_id]['location']
+            pointings = {}
+            location = self.site_data[site_id]['location']
+            telescopes = self.site_data[site_id]['telescopes']
 
             if params.SCHEDULER_SKIP_DAYTIME:
-                # Check if the sun is up, if so we can just return None
+                # Check if the sun is up, if so we can just return nothing to observe
                 # TODO: If we ever want to display the queue on a webpage we'll still need
                 #       to calculate every time, even during the day.
                 altaz_frame = AltAz(obstime=check_time, location=location)
@@ -197,65 +200,64 @@ class Scheduler:
                 altaz_coords = sun_coords.transform_to(altaz_frame)
                 sunalt = altaz_coords.alt.degree
                 if sunalt > params.SCHEDULER_SUNALT_LIMIT:
-                    # It's still daytime
-                    self.log.debug(f'Telescope {telescope_id}: Daytime (sunalt={sunalt:.1f})')
-                    return [None for _ in self.tel_data[telescope_id]['horizon']]
+                    # It's still daytime, no reason to check the queue
+                    for telescope_id in sorted(telescopes):
+                        self.log.debug(f'Telescope {telescope_id}: Daytime (sunalt={sunalt:.1f})')
+                    return {telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
+                            for telescope_id in telescopes}
 
-            # Import the queue for this telescope from the database
-            # TODO: It would be great if this could be per site,
-            #       then evaluating can take the telescope_id (for telescope constraint)
-            queue = PointingQueue.from_database(telescope_id, check_time)
+            # Import the queue for this site from the database
+            queue = PointingQueue.from_database(site_id, check_time)
 
-            # Start with the first horizon, calculate pointing validity
-            queue.calculate_priorities(horizon=self.tel_data[telescope_id]['horizon'][0],
-                                       readout_time=self.readout_time,
-                                       template_requirement=self.template_requirement,
-                                       )
+            # Loop through each telescope
+            # TODO: write queue files / HTML page for each
+            for telescope_id in sorted(telescopes):
+                telescope_pointings = []
 
-            # Write out the queue file and web pages
-            # TODO: These are only for one telescope/horizon?
-            if self.write_file:
-                queue_file = os.path.join(params.QUEUE_PATH, 'queue_info')
-                queue.write_to_file(queue_file)
-            if self.write_html:
-                write_queue_page(queue)
+                # Start with the first horizon, find what to do
+                pointing, reason = queue.get_pointing(
+                    telescope_id,
+                    horizon=0,
+                    readout_time=self.readout_time,
+                    template_requirement=self.template_requirement,
+                    return_reason=True,
+                )
+                telescope_pointings.append(pointing)
+                self.log.debug(f'Telescope {telescope_id}: {reason}')
 
-            # Find what to do next
-            pointing, reason = queue.what_to_do_next(return_reason=True)
-            self.log.debug(f'Telescope {telescope_id}: {reason}')
+                # Now check if it's above each horizon, and if not find the next best Pointing
+                # TODO: AltAz is stored on the pointing, there should be a quicker way to check
+                # TODO: An even better solution might be for get_pointing() to take
+                #       multiple horizon numbers and evaluate each pointing based on both,
+                #       or automatically do it for every telescope horizon when evaluating...
+                for i in range(len(telescopes[telescope_id]['horizon']) - 1):
+                    if pointing is not None and not above_horizon(
+                            pointing.ra, pointing.dec, location, check_time,
+                            telescopes[telescope_id]['horizon'][i + 1]):
+                        # The Pointing is below this (presumably higher) horizon.
+                        # This should be fairly rare, if it's just for wind shielding.
+                        pointing, reason = queue.get_pointing(
+                            telescope_id,
+                            horizon=i + 1,
+                            readout_time=self.readout_time,
+                            template_requirement=self.template_requirement,
+                            return_reason=True,
+                        )
+                        telescope_pointings.append(pointing)
+                        self.log.debug(f'Telescope {telescope_id}-{i + 1}: {reason}')
+                    else:
+                        # This Pointing is fine
+                        telescope_pointings.append(pointing)
 
-            # Add to list
-            pointings = []
-            pointings.append(pointing)
-
-            # Now check if it's above each horizon, and if not find the next best Pointing
-            # TODO: AltAz is stored on the pointing, there should be a quicker way to check
-            for i, horizon in enumerate(self.tel_data[telescope_id]['horizon'][1:]):
-                if pointing is not None and not above_horizon(
-                        pointing.ra, pointing.dec, location, check_time, horizon):
-                    # The Pointing is below this (presumably higher) horizon.
-                    # This should be fairly rare, if it's just for wind shielding.
-                    # There might be a more efficient way to do this,
-                    # here we just recalculate using the higher horizon.
-                    # A better solution might be for calculate_priorities() to take multiple
-                    # horizons and evaluate each pointing based on both, but that's
-                    # probably a waste of time (even if altaz is cached).
-                    queue.calculate_priorities(horizon=horizon,
-                                               readout_time=self.readout_time,
-                                               template_requirement=self.template_requirement,
-                                               )
-                    pointing, reason = queue.what_to_do_next(return_reason=True)
-                    pointings.append(pointing)
-                    self.log.debug(f'Telescope {telescope_id}-{i+1}: {reason}')
-                else:
-                    # This Pointing is fine
-                    pointings.append(pointing)
+                # Add to site dict
+                pointings[telescope_id] = telescope_pointings
 
             return pointings
         except Exception:
-            self.log.error('Failed to schedule Pointing for Telescope {}'.format(telescope_id))
+            self.log.error('Failed to schedule Pointings for Site {}'.format(site_id))
             self.log.debug('', exc_info=True)
-            return [None for _ in self.tel_data[telescope_id]['horizon']]
+            return {telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
+                    for telescope_id in telescopes}
 
     # Functions
     def check_queue(self, telescope_id, horizon=0, force_update=False):

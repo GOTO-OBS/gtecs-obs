@@ -87,13 +87,15 @@ class TelescopeConstraint:
 
     def compute_constraint(self, pointing):
         """Compute the constraint."""
-        if pointing.valid_telescopes is None:
-            # Doesn't have a restriction
-            return True
-        if self.telescope_id in pointing.valid_telescopes:
-            # The telescope is valid
-            return True
-        return False
+        if (pointing.valid_telescopes is not None and
+                self.telescope_id not in pointing.valid_telescopes):
+            # Only valid for certain telescope(s), not including this one
+            return False
+        if (pointing.current_telescope is not None and
+                pointing.current_telescope != self.telescope_id):
+            # Valid for this telescope, but currently being observed by a different one
+            return False
+        return True
 
 
 class TemplateConstraint:
@@ -127,13 +129,14 @@ class TemplateConstraint:
 
 
 class Pointing:
-    """A class to contain infomation on each pointing."""
+    """A class to contain information on each Pointing in the Queue."""
 
-    def __init__(self, db_id, name, ra, dec, rank, weight, num_obs, too,
+    def __init__(self, db_id, status, name, ra, dec, rank, weight, num_obs, too,
                  mintime, maxsunalt, minalt, maxmoon, minmoonsep,
-                 start, stop, current, valid_telescopes, template_telescopes, exp_sets,
+                 start, stop, current_telescope, valid_telescopes, template_telescopes, exp_sets,
                  time=None):
         self.db_id = int(db_id)
+        self.status = status
         self.name = name
         self.ra = float(ra)
         self.dec = float(dec)
@@ -148,7 +151,7 @@ class Pointing:
         self.minmoonsep = minmoonsep
         self.start = start
         self.stop = stop
-        self.current = bool(current)
+        self.current_telescope = current_telescope
         self.valid_telescopes = valid_telescopes
         self.template_telescopes = template_telescopes
         self.exp_sets = exp_sets
@@ -167,15 +170,8 @@ class Pointing:
         return self != other
 
     def __repr__(self):
-        template = ('Pointing(db_id={}, name={}, ra={}, dec={}, rank={}, weight={}, ' +
-                    'num_obs={}, too={}, maxsunalt={}, minalt={}, mintime={}, maxmoon={}, ' +
-                    'minmoonsep={}, start={}, stop={}, ' +
-                    'current={}, time={})')
-        return template.format(
-            self.db_id, self.name, self.ra, self.dec, self.rank, self.weight,
-            self.num_obs, self.too, self.maxsunalt, self.minalt, self.mintime,
-            self.maxmoon, self.minmoonsep, self.start, self.stop,
-            self.current, self.time)
+        template = ('<Pointing: db_id={}, time={}, status={}>')
+        return template.format(self.db_id, self.time, self.status)
 
     @classmethod
     def from_database(cls, db_pointing, time=None):
@@ -188,7 +184,13 @@ class Pointing:
         rank = db_pointing.rank
         start_time = db_pointing.start_time
         stop_time = db_pointing.stop_time
-        current = db_pointing.status_at_time(time) == 'running'
+        status = db_pointing.status_at_time(time)
+        if status == 'running':
+            current_telescope = db_pointing.telescope_id
+            if current_telescope is None:
+                raise ValueError('Pointing {} is running but has Telescope ID'.format(db_id))
+        else:
+            current_telescope = None
 
         # Get linked Target properties
         db_target = db_pointing.target
@@ -223,6 +225,7 @@ class Pointing:
 
         # Create Pointing object
         pointing = cls(db_id=db_id,
+                       status=status,
                        name=name,
                        ra=ra,
                        dec=dec,
@@ -237,7 +240,7 @@ class Pointing:
                        minmoonsep=min_moonsep,
                        start=start_time,
                        stop=stop_time,
-                       current=current,
+                       current_telescope=current_telescope,
                        valid_telescopes=valid_telescopes,
                        template_telescopes=template_telescopes,
                        exp_sets=exp_sets,
@@ -253,9 +256,9 @@ class Pointing:
 class PointingQueue:
     """A class to represent a queue of pointings."""
 
-    def __init__(self, pointings, telescope_id, time=None):
+    def __init__(self, pointings, site_id, time=None):
         self.pointings = pointings
-        self.telescope_id = telescope_id
+        self.site_id = site_id
         if time is None:
             time = Time.now()
         self.time = time
@@ -265,13 +268,9 @@ class PointingQueue:
                                 [float(p.dec) for p in self.pointings],
                                 unit=u.deg, frame='icrs')
 
-        # Get site infomation for this telescope
-        with db.open_session() as session:
-            telescope = db.get_telescope_by_id(session, telescope_id)
-            self.observer = Observer(telescope.site.location)
-            self.telescopes_at_site = [t.db_id for t in telescope.site.telescopes]
-            if self.telescope_id not in self.telescopes_at_site:
-                raise ValueError('Telescope is not correctly linked to Site')
+        # Get site details from the database
+        self.site_data = db.get_site_info(site_id)
+        self.observer = Observer(self.site_data['location'])
 
         # Mark that this queue has not been processed yet
         self.priorities_calculated = False
@@ -280,17 +279,18 @@ class PointingQueue:
         return len(self.pointings)
 
     def __repr__(self):
-        template = ('PointingQueue(<{} Pointings>, telescope_id={}, time={})')
-        return template.format(len(self.pointings), self.telescope_id, self.time)
+        template = ('PointingQueue(<{} Pointings>, site_id={}, time={})')
+        return template.format(len(self.pointings), self.site_id, self.time)
 
     @classmethod
-    def from_database(cls, telescope_id, time=None, altitude_limit=None, hourangle_limit=None):
-        """Create a Pointing Queue from current Pointings in the database.
+    def from_database(cls, site_id, time=None, altitude_limit=None, hourangle_limit=None):
+        """Create a Pointing Queue from Pointings in the database.
 
         Parameters
         ----------
-        telescope_id : int
-            The telescope to fetch the queue for.
+        site_id : int
+            The site to fetch the queue for.
+
         time : `~astropy.time.Time`
             The time to fetch the queue for.
             default=Time.now()
@@ -316,23 +316,28 @@ class PointingQueue:
             hourangle_limit = params.HARD_HA_LIM
 
         with db.open_session() as session:
+            # Get the site
+            site = db.get_site_by_id(session, site_id)
+
             # Get pending pointings
-            pending_pointings = db.get_pending_pointings(session, telescope_id,
+            pending_pointings = db.get_pending_pointings(session,
                                                          time=time,
+                                                         location=site.location,
                                                          altitude_limit=altitude_limit,
                                                          hourangle_limit=hourangle_limit,
                                                          )
             pointings = [Pointing.from_database(db_pointing, time=time)
                          for db_pointing in pending_pointings]
 
-            # Also get the current pointing, if any
-            current_pointing = db.get_current_pointing(session, telescope_id, time=time)
-            if current_pointing is not None:
-                pointing = Pointing.from_database(current_pointing, time=time)
-                pointings.append(pointing)
+            # Also get the current pointing for all telescopes at this site, if any
+            for telescope in site.telescopes:
+                current_pointing = db.get_current_pointing(session, telescope.db_id, time=time)
+                if current_pointing is not None:
+                    pointing = Pointing.from_database(current_pointing, time=time)
+                    pointings.append(pointing)
 
             # Create the Queue class
-            queue = cls(pointings, telescope_id, time)
+            queue = cls(pointings, site_id, time)
         return queue
 
     def calculate_times(self, readout_time):
@@ -343,7 +348,7 @@ class PointingQueue:
                        for p in self.pointings]
         self.finish_times = self.time + u.Quantity(obstime_arr, unit=u.s)
 
-    def apply_constraints(self, horizon, template_requirement):
+    def apply_constraints(self, telescope_id, horizon_id, template_requirement):
         """Check if the pointings are valid, both at start and end of expected observing period."""
         # Create Constraints
         self.constraints = {}
@@ -357,6 +362,7 @@ class PointingQueue:
         self.constraints['MinAlt'] = AltitudeConstraint(minalts, None)
 
         # ArtHoriz
+        horizon = self.site_data['telescopes'][telescope_id]['horizon'][horizon_id]
         self.constraints['ArtHoriz'] = ArtificialHorizonConstraint(*horizon)
 
         # Moon
@@ -377,11 +383,12 @@ class PointingQueue:
         self.constraints['Time'] = TimeConstraint(starts, stops)
 
         # Telescope
-        self.constraints['Telescope'] = TelescopeConstraint(self.telescope_id)
+        self.constraints['Telescope'] = TelescopeConstraint(telescope_id)
 
         # Template
-        self.constraints['Template'] = TemplateConstraint(self.telescope_id,
-                                                          self.telescopes_at_site,
+        telescopes_at_site = sorted(self.site_data['telescopes'].keys())
+        self.constraints['Template'] = TemplateConstraint(telescope_id,
+                                                          telescopes_at_site,
                                                           template_requirement)
 
         # Apply constraints at the start time (now)
@@ -414,8 +421,8 @@ class PointingQueue:
             pointing.constraint_names = list(start_cons)
             pointing.valid_arr = start_cons_valid_arr[i]
 
-            # time and end constraints (doesn't apply to current pointing)
-            if not pointing.current:
+            # time and end constraints (doesn't apply to Pointings already running)
+            if pointing.current_telescope != telescope_id:
                 pointing.constraint_names += time_cons
                 pointing.valid_arr = np.concatenate((pointing.valid_arr,
                                                      time_cons_valid_arr[i]))
@@ -482,8 +489,8 @@ class PointingQueue:
             pointing.tts = tts_arr[i]
             pointing.tiebreaker = tiebreak_arr[i]
 
-    def calculate_priorities(self, horizon, readout_time, template_requirement):
-        """Calculate pointing validities and priorities at the given time."""
+    def calculate_priorities(self, telescope_id, horizon, readout_time, template_requirement):
+        """Calculate pointing validities and priorities for the given observer."""
         if len(self.pointings) == 0:
             return
 
@@ -491,7 +498,7 @@ class PointingQueue:
         self.calculate_times(readout_time)
 
         # Apply constraints to all Pointings
-        self.apply_constraints(horizon, template_requirement)
+        self.apply_constraints(telescope_id, horizon, template_requirement)
 
         # Calculate tiebreaker values for all Pointings
         self.calculate_tiebreakers()
@@ -499,8 +506,7 @@ class PointingQueue:
         # Mark the queue as processed
         self.priorities_calculated = True
 
-    @property
-    def sorted_pointings(self):
+    def get_sorted_pointings(self):
         """Return the pointings sorted by priority.
 
         Sorting metrics
@@ -520,47 +526,21 @@ class PointingQueue:
                                       p.tiebreaker))
         return pointings
 
-    @property
-    def highest_priority_pointing(self):
+    def get_highest_priority_pointing(self):
         """Return the pointing with the highest priority."""
         if len(self.pointings) == 0:
             return None
-        return self.sorted_pointings[0]
+        return self.get_sorted_pointings()[0]
 
-    @property
-    def current_pointing(self):
+    def get_current_pointing(self, telescope_id):
         """Return the current pointing from the queue (there should only be one)."""
         for p in self.pointings:
-            if p.current:
+            if p.current_telescope == telescope_id:
                 return p
         return None
 
-    def what_to_do_next(self, return_reason=False):
-        """Decide what to do based on the current queue.
-
-        Options are to slew to a new target, remain on the current target, or park the telescope.
-
-        Parameters
-        ----------
-        return_reason: bool, default=False
-            if True, return a string explaining why the result was chosen
-
-        Returns
-        -------
-        new_pointing : `Pointing` or None
-            The new pointing to send to the pilot
-            Could be either:
-            current_pointing (remain on current target),
-            highest_pointing (slew to new target) or
-            `None`           (nothing to do, park).
-        reason : str
-            Returns if return_reason is True.
-
-        """
-        # Get pointings (this will also ensure the priorities have been calculated)
-        current_pointing = self.current_pointing
-        highest_pointing = self.highest_priority_pointing
-
+    def chose_pointing(self, highest_pointing, current_pointing, return_reason=False):
+        """Decide what to do based on the current queue."""
         # Deal with either being missing (telescope is idle or queue is empty)
         if current_pointing is None and highest_pointing is None:
             reason = 'Not doing anything; Nothing to do => Do nothing'
@@ -645,8 +625,57 @@ class PointingQueue:
         log_str = 'CP={} HP={}: NP={} ({})'.format(current_str, highest_str, new_str, reason)
         return new_pointing, log_str
 
+    def get_pointing(self, telescope_id, horizon=0, readout_time=10, template_requirement='ANY',
+                     return_reason=False):
+        """Decide what to do based on the current queue.
+
+        Options are to slew to a new target, remain on the current target, or park the telescope.
+
+        Parameters
+        ----------
+        telescope_id : int
+            The telescope ID to calculate the queue for.
+
+        horizon : float, default=0
+            Which telescope horizon to use.
+        readout_time : float, default=10
+            Readout time in seconds, to use when estimating time to observe each pointing.
+        template_requirement : str
+            How restrictive to consider the templates required for pointings.
+            One of 'ANY', 'SITE', or 'TELESCOPE'
+
+        return_reason: bool, default=False
+            if True, return a string explaining why the result was chosen
+
+        Returns
+        -------
+        new_pointing : `Pointing` or None
+            The new pointing to send to the pilot
+            Could be either:
+            current_pointing (remain on current target),
+            highest_pointing (slew to new target) or
+            `None`           (nothing to do, park).
+        reason : str
+            Returns if return_reason is True.
+
+        """
+        if telescope_id not in self.site_data['telescopes']:
+            raise ValueError('Telescope ID {} is not defined for Site {}'.format(
+                telescope_id, self.site_id))
+        if len(self.site_data['telescopes'][telescope_id]['horizon']) < horizon + 1:
+            raise IndexError('Telescope {} only has {} horizons, cannot get horizon {}'.format(
+                telescope_id, len(self.site_data['telescopes'][telescope_id]['horizon']), horizon))
+
+        # Calculate priorities and get pointings
+        self.calculate_priorities(telescope_id, horizon, readout_time, template_requirement)
+        highest_pointing = self.get_highest_priority_pointing()
+        current_pointing = self.get_current_pointing(telescope_id)
+
+        # Decide what to do and return
+        return self.chose_pointing(highest_pointing, current_pointing, return_reason)
+
     def write_to_file(self, filename):
-        """Write any time-dependent pointing infomation to a file."""
+        """Write any time-dependent pointing information to a file."""
         if len(self.pointings) == 0:
             return
 

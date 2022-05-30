@@ -280,8 +280,8 @@ class PointingQueue:
         return len(self.pointings)
 
     def __repr__(self):
-        template = ('PointingQueue(length={})')
-        return template.format(len(self.pointings))
+        template = ('PointingQueue(<{} Pointings>, telescope_id={}, time={})')
+        return template.format(len(self.pointings), self.telescope_id, self.time)
 
     @classmethod
     def from_database(cls, telescope_id, time=None, altitude_limit=None, hourangle_limit=None):

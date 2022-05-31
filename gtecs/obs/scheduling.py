@@ -448,16 +448,9 @@ class PointingQueue:
         weight_arr[bad_weight_mask] = 1
 
         # Find airmass values (0 to 1)
-        # airmass at start
-        altaz_start = _get_altaz(self.time, self.observer, self.targets)['altaz']
-        secz_start = altaz_start.secz
-
-        # airmass at end
+        altaz = _get_altaz(self.time, self.observer, self.targets)['altaz']
         altaz_end = _get_altaz(self.finish_times, self.observer, self.targets)['altaz']
-        secz_end = altaz_end.secz
-
-        # take average
-        secz_arr = (secz_start + secz_end) / 2.
+        secz_arr = (altaz.secz + altaz_end.secz) / 2.
         airmass_arr = secz_arr.value / 10.
         bad_airmass_mask = np.logical_or(airmass_arr < 0, airmass_arr > 1)
         airmass_arr[bad_airmass_mask] = 1
@@ -477,7 +470,7 @@ class PointingQueue:
 
         # Save values on the pointings
         for i, pointing in enumerate(self.pointings):
-            pointing.altaz_start = altaz_start[i]
+            pointing.altaz = altaz[i]
             pointing.altaz_end = altaz_end[i]
             pointing.weight = weight_arr[i]
             pointing.airmass = airmass_arr[i]

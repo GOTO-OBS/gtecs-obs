@@ -14,7 +14,7 @@ from gtecs.common.logging import get_logger
 
 from . import database as db
 from . import params
-from .astronomy import above_horizon
+from .astronomy import horizon_limit
 from .scheduling import PointingQueue
 from .slack import send_slack_msg
 
@@ -128,18 +128,14 @@ class Scheduler:
 
                 # Get the queue and find highest priority Pointings for each telescope
                 check_time = Time(self.loop_time, format='unix')
+                msg = 'Checking queue'
                 if self.force_check_flag:
-                    self.log.debug('Checking queue (forced update)')
-                else:
-                    self.log.debug('Checking queue')
-
-                # Loop through each site
+                    msg += ' (forced update)'
+                self.log.debug(msg)
                 new_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
                 for site_id in self.site_data:
                     new_pointings.update(self._get_pointings(site_id, check_time))
                 self.log.debug('Queue check complete')
-
-                # Update stored Pointings
                 self.old_pointings = self.latest_pointings
                 self.latest_pointings = new_pointings
 
@@ -225,17 +221,19 @@ class Scheduler:
                 telescope_pointings.append(pointing)
                 self.log.debug(f'Telescope {telescope_id}: {reason}')
 
-                # Now check if it's above each horizon, and if not find the next best Pointing
-                # TODO: AltAz is stored on the pointing, there should be a quicker way to check
-                # TODO: An even better solution might be for get_pointing() to take
+                # Now check if it's above any other horizons, and if not get the next best Pointing
+                # TODO: A better solution might be for get_pointing() to take
                 #       multiple horizon numbers and evaluate each pointing based on both,
                 #       or automatically do it for every telescope horizon when evaluating...
                 for i in range(len(telescopes[telescope_id]['horizon']) - 1):
-                    if pointing is not None and not above_horizon(
-                            pointing.ra, pointing.dec, location, check_time,
-                            telescopes[telescope_id]['horizon'][i + 1]):
+                    if pointing is None:
+                        telescope_pointings.append(None)
+                        continue
+                    horizon = telescopes[telescope_id]['horizon'][i + 1]
+                    if pointing.altaz.alt < horizon_limit(pointing.altaz.az, horizon):
                         # The Pointing is below this (presumably higher) horizon.
                         # This should be fairly rare, if it's just for wind shielding.
+                        # Need to find the next best Pointing, recalculating with the new horizon.
                         pointing, reason = queue.get_pointing(
                             telescope_id,
                             horizon=i + 1,

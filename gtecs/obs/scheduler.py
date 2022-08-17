@@ -1,5 +1,6 @@
 """Class for monitoring the obs database and finding pointings to observe."""
 
+import datetime
 import os
 import threading
 import time
@@ -127,7 +128,7 @@ class Scheduler:
             if self.force_check_flag or (self.loop_time - self.check_time) > self.check_period:
                 self.update_lock = True
 
-                # Caretaker step to deal with any unscheduled Targets with expired Pointings
+                # Caretaker step to monitor the database
                 self._caretaker()
 
                 # Get the queue and find highest priority Pointings for each telescope
@@ -175,8 +176,9 @@ class Scheduler:
 
     # Internal functions
     def _caretaker(self):
-        """Schedule new Pointings for any unscheduled Targets."""
+        """Monitor the database."""
         with db.open_session() as session:
+            # Schedule new Pointings for any unscheduled Targets
             unscheduled_targets = db.get_targets(session, status='unscheduled')
             if len(unscheduled_targets) > 0:
                 self.log.info('Rescheduling {} unscheduled Targets'.format(
@@ -184,6 +186,19 @@ class Scheduler:
                 pointings = [target.get_next_pointing() for target in unscheduled_targets]
                 pointings = [p for p in pointings if p is not None]
                 db.insert_items(session, pointings)
+
+            # Check if any running Pointings have been running for too long (e.g. the pilot died)
+            running_pointings = db.get_pointings(session, status='running')
+            for pointing in running_pointings:
+                running_time = (datetime.datetime.now() - pointing.running_time).seconds
+                obs_time = pointing.get_obstime(self.readout_time)
+                if running_time > obs_time * 2:
+                    self.log.info('Pointing {} has been running for {}s/{}s'.format(
+                                  pointing.db_id, running_time, obs_time))
+                    db.mark_pointing_interrupted(pointing.db_id, schedule_next=True)
+                    self.log.info(f'Marked Pointing {pointing.db_id} as interrupted')
+                    time.sleep(1)  # sleep to make sure timestamp is in the past
+                    self.force_check_flag = True
 
     def _get_pointings(self, site_id, check_time):
         """Calculate what to observe for telescopes at the given site."""

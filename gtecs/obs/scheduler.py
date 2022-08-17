@@ -41,6 +41,8 @@ class Scheduler:
         self.check_time = 0
         self.check_period = params.SCHEDULER_CHECK_PERIOD
         self.force_check_flag = False
+        self.update_lock = False
+        self.query_lock = False
 
         self.readout_time = params.READOUT_TIME
         self.template_requirement = params.TEMPLATE_REQUIREMENT
@@ -123,6 +125,8 @@ class Scheduler:
 
             # Only check on the given period, or if forced
             if self.force_check_flag or (self.loop_time - self.check_time) > self.check_period:
+                self.update_lock = True
+
                 # Caretaker step to deal with any unscheduled Targets with expired Pointings
                 self._caretaker()
 
@@ -155,13 +159,14 @@ class Scheduler:
                                 for telescope_id in self.latest_pointings]
                     new_str = ' '.join(new_strs)
                     if new_str != old_str:
-                        self.log.info(new_str)
+                        self.log.info('Current pointings: ' + new_str)
                 except Exception:
                     self.log.error('Could not write current status')
 
                 # Set these after the check has finished, so the check_queue() function has to wait
                 self.check_time = self.loop_time
                 self.force_check_flag = False
+                self.update_lock = False
 
             time.sleep(0.1)
 
@@ -258,20 +263,123 @@ class Scheduler:
                     for telescope_id in telescopes}
 
     # Functions
-    def check_queue(self, telescope_id, horizon=0, force_update=False):
-        """Return the ID of the current highest priority pointing for the given telescope.
+    def update_schedule(self, telescope_id, current_pointing_id, current_status, horizon=0,
+                        return_new=True, force_update=False):
+        """Get what Pointing to observe for the given telescope.
+
+        This function should be called by the pilot for each telescope. By including the
+        current pointing and status the scheduler will update the database based on what the
+        pilot is observing.
+
+        Parameters
+        ----------
+        telescope_id : int
+            The ID number of the Telescope requesting a Pointing.
+        current_pointing_id : int or None
+            The ID number of the current Pointing the telescope is observing, if any.
+        current_status : str or None
+            The status of the current Pointing to update the observing database.
+            Valid statuses are 'running', 'completed' or 'interrupted',
+            or None if current_pointing is None.
+
+        horizon : int, optional
+            Which horizon number to consider when scheduling, based on the horizons for the
+            telescope defined in the database.
+            default = 0
+        return_new : bool, optional
+            If False, only update the current Pointing and don't return a new one.
+            This should be used when the telescope is shutting down, so we don't mark the final
+            Pointing as running.
+            default = True
+        force_update : bool, optional
+            If True force the scheduler to recalculate at the current time.
+            Otherwise the pointing from the most recent check will be returned (~5s cadence).
+            default = False
+
+        """
+        # Prevent multiple queries at the same time, or queries while the schedule is updating
+        while (self.query_lock is True or self.update_lock is True):
+            time.sleep(0.1)
+        self.query_lock = True
+
+        try:
+            msg = f'Query from Telescope {telescope_id}-{horizon}'
+            msg += f' (CP={current_pointing_id}, {current_status})'
+            self.log.info(msg)
+
+            if current_pointing_id is not None:
+                if current_status == 'completed':
+                    # The Telescope has successfully finished this Pointing.
+                    # We need to update the database, and force a schedule update.
+                    db.mark_pointing_completed(current_pointing_id, schedule_next=True)
+                    self.log.debug(f'Marked Pointing {current_pointing_id} as completed')
+                    time.sleep(1)  # sleep to make sure timestamp is in the past
+                    self.force_check_flag = True
+                elif current_status == 'interrupted':
+                    # This Pointing was interrupted before it could finish.
+                    # We need to update the database, and force a schedule update.
+                    db.mark_pointing_interrupted(current_pointing_id, schedule_next=True)
+                    self.log.debug(f'Marked Pointing {current_pointing_id} as interrupted')
+                    time.sleep(1)  # sleep to make sure timestamp is in the past
+                    self.force_check_flag = True
+
+            # If we don't want a new Pointing then we can return here.
+            if not return_new:
+                self.log.info('Returning (no Pointing requested)')
+                self.query_lock = False
+                return None
+
+            # Wait for scheduler to update.
+            if force_update or self.force_check_flag:
+                self.force_check_flag = True
+                while self.force_check_flag:
+                    time.sleep(0.1)
+
+            # Get the latest Pointing from the scheduler
+            new_pointing = self.latest_pointings[telescope_id][horizon]
+
+            # If it's none then return here
+            if new_pointing is None:
+                self.log.info('Returning None')
+                self.query_lock = False
+                return None
+
+            # We have a new Pointing, but it might be already running.
+            if current_pointing_id is not None and new_pointing.db_id == current_pointing_id:
+                self.log.info(f'Returning Pointing {new_pointing.db_id}')
+            else:
+                self.log.info(f'Returning Pointing {new_pointing.db_id} (NEW)')
+
+                if current_pointing_id is not None and current_status == 'running':
+                    # It's interrupting a running Pointing, so mark it as interrupted.
+                    db.mark_pointing_interrupted(current_pointing_id, schedule_next=True)
+                    self.log.debug(f'Marked Pointing {current_pointing_id} as interrupted')
+                    self.force_check_flag = True
+
+            # Mark the new Pointing as running, if it isn't already
+            if new_pointing.current_telescope is None:
+                db.mark_pointing_running(new_pointing.db_id, telescope_id)
+                msg = f'Marked Pointing {new_pointing.db_id} as running on Telescope {telescope_id}'
+                self.log.debug(msg)
+                self.force_check_flag = True
+
+            # Get the pointing info, and add anything else useful
+            pointing_info = db.get_pointing_info(new_pointing.db_id)
+            pointing_info['obstime'] = new_pointing.get_obstime(self.readout_time)
+
+        finally:
+            self.query_lock = False
+
+        return pointing_info
+
+    def check_queue(self, force_update=False):
+        """Return information on the Pointings currently in the queue for all Telescopes.
 
         Note this returns immediately with what's been previously calculated by the scheduler,
         unless the `force_update` flag is set to True.
 
         Parameters
         ----------
-        telescope_id : int, or list of int
-            The ID number(s) for the Telescope(s) to query the queue for.
-
-        horizon : int, optional
-            Which horizon number to apply, based on horizons defined in the database.
-            default = 0
         force_update : bool, optional
             If True force the scheduler to recalculate at the current time.
             Otherwise the pointing from the most recent check will be returned (~5s cadence).
@@ -283,28 +391,10 @@ class Scheduler:
             while self.force_check_flag:
                 time.sleep(0.1)
 
-        telescope_ids = telescope_id
-        if isinstance(telescope_id, int):
-            telescope_ids = [telescope_id]
-
-        pointings = []
-        for telescope_id in telescope_ids:
-            msg = f'Fetching pointing for Telescope {telescope_id}:'
-            pointing = self.latest_pointings[telescope_id][horizon]
-            if pointing is None:
-                msg += ' returns None'
-                self.log.debug(msg)
-                pointings.append(None)
-            else:
-                pointing_info = db.get_pointing_info(pointing.db_id)
-                # Add any useful scheduling info
-                pointing_info['obstime'] = pointing.get_obstime(self.readout_time)
-                msg += f' returns Pointing {pointing_info["id"]}'
-                self.log.debug(msg)
-                pointings.append(pointing_info)
-
-        if len(pointings) == 1:
-            return pointings[0]
+        pointings = {telescope_id: [db.get_pointing_info(pointing.db_id)
+                                    if pointing is not None else None
+                                    for pointing in pointings]
+                     for telescope_id, pointings in self.latest_pointings.items()}
         return pointings
 
     def get_pointing_info(self, pointing_id):
@@ -314,36 +404,6 @@ class Scheduler:
 
         """
         return db.get_pointing_info(pointing_id)
-
-    def mark_pointing_running(self, pointing_id, telescope_id):
-        """Mark the given pointing as running on the given telescope.
-
-        This can be used by the remote clients which can't otherwise access the database.
-
-        """
-        db.mark_pointing_running(pointing_id, telescope_id)
-        self.log.debug(f'Marked Pointing {pointing_id} as running on Telescope {telescope_id}')
-        self.force_check_flag = True
-
-    def mark_pointing_completed(self, pointing_id):
-        """Mark the given pointing as completed.
-
-        This can be used by the remote clients which can't otherwise access the database.
-
-        """
-        db.mark_pointing_completed(pointing_id, schedule_next=True)
-        self.log.debug(f'Marked Pointing {pointing_id} as completed')
-        self.force_check_flag = True
-
-    def mark_pointing_interrupted(self, pointing_id):
-        """Mark the given pointing as interrupted.
-
-        This can be used by the remote clients which can't otherwise access the database.
-
-        """
-        db.mark_pointing_interrupted(pointing_id, schedule_next=True, delay=None)
-        self.log.debug(f'Marked Pointing {pointing_id} as interrupted')
-        self.force_check_flag = True
 
 
 def run():

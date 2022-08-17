@@ -66,23 +66,24 @@ def query(command, args):
         else:
             raise ValueError('Invalid arguments')
 
-        telescope_data = db.get_telescope_info()
-        telescope_ids = tuple(telescope_data.keys())  # has to be hashable for Pyro, tuple not list
-
         # do one query for all telescopes
         with Pyro4.Proxy(params.PYRO_URI) as proxy:
-            pointings = proxy.check_queue(telescope_ids, horizon=0, force_update=force)
+            pointings = proxy.check_queue(force_update=force)
 
-        for i, telescope_id in enumerate(telescope_ids):
+        telescope_data = db.get_telescope_info()
+        for telescope_id in telescope_data:
             # Print Pointing (or None) for each telescope
             print(telescope_data[telescope_id]['name'], end=': ')
             try:
-                if pointings[i] is not None:
-                    print(f'Pointing ID={pointings[i]["id"]} ({pointings[i]["name"]})')
-                else:
+                if telescope_id not in pointings:
+                    print('ERROR')
+                elif pointings[telescope_id][0] is None:
                     print('None')
+                else:
+                    pointing = pointings[telescope_id][0]
+                    print(f'Pointing ID={pointing["id"]} ({pointing["name"]})')
                 # TODO: Print higher horizon if shielding?
-                # TODO: Print what it's current'y observing?
+                # TODO: Print what it's currently observing?
                 # TODO: Verbose Pointing info?
             except Exception:
                 print('ERROR')

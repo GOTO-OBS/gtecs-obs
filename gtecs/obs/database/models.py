@@ -1113,6 +1113,9 @@ class Strategy(Base):
         """
         if self.infinite:
             return -1
+        elif self.num_completed is None:
+            # column property is None: not added to DB yet
+            return self.num_todo
         else:
             return self.num_todo - self.num_completed
 
@@ -1128,6 +1131,9 @@ class Strategy(Base):
             return self.num_remaining
         if self.infinite:
             return -1
+        elif self.num_completed_at_time(time) is None:
+            # column property is None: not added to DB yet
+            return self.num_todo
         else:
             return self.num_todo - self.num_completed_at_time(time)
 
@@ -1909,7 +1915,10 @@ class Target(Base):
 
         """
         if self.rank is not None and self.rank_decay:
-            return self.rank + 10 * self.num_completed
+            if self.num_completed is not None:
+                return self.rank + 10 * self.num_completed
+            else:
+                return self.rank
         else:
             return self.rank
 
@@ -2068,7 +2077,7 @@ class Target(Base):
             if latest_pointing.time_block.valid_time is not None:
                 # We want to start after "wait_time" from when the last Pointing was due to finish.
                 # (i.e. the stop_time, the end of its "block").
-                # But that might have been forshortened by the Target's stop_time, so we
+                # But that might have been foreshortened by the Target's stop_time, so we
                 # take the previous Pointing's start_time, add the valid time (if it has one) to
                 # get its nominal stop_time, then add the wait time.
                 start_time = (Time(latest_pointing.start_time) +

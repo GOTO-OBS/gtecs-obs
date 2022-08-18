@@ -1,6 +1,5 @@
 """Class for monitoring the obs database and finding pointings to observe."""
 
-import datetime
 import os
 import threading
 import time
@@ -127,12 +126,12 @@ class Scheduler:
             # Only check on the given period, or if forced
             if self.force_check_flag or (self.loop_time - self.check_time) > self.check_period:
                 self.update_lock = True
+                check_time = Time(self.loop_time, format='unix')
 
                 # Caretaker step to monitor the database
-                self._caretaker()
+                self._caretaker(check_time)
 
                 # Get the queue and find highest priority Pointings for each telescope
-                check_time = Time(self.loop_time, format='unix')
                 msg = 'Checking queue'
                 if self.force_check_flag:
                     msg += ' (forced update)'
@@ -175,7 +174,7 @@ class Scheduler:
         return
 
     # Internal functions
-    def _caretaker(self):
+    def _caretaker(self, check_time):
         """Monitor the database."""
         with db.open_session() as session:
             # Schedule new Pointings for any unscheduled Targets
@@ -190,10 +189,10 @@ class Scheduler:
             # Check if any running Pointings have been running for too long (e.g. the pilot died)
             running_pointings = db.get_pointings(session, status='running')
             for pointing in running_pointings:
-                running_time = (datetime.datetime.now() - pointing.running_time).seconds
+                running_time = (check_time - Time(pointing.running_time)).sec
                 obs_time = pointing.get_obstime(self.readout_time)
                 if running_time > obs_time * 2:
-                    self.log.info('Pointing {} has been running for {}s/{}s'.format(
+                    self.log.info('Pointing {} has been running for {:.1f}s/{:.1f}s'.format(
                                   pointing.db_id, running_time, obs_time))
                     db.mark_pointing_interrupted(pointing.db_id, schedule_next=True)
                     self.log.info(f'Marked Pointing {pointing.db_id} as interrupted')

@@ -436,6 +436,7 @@ class Scheduler:
                 db.mark_pointing_running(new_pointing.db_id, telescope_id)
                 msg = f'Marked Pointing {new_pointing.db_id} as running on Telescope {telescope_id}'
                 self.log.debug(msg)
+                time.sleep(1)  # sleep to make sure timestamp is in the past
                 self.force_check_flag = True
 
             # Get the pointing info, and add anything else useful

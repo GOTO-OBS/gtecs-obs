@@ -61,6 +61,7 @@ class Scheduler:
         self.old_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
         self.latest_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
 
+        self.is_night = {telescope_id: False for telescope_id in self.telescopes}
         self.pilot_query_time = {telescope_id: None for telescope_id in self.telescopes}
 
     def __del__(self):
@@ -130,6 +131,9 @@ class Scheduler:
             if self.force_check_flag or (self.loop_time - self.check_time) > self.check_period:
                 self.update_lock = True
                 check_time = Time(self.loop_time, format='unix')
+
+                # Calculate night times for telescope sites
+                self._check_night_times(check_time)
 
                 # Check the connection to the pilots
                 self._pilot_heartbeat(check_time)
@@ -201,6 +205,18 @@ class Scheduler:
         return
 
     # Internal functions
+    def _check_night_times(self, check_time=None):
+        """Calculate if it is night for each telescope at each site."""
+        if check_time is None:
+            check_time = Time.now()
+
+        for site_id in self.site_data:
+            altaz_frame = AltAz(obstime=check_time, location=self.site_data[site_id]['location'])
+            sun_coords = get_sun(check_time)
+            sun_altaz = sun_coords.transform_to(altaz_frame)
+            for telescope_id in self.site_data[site_id]['telescopes']:
+                self.is_night[telescope_id] = sun_altaz.alt.degree < params.SCHEDULER_SUNALT_LIMIT
+
     def _caretaker(self):
         """Monitor the database."""
         with db.open_session() as session:
@@ -222,13 +238,12 @@ class Scheduler:
                     continue
                 if (check_time - self.pilot_query_time[telescope_id]).sec > 60:
                     # It's been more than a minute since we last had a query from this pilot.
-                    # TODO: Change based on if it's day or night time.
-                    # TODO: Send Slack alerts? Could be when a telescope first connects in the
-                    # evening, and then if the connection is lost before sunrise.
-                    # self.log.debug('No contact from Telescope {} since {}'.format(
-                    #                telescope_id, self.pilot_query_time[telescope_id].iso))
+                    if self.is_night[telescope_id]:
+                        # Only log during the night time.
+                        self.log.debug('No contact from Telescope {} since {}'.format(
+                                       telescope_id, self.pilot_query_time[telescope_id].iso))
 
-                    # 1) If there is still a running pointing, mark it as interrupted.
+                    # If there is still a running pointing, mark it as interrupted.
                     telescope = db.get_telescope_by_id(session, telescope_id)
                     if telescope.current_pointing is not None:
                         pointing = telescope.current_pointing
@@ -241,27 +256,22 @@ class Scheduler:
                         time.sleep(1)  # sleep to make sure timestamp is in the past
                         self.force_check_flag = True
 
+                # TODO: Send Slack alerts? Could be when a telescope first connects in the
+                #       evening, and then if the connection is lost before sunrise.
+
     def _get_pointings(self, site_id, check_time):
         """Calculate what to observe for telescopes at the given site."""
         try:
             pointings = {}
-            location = self.site_data[site_id]['location']
             telescopes = self.site_data[site_id]['telescopes']
 
-            if params.SCHEDULER_SKIP_DAYTIME:
-                # Check if the sun is up, if so we can just return nothing to observe
-                # TODO: If we ever want to display the queue on a webpage we'll still need
-                #       to calculate every time, even during the day.
-                altaz_frame = AltAz(obstime=check_time, location=location)
-                sun_coords = get_sun(check_time)
-                altaz_coords = sun_coords.transform_to(altaz_frame)
-                sunalt = altaz_coords.alt.degree
-                if sunalt > params.SCHEDULER_SUNALT_LIMIT:
-                    # It's still daytime, no reason to check the queue
-                    for telescope_id in sorted(telescopes):
-                        self.log.debug(f'Telescope {telescope_id}: Daytime (sunalt={sunalt:.1f})')
-                    return {telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
-                            for telescope_id in telescopes}
+            if (params.SCHEDULER_SKIP_DAYTIME and
+                    not all(self.is_night[telescope_id] for telescope_id in sorted(telescopes))):
+                # It's still daytime, no reason to check the queue
+                for telescope_id in sorted(telescopes):
+                    self.log.debug(f'Telescope {telescope_id}: Daytime')
+                return {telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
+                        for telescope_id in telescopes}
 
             # Import the queue for this site from the database
             queue = PointingQueue.from_database(site_id, check_time)

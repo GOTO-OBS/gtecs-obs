@@ -328,14 +328,14 @@ class Scheduler:
                     db.mark_pointing_completed(current_pointing_id, schedule_next=True)
                     self.log.debug(f'Marked Pointing {current_pointing_id} as completed')
                     time.sleep(1)  # sleep to make sure timestamp is in the past
-                    self.force_check_flag = True
+                    force_update = True
                 elif current_status == 'interrupted':
                     # This Pointing was interrupted before it could finish.
                     # We need to update the database, and force a schedule update.
                     db.mark_pointing_interrupted(current_pointing_id, schedule_next=True)
                     self.log.debug(f'Marked Pointing {current_pointing_id} as interrupted')
                     time.sleep(1)  # sleep to make sure timestamp is in the past
-                    self.force_check_flag = True
+                    force_update = True
 
             # If we don't want a new Pointing then we can return here.
             if not return_new:
@@ -344,7 +344,13 @@ class Scheduler:
                 return None
 
             # Wait for scheduler to update.
-            if force_update or self.force_check_flag:
+            # This is particularly important if we just marked a pointing, as during the 1s wait
+            # a new check might have started which won't yet take that into account.
+            # So we have to wait for the update lock to clear, then set the force check flag and
+            # wait for that check to happen.
+            while self.update_lock is True:
+                time.sleep(0.1)
+            if force_update:
                 self.force_check_flag = True
                 while self.force_check_flag:
                     time.sleep(0.1)

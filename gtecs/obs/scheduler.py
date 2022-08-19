@@ -4,6 +4,7 @@ import os
 import threading
 import time
 import traceback
+from copy import copy
 
 import Pyro4
 
@@ -146,20 +147,41 @@ class Scheduler:
                 # Write status log line
                 # TODO: account for horizons?
                 try:
-                    old_strs = ['{}:{}'.format(telescope_id,
-                                               self.old_pointings[telescope_id][0].db_id
-                                               if self.old_pointings[telescope_id][0] is not None
-                                               else 'None')
-                                for telescope_id in self.old_pointings]
+                    old_strs = []
+                    new_strs = []
+                    for telescope_id in self.telescopes:
+                        old_pointing = self.old_pointings[telescope_id][0]
+                        old_str = '{}:'.format(telescope_id)
+                        if old_pointing is None:
+                            old_str += 'None'
+                        else:
+                            pointing_str = str(old_pointing.db_id)
+                            if not old_pointing.valid:
+                                pointing_str = '*' + pointing_str
+                            if old_pointing.too:
+                                pointing_str = pointing_str + '!'
+                            if old_pointing.current_telescope == telescope_id:
+                                pointing_str = pointing_str + '°'
+                            old_str += pointing_str
+                        old_strs.append(old_str)
+                        new_pointing = self.latest_pointings[telescope_id][0]
+                        new_str = '{}:'.format(telescope_id)
+                        if new_pointing is None:
+                            new_str += 'None'
+                        else:
+                            pointing_str = str(new_pointing.db_id)
+                            if not new_pointing.valid:
+                                pointing_str = '*' + pointing_str
+                            if new_pointing.too:
+                                pointing_str = pointing_str + '!'
+                            if new_pointing.current_telescope == telescope_id:
+                                pointing_str = pointing_str + '°'
+                            new_str += pointing_str
+                        new_strs.append(new_str)
                     old_str = ' '.join(old_strs)
-                    new_strs = ['{}:{}'.format(telescope_id,
-                                               self.latest_pointings[telescope_id][0].db_id
-                                               if self.latest_pointings[telescope_id][0] is not None
-                                               else 'None')
-                                for telescope_id in self.latest_pointings]
                     new_str = ' '.join(new_strs)
                     if new_str != old_str:
-                        self.log.info('Current pointings: ' + new_str)
+                        self.log.info('Telescope pointings: ' + new_str)
                 except Exception:
                     self.log.error('Could not write current status')
 
@@ -237,7 +259,7 @@ class Scheduler:
                     template_requirement=self.template_requirement,
                     return_reason=True,
                 )
-                telescope_pointings.append(pointing)
+                telescope_pointings.append(copy(pointing))
                 self.log.debug(f'Telescope {telescope_id}: {reason}')
 
                 # Now check if it's above any other horizons, and if not get the next best Pointing
@@ -260,11 +282,11 @@ class Scheduler:
                             template_requirement=self.template_requirement,
                             return_reason=True,
                         )
-                        telescope_pointings.append(pointing)
+                        telescope_pointings.append(copy(pointing))
                         self.log.debug(f'Telescope {telescope_id}-{i + 1}: {reason}')
                     else:
                         # This Pointing is fine
-                        telescope_pointings.append(pointing)
+                        telescope_pointings.append(copy(pointing))
 
                 # Add to site dict
                 pointings[telescope_id] = telescope_pointings

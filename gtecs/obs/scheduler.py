@@ -8,6 +8,7 @@ from copy import copy
 
 import Pyro4
 
+from astropy import units as u
 from astropy.coordinates import AltAz, get_sun
 from astropy.time import Time
 
@@ -63,6 +64,7 @@ class Scheduler:
 
         self.is_night = {telescope_id: False for telescope_id in self.telescopes}
         self.pilot_query_time = {telescope_id: None for telescope_id in self.telescopes}
+        self.database_update_time = 0
 
     def __del__(self):
         self.shutdown()
@@ -140,6 +142,15 @@ class Scheduler:
 
                 # Caretaker step to monitor the database
                 self._caretaker()
+
+                if self.loop_time - self.database_update_time < 2:
+                    # If we just updated we need to wait to be sure that the timestamps are >1s
+                    # in the past.
+                    # This is because in the database the time precision is only to the second,
+                    # annoyingly.
+                    self.log.debug('Waiting for the database to update...')
+                    time.sleep(1)
+                    check_time += 1 * u.s  # Important: increase the check time as well!
 
                 # Get the queue and find highest priority Pointings for each telescope
                 msg = 'Checking queue'
@@ -228,6 +239,7 @@ class Scheduler:
                 pointings = [target.get_next_pointing() for target in unscheduled_targets]
                 pointings = [p for p in pointings if p is not None]
                 db.insert_items(session, pointings)
+                self.database_update_time = time.time()
 
     def _pilot_heartbeat(self, check_time):
         """Keep track of if we loose connection to any of the telescopes during the night."""
@@ -253,8 +265,8 @@ class Scheduler:
                                       pointing.db_id, running_time, obs_time))
                         db.mark_pointing_interrupted(pointing.db_id, schedule_next=True)
                         self.log.info(f'Marked Pointing {pointing.db_id} as interrupted')
-                        time.sleep(1)  # sleep to make sure timestamp is in the past
-                        self.force_check_flag = True
+                        self.database_update_time = time.time()
+                        # No force check needed here, we're already in one!
 
                 # TODO: Send Slack alerts? Could be when a telescope first connects in the
                 #       evening, and then if the connection is lost before sunrise.
@@ -382,14 +394,14 @@ class Scheduler:
                     # We need to update the database, and force a schedule update.
                     db.mark_pointing_completed(current_pointing_id, schedule_next=True)
                     self.log.debug(f'Marked Pointing {current_pointing_id} as completed')
-                    time.sleep(1)  # sleep to make sure timestamp is in the past
+                    self.database_update_time = time.time()
                     force_update = True
                 elif current_status == 'interrupted':
                     # This Pointing was interrupted before it could finish.
                     # We need to update the database, and force a schedule update.
                     db.mark_pointing_interrupted(current_pointing_id, schedule_next=True)
                     self.log.debug(f'Marked Pointing {current_pointing_id} as interrupted')
-                    time.sleep(1)  # sleep to make sure timestamp is in the past
+                    self.database_update_time = time.time()
                     force_update = True
 
             # If we don't want a new Pointing then we can return here.
@@ -429,6 +441,7 @@ class Scheduler:
                     # It's interrupting a running Pointing, so mark it as interrupted.
                     db.mark_pointing_interrupted(current_pointing_id, schedule_next=True)
                     self.log.debug(f'Marked Pointing {current_pointing_id} as interrupted')
+                    self.database_update_time = time.time()
                     self.force_check_flag = True
 
             # Mark the new Pointing as running, if it isn't already
@@ -436,7 +449,7 @@ class Scheduler:
                 db.mark_pointing_running(new_pointing.db_id, telescope_id)
                 msg = f'Marked Pointing {new_pointing.db_id} as running on Telescope {telescope_id}'
                 self.log.debug(msg)
-                time.sleep(1)  # sleep to make sure timestamp is in the past
+                self.database_update_time = time.time()
                 self.force_check_flag = True
 
             # Get the pointing info, and add anything else useful

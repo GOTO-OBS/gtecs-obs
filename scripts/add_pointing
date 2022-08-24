@@ -363,9 +363,10 @@ def fill_target(session):
     while tel_mask == 'unknown':
         telescope_id = input('Restrict to a single telescope? [<int>/n]: ')
         if telescope_id in ['n', 'N']:
-            strategy_params['tel_mask'] = None
+            tel_mask = None
         elif int(telescope_id) in telescope_data:
-            strategy_params['tel_mask'] = 2 ** (int(telescope_id) - 1)
+            tel_mask = 2 ** (int(telescope_id) - 1)
+    strategy_params['tel_mask'] = tel_mask
 
     return target_params, strategy_params
 

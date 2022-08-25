@@ -83,7 +83,7 @@ def validate_user(username, password):
         return user.password_hash == hashlib.sha512(password.encode()).hexdigest()
 
 
-def get_pointings(session, pointing_ids=None, status=None):
+def get_pointings(session, pointing_ids=None, status=None, time=None):
     """Get pointings, filtered by ID or status.
 
     Parameters
@@ -95,19 +95,25 @@ def get_pointings(session, pointing_ids=None, status=None):
     status : string or list
         supply a status or list of statuses to filter by status
 
+    time : `~astropy.time.Time` or None
+        If given, the time to check the status at.
+        Defaults to Time.now().
+
     Returns
     -------
     pointings : list of `Pointing`
         a list of all matching Pointings
 
     """
+    if time is None:
+        time = Time.now()
     query = session.query(Pointing)
     if pointing_ids is not None:
         query = query.filter(Pointing.db_id.in_(list(pointing_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
-        query = query.filter(Pointing.status.in_(status))
+        query = query.filter(Pointing.status_at_time(time).in_(status))
     pointings = query.all()
     return pointings
 
@@ -230,7 +236,7 @@ def get_current_pointing(session, telescope_id, time=None):
         The telescope to fetch the pointing for.
 
     time : `~astropy.time.Time` or None
-        If given, the time to check the status at (useful for simulations).
+        If given, the time to check the status at.
         Defaults to Time.now().
 
     Returns
@@ -239,6 +245,8 @@ def get_current_pointing(session, telescope_id, time=None):
         a single Pointing, or None if the telescope is idle.
 
     """
+    if time is None:
+        time = Time.now()
     query = session.query(Pointing)
     query = query.filter(Pointing.status_at_time(time) == 'running')
     query = query.filter(Pointing.telescope_id == telescope_id)
@@ -496,7 +504,7 @@ def get_pointing_info(pointing_id):
     return pointing_info
 
 
-def get_targets(session, target_ids=None, status=None):
+def get_targets(session, target_ids=None, status=None, time=None):
     """Get targets, filtered by ID or status.
 
     Parameters
@@ -508,19 +516,25 @@ def get_targets(session, target_ids=None, status=None):
     status : string or list
         supply a status or list of statuses to filter by status
 
+    time : `~astropy.time.Time` or None
+        If given, the time to check the status at.
+        Defaults to Time.now().
+
     Returns
     -------
     targets : list of `Target`
         a list of all matching Targets
 
     """
+    if time is None:
+        time = Time.now()
     query = session.query(Target)
     if target_ids is not None:
         query = query.filter(Target.db_id.in_(list(target_ids)))
     if status is not None:
         if isinstance(status, str):
             status = [status]
-        query = query.filter(Target.status.in_(status))
+        query = query.filter(Target.status_at_time(time).in_(status))
     targets = query.all()
     return targets
 

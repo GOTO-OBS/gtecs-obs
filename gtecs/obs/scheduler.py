@@ -44,6 +44,7 @@ class Scheduler:
         self.check_period = params.SCHEDULER_CHECK_PERIOD
         self.force_check_flag = False
         self.update_lock = False
+        self.update_queue = []
         self.query_lock = False
 
         self.readout_time = params.READOUT_TIME
@@ -133,34 +134,30 @@ class Scheduler:
             if self.force_check_flag or (self.loop_time - self.check_time) > self.check_period:
                 self.update_lock = True
                 check_time = Time(self.loop_time, format='unix')
+                msg = 'Checking database' + (' (forced update)' if self.force_check_flag else '')
+                self.log.debug(msg)
 
-                # Calculate night times for telescope sites
+                # Calculate night status for telescope sites
                 self._check_night_times(check_time)
 
                 # Check the connection to the pilots
                 self._pilot_heartbeat(check_time)
 
-                # Caretaker step to monitor the database
-                self._caretaker()
-
-                if self.loop_time - self.database_update_time < 2:
+                # Caretaker step to monitor and update the database
+                database_updated = self._caretaker(check_time)
+                if database_updated:
                     # If we just updated we need to wait to be sure that the timestamps are >1s
-                    # in the past.
+                    # in the past when we then get the Pointings queue.
                     # This is because in the database the time precision is only to the second,
-                    # annoyingly.
-                    self.log.debug('Waiting for the database to update...')
-                    time.sleep(1)
-                    check_time += 1 * u.s  # Important: increase the check time as well!
+                    # annoyingly, and we use the same timestamp for all updates.
+                    check_time += 1 * u.s
 
                 # Get the queue and find highest priority Pointings for each telescope
-                msg = 'Checking queue'
-                if self.force_check_flag:
-                    msg += ' (forced update)'
-                self.log.debug(msg)
+                self.log.debug('Updating queue')
                 new_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
                 for site_id in self.site_data:
                     new_pointings.update(self._get_pointings(site_id, check_time))
-                self.log.debug('Queue check complete')
+                self.log.debug('Queue update complete')
                 self.old_pointings = self.latest_pointings
                 self.latest_pointings = new_pointings
 
@@ -228,19 +225,6 @@ class Scheduler:
             for telescope_id in self.site_data[site_id]['telescopes']:
                 self.is_night[telescope_id] = sun_altaz.alt.degree < params.SCHEDULER_SUNALT_LIMIT
 
-    def _caretaker(self):
-        """Monitor the database."""
-        with db.open_session() as session:
-            # Schedule new Pointings for any unscheduled Targets
-            unscheduled_targets = db.get_targets(session, status='unscheduled')
-            if len(unscheduled_targets) > 0:
-                self.log.info('Rescheduling {} unscheduled Targets'.format(
-                              len(unscheduled_targets)))
-                pointings = [target.get_next_pointing() for target in unscheduled_targets]
-                pointings = [p for p in pointings if p is not None]
-                db.insert_items(session, pointings)
-                self.database_update_time = time.time()
-
     def _pilot_heartbeat(self, check_time):
         """Keep track of if we loose connection to any of the telescopes during the night."""
         with db.open_session() as session:
@@ -263,13 +247,51 @@ class Scheduler:
                         obs_time = pointing.get_obstime(self.readout_time)
                         self.log.info('Pointing {} has been running for {:.1f}s/{:.1f}s'.format(
                                       pointing.db_id, running_time, obs_time))
-                        db.mark_pointing_interrupted(pointing.db_id, schedule_next=True)
-                        self.log.info(f'Marked Pointing {pointing.db_id} as interrupted')
-                        self.database_update_time = time.time()
+                        self.update_queue.append((pointing.db_id, 'interrupted'))
                         # No force check needed here, we're already in one!
 
                 # TODO: Send Slack alerts? Could be when a telescope first connects in the
                 #       evening, and then if the connection is lost before sunrise.
+
+    def _caretaker(self, check_time):
+        """Monitor the database and update any Pointings."""
+        database_updated = False
+        with db.open_session() as session:
+            # Process any Pointings that need updating
+            while len(self.update_queue) > 0:
+                pointing = self.update_queue.pop()
+                try:
+                    pointing_id = pointing[0]
+                    new_status = pointing[1]
+                    if new_status == 'running':
+                        telescope_id = pointing[2]
+                        db.mark_pointing_running(pointing_id, telescope_id)
+                        self.log.info(f'Marked Pointing {pointing_id} as running'
+                                      f' on Telescope {telescope_id}')
+                        database_updated = True
+                    elif new_status == 'completed':
+                        db.mark_pointing_completed(pointing_id, schedule_next=True)
+                        self.log.info(f'Marked Pointing {pointing_id} as completed')
+                        database_updated = True
+                    elif new_status == 'interrupted':
+                        db.mark_pointing_interrupted(pointing_id, schedule_next=True)
+                        self.log.info(f'Marked Pointing {pointing_id} as interrupted')
+                        database_updated = True
+                except Exception:
+                    self.log.error('Error marking Pointing: {}'.format(pointing))
+                    self.log.debug('', exc_info=True)
+
+            # Create new Pointings for any Targets that are still unscheduled (e.g. expired)
+            unscheduled_targets = db.get_targets(session, status='unscheduled', time=check_time)
+            if len(unscheduled_targets) > 0:
+                self.log.info('Rescheduling {} unscheduled Targets: {}'.format(
+                              len(unscheduled_targets), [t.db_id for t in unscheduled_targets]))
+                pointings = [target.get_next_pointing() for target in unscheduled_targets]
+                pointings = [p for p in pointings if p is not None]
+                db.insert_items(session, pointings)
+                database_updated = True
+
+        return database_updated
 
     def _get_pointings(self, site_id, check_time):
         """Calculate what to observe for telescopes at the given site."""
@@ -391,17 +413,11 @@ class Scheduler:
             if current_pointing_id is not None:
                 if current_status == 'completed':
                     # The Telescope has successfully finished this Pointing.
-                    # We need to update the database, and force a schedule update.
-                    db.mark_pointing_completed(current_pointing_id, schedule_next=True)
-                    self.log.debug(f'Marked Pointing {current_pointing_id} as completed')
-                    self.database_update_time = time.time()
+                    self.update_queue.append((current_pointing_id, 'completed'))
                     force_update = True
                 elif current_status == 'interrupted':
                     # This Pointing was interrupted before it could finish.
-                    # We need to update the database, and force a schedule update.
-                    db.mark_pointing_interrupted(current_pointing_id, schedule_next=True)
-                    self.log.debug(f'Marked Pointing {current_pointing_id} as interrupted')
-                    self.database_update_time = time.time()
+                    self.update_queue.append((current_pointing_id, 'interrupted'))
                     force_update = True
 
             # If we don't want a new Pointing then we can return here.
@@ -414,7 +430,7 @@ class Scheduler:
             # This is particularly important if we just marked a pointing, as during the 1s wait
             # a new check might have started which won't yet take that into account.
             # So we have to wait for the update lock to clear, then set the force check flag and
-            # wait for that check to happen.
+            # wait for that check to happen to mark the Pointings and update the queue.
             while self.update_lock is True:
                 time.sleep(0.1)
             if force_update:
@@ -439,17 +455,12 @@ class Scheduler:
 
                 if current_pointing_id is not None and current_status == 'running':
                     # It's interrupting a running Pointing, so mark it as interrupted.
-                    db.mark_pointing_interrupted(current_pointing_id, schedule_next=True)
-                    self.log.debug(f'Marked Pointing {current_pointing_id} as interrupted')
-                    self.database_update_time = time.time()
+                    self.update_queue.append((current_pointing_id, 'interrupted'))
                     self.force_check_flag = True
 
             # Mark the new Pointing as running, if it isn't already
             if new_pointing.current_telescope is None:
-                db.mark_pointing_running(new_pointing.db_id, telescope_id)
-                msg = f'Marked Pointing {new_pointing.db_id} as running on Telescope {telescope_id}'
-                self.log.debug(msg)
-                self.database_update_time = time.time()
+                self.update_queue.append((new_pointing.db_id, 'running', telescope_id))
                 self.force_check_flag = True
 
             # Get the pointing info, and add anything else useful

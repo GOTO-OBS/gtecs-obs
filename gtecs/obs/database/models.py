@@ -1103,7 +1103,7 @@ class Strategy(Base):
         return select([func.count(Pointing.db_id)]).\
             where(and_(Pointing.strategy_id == self.db_id,
                        Pointing.status_at_time(time) == 'completed',
-                       ))
+                       )).scalar_subquery()
 
     @hybrid_property
     def num_remaining(self):
@@ -1744,7 +1744,7 @@ class Target(Base):
         return select([func.count(Pointing.db_id)]).\
             where(and_(Pointing.target_id == self.db_id,
                        Pointing.status_at_time(time) == 'completed',
-                       ))
+                       )).scalar_subquery()
 
     # These have been replaced by a column property, which is a lot faster
 

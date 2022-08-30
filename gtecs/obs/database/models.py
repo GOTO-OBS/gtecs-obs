@@ -132,6 +132,9 @@ class ExposureSet(Base):
     binning : int, optional
         binning factor to apply
         default = 1 (no binning)
+    dithering : int, optional
+        dithering pattern to use (0=None, 1=default, 2+=custom (TODO: not implemented))
+        default = 1 (default dithering)
     ut_mask : int, optional
         if set, this is a binary mask which will determine which unit
         telescopes carry out the exposure. A value of 5 (binary 0101) will
@@ -175,6 +178,7 @@ class ExposureSet(Base):
     filt = Column('filter',   # filter is a built in function in Python
                   String(1), nullable=False)
     binning = Column(Integer, nullable=False, default=1)
+    dithering = Column(Integer, nullable=False, default=1)
     ut_mask = Column(Integer, default=None)
 
     # Foreign keys
@@ -203,6 +207,7 @@ class ExposureSet(Base):
                    'exptime={}'.format(self.exptime),
                    'filt={}'.format(self.filt),
                    'binning={}'.format(self.binning),
+                   'dithering={}'.format(self.dithering),
                    'ut_mask={}'.format(self.ut_mask),
                    'target_id={}'.format(self.target_id),
                    ]

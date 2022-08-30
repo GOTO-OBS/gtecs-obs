@@ -141,6 +141,7 @@ def write_exp_file(db_id, exposure_sets):
                         '<td> ' + str(exposure_set.exptime) + ' </td>' +
                         '<td> ' + str(exposure_set.filt) + ' </td>' +
                         '<td> ' + str(exposure_set.binning) + ' </td>' +
+                        '<td> ' + str(exposure_set.dithering) + ' </td>' +
                         '</tr>\n')
                 i += 1
             f.write("</table></body></html>")

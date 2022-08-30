@@ -453,6 +453,7 @@ def get_pointing_info(pointing_id):
             expset_info['exptime'] = exposure_set.exptime
             expset_info['filt'] = exposure_set.filt
             expset_info['binning'] = exposure_set.binning
+            expset_info['dithering'] = exposure_set.dithering
             expset_info['ut_mask'] = exposure_set.ut_mask
             pointing_info['exposure_sets'].append(expset_info)
 

@@ -148,9 +148,9 @@ if __name__ == '__main__':
         sunalt = float(args.sunalt) * u.deg
         now = Time.now()
         if len(telescopes) > 1:
-            raise ValueError('Cannot use --sunalt flag with multiple telescopes')
+            raise ValueError('Cannot use --sunalt flag with multiple telescopes')  # TODO: per site?
         with db.open_session() as session:
-            t = db.get_telescope_by_id(telescopes[0])
+            t = db.get_telescope_by_id(session, telescopes[0])
             observer = Observer(t.site.location)
             if observer.sun_altaz(now).alt > sunalt:
                 # Sun is above, get next time it sets below

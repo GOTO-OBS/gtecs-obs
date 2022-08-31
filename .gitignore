@@ -6,6 +6,3 @@ __pycache__/
 # Visual Studio Code files
 *.browse*
 *.vscode*
-
-# Test schema
-newschema.sql

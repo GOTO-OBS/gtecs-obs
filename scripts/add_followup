@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """A simple script to add a target for followup to the observation database."""
 
-import os
-import sys
+import argparse
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -11,17 +10,29 @@ from astropy.time import Time
 from gtecs.obs import database as db
 
 
-def run(name, target_ra, target_dec):
-    """Add an Mpointing with 5 60s L filter exposures."""
+TARGET_PARAMS = {'rank': 0,
+                 }
+STRATEGY_PARAMS = {'num_todo': 1,
+                   'wait_time': 12 * u.hour,
+                   }
+
+EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'},
+               {'num_exp': 1, 'exptime': 60, 'filt': 'R'},
+               {'num_exp': 1, 'exptime': 60, 'filt': 'G'},
+               {'num_exp': 1, 'exptime': 60, 'filt': 'B'},
+               ]
+
+
+def run(name, coord):
+    """Create the target and add it to the database."""
     with db.open_session() as session:
         # Get the current grid
         db_grid = db.get_current_grid(session)
 
         # Create a SkyGrid from the database Grid
-        grid = db_grid.get_skygrid()
+        grid = db_grid.skygrid
 
         # Find which tile the given coordinates are in
-        coord = SkyCoord(target_ra * u.deg, target_dec * u.deg)
         tile_name = grid.get_tile(coord)
 
         # Find the matching GridTile
@@ -38,77 +49,47 @@ def run(name, target_ra, target_dec):
                                                                     db_grid_tile.dec,
                                                                     ))
 
-        # Get the User, or make it if it doesn't exist
-        try:
-            user = db.get_user(session, username='goto')
-        except ValueError:
-            print('ERROR: No database user found')
-            return
+        # Get default User
+        user = db.get_user(session, username='default')
 
-        # Get Mpointing and ExposureSet data
-        expsets = [{'num_exp': 5,
-                    'exptime': 60,
-                    'filt': 'L',
-                    },
-                   ]
+        # Create Target
+        target_params = TARGET_PARAMS.copy()
+        target_params['name'] = name
+        target_params['start_time'] = str(Time.now())
+        target_params['stop_time'] = str(Time.now() + 1 * u.day)
 
-        mp_data = {'object_name': name,
-                   'start_rank': 0,
-                   'num_todo': 1,
-                   'wait_time': 12 * 60,
-                   'start_time': str(Time.now()),
-                   'stop_time': str(Time.now() + 1 * u.day),
-                   'min_time': 450,  # (60+30)*5
-                   }
-
-        # Create database enteries
-        db_mpointing = db.Mpointing(**mp_data, user=user)
-        db_mpointing.grid_tile = db_grid_tile
-        for exp_data in expsets:
-            db_exposure_set = db.ExposureSet(**exp_data)
-            db_mpointing.exposure_sets.append(db_exposure_set)
-
-        # Create the first Pointing (i.e. preempt the caretaker)
-        db_pointing = db_mpointing.get_next_pointing()
-        db_mpointing.pointings.append(db_pointing)
+        target = db.Target(**target_params,
+                           user=user,
+                           strategy=db.Strategy(**STRATEGY_PARAMS.copy()),
+                           grid_tile=db_grid_tile,
+                           )
+        for exps_params in EXPS_PARAMS:
+            target.exposure_sets.append(db.ExposureSet(**exps_params))
 
         # Add to database
-        db.insert_items(session, [db_mpointing])
-
-        # Print for debugging
+        db.insert_items(session, [target])
         print('Added to database:')
-        session.refresh(db_mpointing)
-        print(db_mpointing)
-        for db_exposure_set in db_mpointing.exposure_sets:
-            print(db_exposure_set)
+        session.refresh(target)
+        print(target)
+        for exposure_set in target.exposure_sets:
+            print(exposure_set)
+
+    print('Done')
 
 
 if __name__ == '__main__':
-    args = sys.argv[1:]
-    if len(args) != 3:
-        print('Add a single pointing with 5 60s L exposures')
-        print('Usage: {} <name> <ra> <dec>'.format(os.path.basename(__file__)))
-        print(' (<ra> and <dec> should be in decimal degrees)')
-        sys.exit()
+    description = """Add a single pointing for a given target."""
 
-    # Target name
-    name = args[0]
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    # RA
-    try:
-        ra = float(args[1])
-        assert 0 <= ra < 360
-    except Exception:
-        print('Invalid RA, must be in decimal degrees')
-        sys.exit()
+    parser.add_argument('name', type=str, help='Target name')
+    parser.add_argument('ra', type=float, help='Target RA')
+    parser.add_argument('dec', type=float, help='Target Dec')
 
-    # Dec
-    try:
-        dec = float(args[2])
-        assert -90 < dec < 90
-    except Exception:
-        print('Invalid Dec, must be in decimal degrees')
-        sys.exit()
+    args = parser.parse_args()
 
-    # Run main program
-    run(name, ra, dec)
+    name = args.name
+    coord = SkyCoord(args.ra * u.deg, args.dec * u.deg)
+
+    run(name, coord)

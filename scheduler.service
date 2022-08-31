@@ -1,0 +1,12 @@
+[Unit]
+Description=G-TeCS scheduler and database monitor
+After=network-online.target
+
+[Service]
+Type=simple
+User=goto
+ExecStart=/home/goto/.local/bin/scheduler start
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

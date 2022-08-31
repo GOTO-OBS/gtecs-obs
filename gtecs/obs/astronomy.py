@@ -6,9 +6,10 @@ from astropy import units as u
 from astropy.coordinates import GCRS, Longitude, get_sun
 from astropy.time import Time
 
-
 import numpy as np
 from numpy.polynomial.polynomial import polyval
+
+from scipy import interpolate
 
 
 def _equation_of_time(time):
@@ -150,3 +151,25 @@ def time_to_set(observer, targets, now):
     set_times = _rise_set_trig(now, targets, observer.location, 'next', 'setting')
     seconds_until_set = (set_times - now).to(u.s)
     return seconds_until_set
+
+
+def horizon_limit(azimuth, horizon=30):
+    """Get the horizon altitude limit at the given azimuth.
+
+    Parameters
+    ----------
+    azimuth : float or numpy.ndarray
+        azimuth in degrees
+    horizon : float or tuple of (azs, alts), optional
+        artificial horizon, either a flat value or varying with azimuth.
+        default is a flat horizon of 30 deg
+
+    """
+    if isinstance(horizon, (int, float)):
+        horizon = ([0, 90, 180, 270, 360], [horizon, horizon, horizon, horizon, horizon])
+
+    get_alt_limit = interpolate.interp1d(*horizon,
+                                         bounds_error=False,
+                                         fill_value='extrapolate')
+    alt_limit = get_alt_limit(azimuth) * u.deg
+    return alt_limit

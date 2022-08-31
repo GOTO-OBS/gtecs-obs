@@ -41,11 +41,11 @@ def import_queue_file():
     # remaining lines are pointings
     pointing_list = []
     for line in lines[2:]:
-        db_id, altaznow, altazlater, constraints = json.loads(line)
+        db_id, altaz_start, altaz_end, constraints = json.loads(line)
         db_id = int(db_id)
         constraint_names, valid_arr = list(zip(*constraints))
         valid_bools = [bool(x) for x in valid_arr]
-        pointing_info = [db_id, altaznow, altazlater,
+        pointing_info = [db_id, altaz_start, altaz_end,
                          list(constraint_names), valid_bools]
         pointing_list.append(pointing_info)
     return time, all_constraint_names, pointing_list
@@ -53,7 +53,7 @@ def import_queue_file():
 
 def write_flag_file(pointing, time, all_constraint_names, pointing_info):
     """Write flag file for a given pointing."""
-    db_id, altaznow, altazlater, constraint_names, valid_arr = pointing_info
+    db_id, altaz_start, altaz_end, constraint_names, valid_arr = pointing_info
     flag_filename = os.path.join(params.HTML_PATH, 'ID_{}_flags.html'.format(db_id))
 
     with open(flag_filename, 'w') as f:
@@ -102,19 +102,13 @@ def write_flag_file(pointing, time, all_constraint_names, pointing_info):
             f.write('ra = ' + ra + '<br>\n')
             f.write('dec = ' + dec + '<br>\n')
 
-            alt_now, az_now = altaznow
-            f.write('alt_now = {:.2f}<br>\n'.format(alt_now))
-            f.write('az_now = {:.2f}<br>\n'.format(az_now))
+            alt_start, az_start = altaz_start
+            f.write('alt_start = {:.2f}<br>\n'.format(alt_start))
+            f.write('az_start = {:.2f}<br>\n'.format(az_start))
 
-            alt_later, az_later = altazlater
-            f.write('alt_mintime = {:.2f}<br>\n'.format(alt_later))
-            f.write('az_mintime = {:.2f}<br>\n'.format(az_later))
-
-            # altart
-            # altart_mintime
-
-            # moondist
-            # sunalt_mintime
+            alt_end, az_end = altaz_end
+            f.write('alt_end = {:.2f}<br>\n'.format(alt_end))
+            f.write('az_end = {:.2f}<br>\n'.format(az_end))
         f.write("</body></html>")
 
 
@@ -122,7 +116,7 @@ def write_exp_file(db_id, exposure_sets):
     """Write exposure files for a pointing."""
     exp_filename = os.path.join(params.HTML_PATH, 'ID_{}_exp.html'.format(db_id))
 
-    # unlike the flags, exposure info dosn't change
+    # unlike the flags, exposure info doesn't change
     # so don't re-write the files if they're already there!
     if not os.path.exists(exp_filename):
         with open(exp_filename, 'w') as f:
@@ -147,15 +141,13 @@ def write_exp_file(db_id, exposure_sets):
                         '<td> ' + str(exposure_set.exptime) + ' </td>' +
                         '<td> ' + str(exposure_set.filt) + ' </td>' +
                         '<td> ' + str(exposure_set.binning) + ' </td>' +
-                        '<td> ' + str(exposure_set.imgtype) + ' </td>' +
-                        '<td> ' + str(exposure_set.ra_offset) + ' </td>' +
-                        '<td> ' + str(exposure_set.dec_offset) + ' </td>' +
+                        '<td> ' + str(exposure_set.dithering) + ' </td>' +
                         '</tr>\n')
                 i += 1
             f.write("</table></body></html>")
 
 
-def write_queue_page(observer):
+def write_queue_page(queue):
     """Write the GOTO queue page."""
     # load any needed infomation saved by the scheduler
     time, all_constraint_names, pointing_list = import_queue_file()
@@ -192,10 +184,10 @@ def write_queue_page(observer):
         f.write('LST: ')
         import warnings
         warnings.simplefilter("ignore", UnicodeWarning)
-        lst = time.sidereal_time('mean', longitude=observer.location.lon)
+        lst = time.sidereal_time('mean', longitude=queue.observer.location.lon)
         f.write(lst.to_string(sep=':', precision=2))
 
-        altaz_frame = AltAz(obstime=time, location=observer.location)
+        altaz_frame = AltAz(obstime=time, location=queue.observer.location)
 
         f.write('  SunAlt: ')
         sun = get_sun(time)
@@ -255,7 +247,7 @@ def write_queue_page(observer):
             write_exp_file(db_id, exposure_sets)
             exp_link = 'ID_{}_exp.html'.format(db_id)
             exp_str = ('<a href=' + exp_link + ' rel=\"#overlay\">' +
-                       str(pointing.object_name) + '</a>' + popup_str)
+                       str(pointing.name) + '</a>' + popup_str)
 
             # find ra/dec
             target = ICRS(pointing.ra * u.deg, pointing.dec * u.deg)

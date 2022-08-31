@@ -33,20 +33,20 @@ else:
 with db.open_session() as session:
     all_pointings = db.get_pointings(session)
     n_all = len(all_pointings)
-    print("{} points in database".format(n_all))
+    print('{} points in database'.format(n_all))
 
-    running, _ = db.get_queue(session)
-    if running:
-        print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running.db_id))
+    running = db.get_pointings(session, status='running')
+    if len(running) > 0:
+        print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running[0].db_id))
     else:
         print('\n')
 
     for pointing in all_pointings:
         if show_all or pointing.status != 'expired':
-            string = '{: <6.0f} | {: >20} | {: >3.0f}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
+            string = '{: <6.0f} | {: >20} | {}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
                 pointing.db_id,
-                pointing.object_name,
-                pointing.rank,
+                pointing.name,
+                '{: >3.0f}'.format(pointing.rank) if pointing.rank is not None else 'inf',
                 '!' if pointing.too else ' ',
                 pointing.ra, pointing.dec,
                 pointing.start_time)
@@ -58,13 +58,12 @@ with db.open_session() as session:
             elif pointing.status == 'completed':
                 status = gtxt('completed')
             elif pointing.status == 'pending':
-                if t > Time(pointing.start_time):
-                    status = btxt('pending')
-                else:
-                    wait = Time(pointing.start_time) - t
-                    status = 'upcoming ({:.1f}h)'.format(wait.to('hour').value)
+                status = btxt('pending')
+            elif pointing.status == 'upcoming':
+                wait = Time(pointing.start_time) - t
+                status = 'upcoming ({:.1f}h)'.format(wait.to('hour').value)
             else:
                 status = pointing.status
             print(status, end='\n')
 
-    print("{} points in database".format(n_all))
+    print('{} points in database'.format(n_all))

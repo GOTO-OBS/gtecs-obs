@@ -1,26 +1,31 @@
 """Function to create a random pointing for testing."""
 
+from astropy import units as u
+from astropy.coordinates import EarthLocation
 from astropy.time import Time
 
-from .models import ExposureSet, Pointing
+import numpy as np
 
-__all__ = ['make_random_pointing']
+from .models import ExposureSet, Strategy, Target
 
 
-def make_random_pointing(user, num_expsets=None, time=None):
-    """Make a random pointing for testing.
+__all__ = ['make_random_target']
+
+
+def make_random_target(user, num_expsets=None, time=None):
+    """Make a random target for testing.
 
     It should be observable from La Palma at the time of creation.
-    However not all pointings will be valid in the queue immedietly due to
+    However not all pointings will be valid in the queue immediately due to
     random start and stop times.
 
     Parameters
     ----------
     user : `User`
-        the User to associate the Pointing with
+        the User to associate the Target with
 
     num_expsets : int, optional
-        the number of Exposure Sets attached to the Pointing
+        the number of Exposure Sets attached to the Target
         if None, a random number of exposure_sets between 1 and 5 will be added
     time : `~astropy.time.Time`, optional
         the time to centre the pointings around
@@ -28,32 +33,31 @@ def make_random_pointing(user, num_expsets=None, time=None):
 
     Returns
     -------
-    pointing : `Pointing`
-        the new Pointing
+    target : `Target`
+        the new target
 
     """
-    import numpy as np
-    from astropy.coordinates import EarthLocation
-    from astropy import units as u
-
     lapalma = EarthLocation(lat=28 * u.deg, lon=-17 * u.deg)
     if time is None:
         time = Time.now()
     # LST in degrees
     lst = time.sidereal_time('mean', longitude=lapalma.lon).deg
-    t1 = time + np.random.randint(-5, 2) * u.day
-    t2 = t1 + np.random.randint(1, 10) * u.day
-    p = Pointing(object_name='random_object',
-                 ra=np.random.uniform(lst - 3, lst + 3),
-                 dec=np.random.uniform(10, 89),
-                 rank=np.random.randint(1, 100),
-                 min_time=np.random.uniform(100, 3600),
-                 max_moon=np.random.choice(['D', 'G', 'B']),
-                 too=np.random.randint(0, 2),
-                 start_time=t1,
-                 stop_time=t2,
-                 user=user,
-                 )
+    t1 = time + np.random.randint(-2, 2) * u.day
+    t2 = t1 + np.random.randint(2, 6) * u.day
+
+    strategy = Strategy(num_todo=np.random.randint(1, 5),
+                        too=np.random.randint(0, 2),
+                        max_moon=np.random.choice(['D', 'G', 'B']),
+                        )
+    target = Target(name='random_target',
+                    ra=np.random.uniform(lst - 3, lst + 3),
+                    dec=np.random.uniform(10, 89),
+                    rank=np.random.randint(1, 100),
+                    start_time=t1,
+                    stop_time=t2,
+                    user=user,
+                    strategy=strategy
+                    )
 
     if num_expsets is None:
         num_expsets = np.random.randint(1, 6)
@@ -62,6 +66,6 @@ def make_random_pointing(user, num_expsets=None, time=None):
                                    exptime=np.random.uniform(10., 360.),
                                    filt=np.random.choice(['L', 'R', 'G', 'B']),
                                    )
-        p.exposure_sets.append(exposure_set)
+        target.exposure_sets.append(exposure_set)
 
-    return p
+    return target

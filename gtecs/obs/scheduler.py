@@ -1,607 +1,528 @@
-"""Robotic queue scheduler functions."""
+"""Class for monitoring the obs database and finding pointings to observe."""
 
-import json
-import logging
 import os
-import warnings
+import threading
+import time
+import traceback
+from copy import copy
 
-from astroplan import (AltitudeConstraint, AtNightConstraint,
-                       Constraint, MoonIlluminationConstraint, MoonSeparationConstraint,
-                       Observer, TimeConstraint)
-from astroplan.constraints import _get_altaz
+import Pyro4
 
 from astropy import units as u
-from astropy.coordinates import EarthLocation, SkyCoord
+from astropy.coordinates import AltAz, get_sun
 from astropy.time import Time
 
-from erfa import ErfaWarning
+from gtecs.common.logging import get_logger
 
-from gtecs.obs import database as db
-
-import numpy as np
-
-from scipy import interpolate
-
+from . import database as db
 from . import params
-from .astronomy import time_to_set
-from .html import write_queue_page
-
-warnings.simplefilter('ignore', ErfaWarning)
-
-
-MOON_PHASES = {'B': 1, 'G': 0.65, 'D': 0.25}
+from .astronomy import horizon_limit
+from .scheduling import PointingQueue
+from .slack import send_slack_msg
 
 
-def apply_constraints(constraints, observer, targets, times):
-    """Determine if the targets are observable for given times, observer, and constraints.
-
-    Similar to Astroplan's ``is_observable``, but returns full constraint
-    results in a 3D array.
-
-    Parameters
-    ----------
-    constraints : list or `~astroplan.constraints.Constraint`
-        Observational constraint(s)
-
-    observer : `~astroplan.Observer`
-        The observer who has constraints ``constraints``
-
-    targets : {list, `~astropy.coordinates.SkyCoord`, `~astroplan.FixedTarget`}
-        Target or list of targets
-
-    times : `~astropy.time.Time`
-        Array of times on which to test the constraint
-
-    Returns
-    -------
-    constraint_array : 3D array
-        first dimension is given by the number of times
-        second dimension is given by the number of targets
-        third dimension is given by the number of constraints
-
-    """
-    if not hasattr(constraints, '__len__'):
-        constraints = [constraints]
-
-    applied_constraints = np.array([constraint(observer, targets, times)
-                                    for constraint in constraints])
-    return np.transpose(applied_constraints)
+Pyro4.config.SERIALIZER = 'pickle'  # IMPORTANT - Can serialize Pointing objects
+Pyro4.config.SERIALIZERS_ACCEPTED.add('pickle')
 
 
-class ArtificialHorizonConstraint(Constraint):
-    """Ensure altitude is above artificial horizon."""
+@Pyro4.expose
+class Scheduler:
+    """Database scheduler daemon class."""
 
-    def __init__(self, az, alt):
-        self.get_alt_limit = interpolate.interp1d(az, alt,
-                                                  bounds_error=False,
-                                                  fill_value='extrapolate')
+    def __init__(self):
+        # get a logger for the scheduler
+        self.log = get_logger('scheduler', params.LOG_PATH,
+                              log_stdout=True,
+                              log_to_file=params.FILE_LOGGING,
+                              log_to_stdout=params.STDOUT_LOGGING)
+        self.log.info('Scheduler started')
 
-    def compute_constraint(self, times, observer, targets):
-        """Compute the constraint."""
-        altaz = _get_altaz(times, observer, targets)['altaz']
-        alt_limit = self.get_alt_limit(altaz.az) * u.deg
-        return altaz.alt > alt_limit
+        # scheduler variables
+        self.running = False
+        self.loop_time = 0
+        self.check_time = 0
+        self.check_period = params.SCHEDULER_CHECK_PERIOD
+        self.force_check_flag = False
+        self.update_lock = False
+        self.update_queue = []
+        self.query_lock = False
 
+        self.readout_time = params.READOUT_TIME
+        self.template_requirement = params.TEMPLATE_REQUIREMENT
+        self.write_file = params.WRITE_QUEUE_FILE
+        self.queue_file = os.path.join(params.QUEUE_PATH, 'queue_info')
+        self.write_html = params.WRITE_QUEUE_PAGE
 
-class Pointing(object):
-    """A class to contain infomation on each pointing."""
+        # Get site data (only once, on init)
+        self.site_data = db.get_site_info()
+        self.telescopes = sorted([telescope_id
+                                  for telescopes in [self.site_data[site_id]['telescopes'].keys()
+                                                     for site_id in self.site_data]
+                                  for telescope_id in telescopes])
 
-    def __init__(self, db_id, name, ra, dec, rank, weight, num_obs, too,
-                 maxsunalt, minalt, mintime, maxmoon, minmoonsep,
-                 start, stop, current):
-        self.db_id = int(db_id)
-        self.name = name
-        self.ra = float(ra)
-        self.dec = float(dec)
-        self.rank = int(rank)
-        self.weight = float(weight)
-        self.num_obs = int(num_obs)
-        self.too = bool(int(too))
-        self.maxsunalt = float(maxsunalt)
-        self.minalt = float(minalt)
-        self.mintime = float(mintime)
-        self.maxmoon = maxmoon
-        self.minmoonsep = minmoonsep
-        self.start = start
-        self.stop = stop
-        self.current = bool(current)
+        self.old_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
+        self.latest_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
 
-    def __eq__(self, other):
+        self.is_night = {telescope_id: False for telescope_id in self.telescopes}
+        self.pilot_query_time = {telescope_id: None for telescope_id in self.telescopes}
+        self.database_update_time = 0
+
+    def __del__(self):
+        self.shutdown()
+
+    def run(self, host, port, timeout=5):
+        """Run the scheduler as a Pyro daemon."""
+        self.running = True
+
+        # Start thread
+        t = threading.Thread(target=self._monitor_thread)
+        t.daemon = True
+        t.start()
+
+        # Check the Pyro address is available
         try:
-            return self.db_id == other.db_id
-        except AttributeError:
-            return False
-
-    def __ne__(self, other):
-        return not self == other
-
-    def __repr__(self):
-        template = ('Pointing(db_id={}, name={}, ra={}, dec={}, rank={}, weight={}, ' +
-                    'num_obs={}, too={}, maxsunalt={}, minalt={}, mintime={}, maxmoon={}, ' +
-                    'minmoonsep={}, start={}, stop={}, ' +
-                    'current={})')
-        return template.format(
-            self.db_id, self.name, self.ra, self.dec, self.rank, self.weight,
-            self.num_obs, self.too, self.maxsunalt, self.minalt, self.mintime,
-            self.maxmoon, self.minmoonsep, self.start, self.stop,
-            self.current)
-
-    @classmethod
-    def from_database(cls, db_pointing):
-        """Import a pointing from the database."""
-        # num_obs will be stored on the Mpointing, if it has one
-        # If not then it's a one-off, so num_obs=0
-        if db_pointing.mpointing:
-            num_obs = db_pointing.mpointing.num_completed
+            pyro_daemon = Pyro4.Daemon(host, port)
+        except Exception:
+            raise
         else:
-            num_obs = 0
+            pyro_daemon.close()
 
-        # weight is stored on the Survey Tile, if it has one
-        # If not it effectively contains 100% of the target, so weight=1
-        if db_pointing.survey_tile:
-            weight = db_pointing.survey_tile.current_weight
+        # Start the daemon
+        with Pyro4.Daemon(host, port) as pyro_daemon:
+            self._uri = pyro_daemon.register(self, objectId='scheduler')
+            Pyro4.config.COMMTIMEOUT = timeout
+
+            # Start request loop
+            self.log.info('Pyro daemon registered to {}'.format(self._uri))
+            pyro_daemon.requestLoop(loopCondition=self.is_running)
+
+        # Loop has closed
+        self.log.info('Pyro daemon successfully shut down')
+        time.sleep(1.)
+
+    def is_running(self):
+        """Check if the daemon is running or not.
+
+        Used for the Pyro loop condition, it needs a function so you can't just
+        give it self.running.
+        """
+        return self.running
+
+    @property
+    def uri(self):
+        """Return the Pyro URI."""
+        if hasattr(self, '_uri'):
+            return self._uri
         else:
-            weight = 1
+            return None
 
-        # The current pointing has running status
-        current = bool(db_pointing.status == 'running')
+    def shutdown(self):
+        """Shut down the running threads."""
+        self.running = False
 
-        # Create pointing object
-        pointing = cls(db_id=db_pointing.db_id,
-                       name=db_pointing.object_name,
-                       ra=db_pointing.ra,
-                       dec=db_pointing.dec,
-                       rank=db_pointing.rank,
-                       weight=weight,
-                       num_obs=num_obs,
-                       too=db_pointing.too,
-                       maxsunalt=db_pointing.max_sunalt,
-                       minalt=db_pointing.min_alt,
-                       mintime=db_pointing.min_time,
-                       maxmoon=db_pointing.max_moon,
-                       minmoonsep=db_pointing.min_moonsep,
-                       start=db_pointing.start_time,
-                       stop=db_pointing.stop_time,
-                       current=current)
-        return pointing
+    # Internal thread
+    def _monitor_thread(self):
+        """Monitor the database and find priority Pointings."""
+        self.log.info('Database monitor thread started')
 
+        while self.running:
+            self.loop_time = time.time()
 
-class PointingQueue(object):
-    """A class to represent a queue of pointings."""
+            # TODO: send database reports to Slack, once a day?
 
-    def __init__(self, pointings=None):
-        if pointings is None:
-            pointings = []
-        self.pointings = pointings
+            # Only check on the given period, or if forced
+            if self.force_check_flag or (self.loop_time - self.check_time) > self.check_period:
+                self.update_lock = True
+                check_time = Time(self.loop_time, format='unix')
+                msg = 'Checking database' + (' (forced update)' if self.force_check_flag else '')
+                self.log.debug(msg)
 
-        # Can't do much with no Pointings
-        if len(self.pointings) == 0:
-            return
+                # Calculate night status for telescope sites
+                self._check_night_times(check_time)
 
-        # Create pointing data arrays
-        self.targets = SkyCoord([float(p.ra) for p in self.pointings],
-                                [float(p.dec) for p in self.pointings],
-                                unit=u.deg, frame='icrs')
-        self.mintimes = u.Quantity([float(p.mintime) for p in self.pointings], unit=u.s)
+                # Check the connection to the pilots
+                self._pilot_heartbeat(check_time)
 
-    def __len__(self):
-        return len(self.pointings)
+                # Caretaker step to monitor and update the database
+                database_updated = self._caretaker(check_time)
+                if database_updated:
+                    # If we just updated we need to wait to be sure that the timestamps are >1s
+                    # in the past when we then get the Pointings queue.
+                    # This is because in the database the time precision is only to the second,
+                    # annoyingly, and we use the same timestamp for all updates.
+                    check_time += 1 * u.s
 
-    def __repr__(self):
-        template = ('PointingQueue(length={})')
-        return template.format(len(self.pointings))
+                # Get the queue and find highest priority Pointings for each telescope
+                self.log.debug('Updating queue')
+                new_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
+                for site_id in self.site_data:
+                    new_pointings.update(self._get_pointings(site_id, check_time))
+                self.log.debug('Queue update complete')
+                self.old_pointings = self.latest_pointings
+                self.latest_pointings = new_pointings
 
-    @classmethod
-    def from_database(cls, time, observer):
-        """Create a Pointing Queue from current Pointings in the database.
+                # Write status log line
+                # TODO: account for horizons?
+                try:
+                    old_strs = []
+                    new_strs = []
+                    for telescope_id in self.telescopes:
+                        old_pointing = self.old_pointings[telescope_id][0]
+                        old_str = '{}:'.format(telescope_id)
+                        if old_pointing is None:
+                            old_str += 'None'
+                        else:
+                            pointing_str = str(old_pointing.db_id)
+                            if not old_pointing.valid:
+                                pointing_str = '*' + pointing_str
+                            if old_pointing.too:
+                                pointing_str = pointing_str + '!'
+                            if old_pointing.current_telescope == telescope_id:
+                                pointing_str = pointing_str + '°'
+                            old_str += pointing_str
+                        old_strs.append(old_str)
+                        new_pointing = self.latest_pointings[telescope_id][0]
+                        new_str = '{}:'.format(telescope_id)
+                        if new_pointing is None:
+                            new_str += 'None'
+                        else:
+                            pointing_str = str(new_pointing.db_id)
+                            if not new_pointing.valid:
+                                pointing_str = '*' + pointing_str
+                            if new_pointing.too:
+                                pointing_str = pointing_str + '!'
+                            if new_pointing.current_telescope == telescope_id:
+                                pointing_str = pointing_str + '°'
+                            new_str += pointing_str
+                        new_strs.append(new_str)
+                    old_str = ' '.join(old_strs)
+                    new_str = ' '.join(new_strs)
+                    if new_str != old_str:
+                        self.log.info('Telescope pointings: ' + new_str)
+                except Exception:
+                    self.log.error('Could not write current status')
+
+                # Set these after the check has finished, so the check_queue() function has to wait
+                self.check_time = self.loop_time
+                self.force_check_flag = False
+                self.update_lock = False
+
+            time.sleep(0.1)
+
+        self.log.info('Database monitor thread stopped')
+        return
+
+    # Internal functions
+    def _check_night_times(self, check_time=None):
+        """Calculate if it is night for each telescope at each site."""
+        if check_time is None:
+            check_time = Time.now()
+
+        for site_id in self.site_data:
+            altaz_frame = AltAz(obstime=check_time, location=self.site_data[site_id]['location'])
+            sun_coords = get_sun(check_time)
+            sun_altaz = sun_coords.transform_to(altaz_frame)
+            for telescope_id in self.site_data[site_id]['telescopes']:
+                self.is_night[telescope_id] = sun_altaz.alt.degree < params.SCHEDULER_SUNALT_LIMIT
+
+    def _pilot_heartbeat(self, check_time):
+        """Keep track of if we loose connection to any of the telescopes during the night."""
+        with db.open_session() as session:
+            for telescope_id in self.telescopes:
+                # Check how long it's been since we had a query from this telescope.
+                if self.pilot_query_time[telescope_id] is None:
+                    continue
+                if (check_time - self.pilot_query_time[telescope_id]).sec > 60:
+                    # It's been more than a minute since we last had a query from this pilot.
+                    if self.is_night[telescope_id]:
+                        # Only log during the night time.
+                        self.log.debug('No contact from Telescope {} since {}'.format(
+                                       telescope_id, self.pilot_query_time[telescope_id].iso))
+
+                    # If there is still a running pointing, mark it as interrupted.
+                    telescope = db.get_telescope_by_id(session, telescope_id)
+                    if telescope.current_pointing is not None:
+                        pointing = telescope.current_pointing
+                        running_time = (check_time - Time(pointing.running_time)).sec
+                        obs_time = pointing.get_obstime(self.readout_time)
+                        self.log.info('Pointing {} has been running for {:.1f}s/{:.1f}s'.format(
+                                      pointing.db_id, running_time, obs_time))
+                        self.update_queue.append((pointing.db_id, 'interrupted'))
+                        # No force check needed here, we're already in one!
+
+                # TODO: Send Slack alerts? Could be when a telescope first connects in the
+                #       evening, and then if the connection is lost before sunrise.
+
+    def _caretaker(self, check_time):
+        """Monitor the database and update any Pointings."""
+        database_updated = False
+        with db.open_session() as session:
+            # Process any Pointings that need updating
+            while len(self.update_queue) > 0:
+                pointing = self.update_queue.pop()
+                try:
+                    pointing_id = pointing[0]
+                    new_status = pointing[1]
+                    if new_status == 'running':
+                        telescope_id = pointing[2]
+                        db.mark_pointing_running(pointing_id, telescope_id)
+                        self.log.info(f'Marked Pointing {pointing_id} as running'
+                                      f' on Telescope {telescope_id}')
+                        database_updated = True
+                    elif new_status == 'completed':
+                        db.mark_pointing_completed(pointing_id, schedule_next=True)
+                        self.log.info(f'Marked Pointing {pointing_id} as completed')
+                        database_updated = True
+                    elif new_status == 'interrupted':
+                        db.mark_pointing_interrupted(pointing_id, schedule_next=True)
+                        self.log.info(f'Marked Pointing {pointing_id} as interrupted')
+                        database_updated = True
+                except Exception:
+                    self.log.error('Error marking Pointing: {}'.format(pointing))
+                    self.log.debug('', exc_info=True)
+
+            # Create new Pointings for any Targets that are still unscheduled (e.g. expired)
+            unscheduled_targets = db.get_targets(session, status='unscheduled', time=check_time)
+            if len(unscheduled_targets) > 0:
+                self.log.info('Rescheduling {} unscheduled Targets: {}'.format(
+                              len(unscheduled_targets), [t.db_id for t in unscheduled_targets]))
+                pointings = [target.get_next_pointing() for target in unscheduled_targets]
+                pointings = [p for p in pointings if p is not None]
+                db.insert_items(session, pointings)
+                database_updated = True
+
+        return database_updated
+
+    def _get_pointings(self, site_id, check_time):
+        """Calculate what to observe for telescopes at the given site."""
+        try:
+            pointings = {}
+            telescopes = self.site_data[site_id]['telescopes']
+
+            if (params.SCHEDULER_SKIP_DAYTIME and
+                    not all(self.is_night[telescope_id] for telescope_id in sorted(telescopes))):
+                # It's still daytime, no reason to check the queue
+                for telescope_id in sorted(telescopes):
+                    self.log.debug(f'Telescope {telescope_id}: Daytime')
+                return {telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
+                        for telescope_id in telescopes}
+
+            # Import the queue for this site from the database
+            queue = PointingQueue.from_database(site_id, check_time)
+
+            # Loop through each telescope
+            # TODO: write queue files / HTML page for each
+            for telescope_id in sorted(telescopes):
+                telescope_pointings = []
+
+                # Start with the first horizon, find what to do
+                pointing, reason = queue.get_pointing(
+                    telescope_id,
+                    horizon=0,
+                    readout_time=self.readout_time,
+                    template_requirement=self.template_requirement,
+                    return_reason=True,
+                )
+                telescope_pointings.append(copy(pointing))
+                self.log.debug(f'Telescope {telescope_id}: {reason}')
+
+                # Now check if it's above any other horizons, and if not get the next best Pointing
+                # TODO: A better solution might be for get_pointing() to take
+                #       multiple horizon numbers and evaluate each pointing based on both,
+                #       or automatically do it for every telescope horizon when evaluating...
+                for i in range(len(telescopes[telescope_id]['horizon']) - 1):
+                    if pointing is None:
+                        telescope_pointings.append(None)
+                        continue
+                    horizon = telescopes[telescope_id]['horizon'][i + 1]
+                    if pointing.altaz.alt < horizon_limit(pointing.altaz.az, horizon):
+                        # The Pointing is below this (presumably higher) horizon.
+                        # This should be fairly rare, if it's just for wind shielding.
+                        # Need to find the next best Pointing, recalculating with the new horizon.
+                        pointing, reason = queue.get_pointing(
+                            telescope_id,
+                            horizon=i + 1,
+                            readout_time=self.readout_time,
+                            template_requirement=self.template_requirement,
+                            return_reason=True,
+                        )
+                        telescope_pointings.append(copy(pointing))
+                        self.log.debug(f'Telescope {telescope_id}-{i + 1}: {reason}')
+                    else:
+                        # This Pointing is fine
+                        telescope_pointings.append(copy(pointing))
+
+                # Add to site dict
+                pointings[telescope_id] = telescope_pointings
+
+            return pointings
+        except Exception:
+            self.log.error('Failed to schedule Pointings for Site {}'.format(site_id))
+            self.log.debug('', exc_info=True)
+            return {telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
+                    for telescope_id in telescopes}
+
+    # Functions
+    def update_schedule(self, telescope_id, current_pointing_id, current_status, horizon=0,
+                        return_new=True, force_update=False):
+        """Get what Pointing to observe for the given telescope.
+
+        This function should be called by the pilot for each telescope. By including the
+        current pointing and status the scheduler will update the database based on what the
+        pilot is observing.
 
         Parameters
         ----------
-        time : `~astropy.time.Time`
-            The time to fetch the queue for.
-        observer : `astroplan.Observer`
-            The observer of the pointings
+        telescope_id : int
+            The ID number of the Telescope requesting a Pointing.
+        current_pointing_id : int or None
+            The ID number of the current Pointing the telescope is observing, if any.
+        current_status : str or None
+            The status of the current Pointing to update the observing database.
+            Valid statuses are 'running', 'completed' or 'interrupted',
+            or None if current_pointing is None.
 
-        Returns
-        -------
-        pointings : list of `Pointing`
-            An list containing Pointings from the database.
+        horizon : int, optional
+            Which horizon number to consider when scheduling, based on the horizons for the
+            telescope defined in the database.
+            default = 0
+        return_new : bool, optional
+            If False, only update the current Pointing and don't return a new one.
+            This should be used when the telescope is shutting down, so we don't mark the final
+            Pointing as running.
+            default = True
+        force_update : bool, optional
+            If True force the scheduler to recalculate at the current time.
+            Otherwise the pointing from the most recent check will be returned (~5s cadence).
+            default = False
 
         """
-        with db.open_session() as session:
-            current, pending = db.get_filtered_queue(session,
-                                                     time=time,
-                                                     location=observer.location,
-                                                     altitude_limit=params.HARD_ALT_LIM,
-                                                     hourangle_limit=params.HARD_HA_LIM)
+        # TODO: Require some sort of unique API key from each telescope for security?
 
-            pointings = [Pointing.from_database(db_pointing) for db_pointing in pending]
-            if current:
-                pointings.append(Pointing.from_database(current))
-            queue = cls(np.array(pointings))
-        return queue
+        # Prevent multiple queries at the same time, or queries while the schedule is updating
+        while (self.query_lock is True or self.update_lock is True):
+            time.sleep(0.1)
+        self.query_lock = True
 
-    def get_current_pointing(self):
-        """Return the current pointing from the queue."""
-        for p in self.pointings:
-            if p.current:
-                return p
-        return None
+        try:
+            msg = f'Query from Telescope {telescope_id}-{horizon}'
+            msg += f' (CP={current_pointing_id}, {current_status})'
+            self.log.info(msg)
+            self.pilot_query_time[telescope_id] = Time.now()
 
-    def apply_constraints(self, now, observer, horizon):
-        """Check if the pointings are valid, both now and after mintimes."""
-        # Create Constraints
-        self.constraints = {}
+            if current_pointing_id is not None:
+                if current_status == 'completed':
+                    # The Telescope has successfully finished this Pointing.
+                    self.update_queue.append((current_pointing_id, 'completed'))
+                    force_update = True
+                elif current_status == 'interrupted':
+                    # This Pointing was interrupted before it could finish.
+                    self.update_queue.append((current_pointing_id, 'interrupted'))
+                    force_update = True
 
-        # SunAlt
-        maxsunalts = u.Quantity([float(p.maxsunalt) for p in self.pointings], unit=u.deg)
-        self.constraints['SunAlt'] = AtNightConstraint(maxsunalts)
+            # If we don't want a new Pointing then we can return here.
+            if not return_new:
+                self.log.info('Returning (no Pointing requested)')
+                self.query_lock = False
+                return None
 
-        # MinAlt
-        minalts = u.Quantity([float(p.minalt) for p in self.pointings], unit=u.deg)
-        self.constraints['MinAlt'] = AltitudeConstraint(minalts, None)
+            # Wait for scheduler to update.
+            # This is particularly important if we just marked a pointing, as during the 1s wait
+            # a new check might have started which won't yet take that into account.
+            # So we have to wait for the update lock to clear, then set the force check flag and
+            # wait for that check to happen to mark the Pointings and update the queue.
+            while self.update_lock is True:
+                time.sleep(0.1)
+            if force_update:
+                self.force_check_flag = True
+                while self.force_check_flag:
+                    time.sleep(0.1)
 
-        # ArtHoriz
-        self.constraints['ArtHoriz'] = ArtificialHorizonConstraint(*horizon)
+            # Get the latest Pointing from the scheduler
+            new_pointing = self.latest_pointings[telescope_id][horizon]
 
-        # Moon
-        moonphases = [MOON_PHASES[p.maxmoon] for p in self.pointings]
-        self.constraints['Moon'] = MoonIlluminationConstraint(None, moonphases)
+            # If it's none then return here
+            if new_pointing is None:
+                self.log.info('Returning None')
+                self.query_lock = False
+                return None
 
-        # MoonSep
-        minmoonseps = u.Quantity([float(p.minmoonsep) for p in self.pointings], unit=u.deg)
-        self.constraints['MoonSep'] = MoonSeparationConstraint(minmoonseps, None)
+            # We have a new Pointing, but it might be already running.
+            if current_pointing_id is not None and new_pointing.db_id == current_pointing_id:
+                self.log.info(f'Returning Pointing {new_pointing.db_id}')
+            else:
+                self.log.info(f'Returning Pointing {new_pointing.db_id} (NEW)')
 
-        # Time
-        starts = Time([p.start for p in self.pointings], scale='utc', format='datetime')
-        # NB the stop time can be None for non-expiring pointings,
-        #    but the constraint needs a Time so just say a long time from now.
-        longtime = Time.now() + 10 * u.year
-        stops = Time([p.stop if p.stop else longtime.datetime for p in self.pointings],
-                     scale='utc', format='datetime')
-        self.constraints['Time'] = TimeConstraint(starts, stops)
+                if current_pointing_id is not None and current_status == 'running':
+                    # It's interrupting a running Pointing, so mark it as interrupted.
+                    self.update_queue.append((current_pointing_id, 'interrupted'))
+                    self.force_check_flag = True
 
-        # Apply constraints
-        normal_cons = ['SunAlt', 'MinAlt', 'ArtHoriz', 'Moon', 'MoonSep']
-        cons_valid_arr = apply_constraints([self.constraints[name] for name in normal_cons],
-                                           observer, self.targets, now)
-        time_cons = ['Time']
-        time_cons_valid_arr = apply_constraints([self.constraints[name] for name in time_cons],
-                                                observer, self.targets, now)
-        mintime_cons = ['SunAlt', 'MinAlt', 'ArtHoriz']
-        later_arr = now + u.Quantity([float(p.mintime) for p in self.pointings], unit=u.s)
-        min_cons_valid_arr = apply_constraints([self.constraints[name] for name in mintime_cons],
-                                               observer, self.targets, later_arr)
-        mintime_names = [name + '_mintime' for name in mintime_cons]
-        self.all_constraint_names = normal_cons + time_cons + mintime_names
+            # Mark the new Pointing as running, if it isn't already
+            if new_pointing.current_telescope is None:
+                self.update_queue.append((new_pointing.db_id, 'running', telescope_id))
+                self.force_check_flag = True
 
-        # Save constraint results on Pointings and calculate if they are valid
-        for i, pointing in enumerate(self.pointings):
-            # normal constraints
-            pointing.constraint_names = list(normal_cons)
-            pointing.valid_arr = cons_valid_arr[i]
+            # Get the pointing info, and add anything else useful
+            pointing_info = db.get_pointing_info(new_pointing.db_id)
+            pointing_info['obstime'] = new_pointing.get_obstime(self.readout_time)
 
-            # extra constraints
-            if not pointing.current:
-                pointing.constraint_names += time_cons
-                pointing.valid_arr = np.concatenate((pointing.valid_arr,
-                                                     time_cons_valid_arr[i]))
-                pointing.constraint_names += mintime_names
-                pointing.valid_arr = np.concatenate((pointing.valid_arr,
-                                                    min_cons_valid_arr[i]))
+        finally:
+            self.query_lock = False
 
-            # save all constraint names on all
-            pointing.all_constraint_names = self.all_constraint_names
+        return pointing_info
 
-            # finally find out if each pointing is valid or not
-            pointing.valid = np.all(pointing.valid_arr)
-            pointing.valid_time = now
+    def check_queue(self, force_update=False):
+        """Return information on the Pointings currently in the queue for all Telescopes.
 
-    def calculate_tiebreakers(self, time, observer):
-        """Calculate the tiebreaker values for every pointing."""
-        # Find weight values (0 to 1)
-        weights = np.array([float(p.weight) for p in self.pointings])
-        weight_arr = 1 - weights
-        bad_weight_mask = np.logical_or(weight_arr < 0, weight_arr > 1)
-        weight_arr[bad_weight_mask] = 1
+        Note this returns immediately with what's been previously calculated by the scheduler,
+        unless the `force_update` flag is set to True.
 
-        # Find airmass values (0 to 1)
-        # airmass at start
-        altaz_now = _get_altaz(time, observer, self.targets)['altaz']
-        secz_now = altaz_now.secz
+        Parameters
+        ----------
+        force_update : bool, optional
+            If True force the scheduler to recalculate at the current time.
+            Otherwise the pointing from the most recent check will be returned (~5s cadence).
+            default = False
 
-        # airmass at mintime (NB all targets)
-        later_arr = time + u.Quantity([float(p.mintime) for p in self.pointings], unit=u.s)
-        altaz_later = _get_altaz(later_arr, observer, self.targets)['altaz']
-        secz_later = altaz_later.secz
+        """
+        if force_update or self.force_check_flag:  # we might already be waiting for an update
+            self.force_check_flag = True
+            while self.force_check_flag:
+                time.sleep(0.1)
 
-        # take average
-        secz_arr = (secz_now + secz_later) / 2.
-        airmass_arr = secz_arr.value / 10.
-        bad_airmass_mask = np.logical_or(airmass_arr < 0, airmass_arr > 1)
-        airmass_arr[bad_airmass_mask] = 1
+        pointings = {telescope_id: [db.get_pointing_info(pointing.db_id)
+                                    if pointing is not None else None
+                                    for pointing in pointings]
+                     for telescope_id, pointings in self.latest_pointings.items()}
+        return pointings
 
-        # Find time to set values (0 to 1)
-        tts_arr = time_to_set(observer, self.targets, time).to(u.hour).value
-        tts_arr = tts_arr / 24.
-        bad_tts_mask = np.logical_or(tts_arr < 0, tts_arr > 1)
-        tts_arr[bad_tts_mask] = 1
+    def get_pointing_info(self, pointing_id):
+        """Get info from the database for a given pointing.
 
-        # Construct the tiebreaker value
-        total_weight = params.WEIGHTING_WEIGHT + params.AIRMASS_WEIGHT + params.TTS_WEIGHT
-        w_weight = params.WEIGHTING_WEIGHT / total_weight
-        a_weight = params.AIRMASS_WEIGHT / total_weight
-        t_weight = params.TTS_WEIGHT / total_weight
-        tiebreak_arr = (weight_arr * w_weight + airmass_arr * a_weight + tts_arr * t_weight)
+        This can be used by the remote clients which can't otherwise access the database.
 
-        # Save values on the pointings
-        for i, pointing in enumerate(self.pointings):
-            pointing.altaz_now = altaz_now[i]
-            pointing.altaz_later = altaz_later[i]
-            pointing.weight = weight_arr[i]
-            pointing.airmass = airmass_arr[i]
-            pointing.tts = tts_arr[i]
-            pointing.tiebreaker = tiebreak_arr[i]
-
-    def get_highest_priority_pointing(self, time, observer, horizon):
-        """Return the pointing with the highest priority."""
-        # If there are no pointings, return None
-        if len(self.pointings) == 0:
-            return None
-
-        # Apply constraints and calculate tiebreakers for all pointings
-        self.apply_constraints(time, observer, horizon)
-        self.calculate_tiebreakers(time, observer)
-
-        # Sort the pointings
-        #   - First is by validity
-        #   - Then by rank
-        #   - Then by ToO flag
-        #   - Then by number of times already observed
-        #   - Finally use the tiebreaker
-        pointings = list(self.pointings)  # make a copy
-        pointings.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
-
-        return pointings[0]
-
-    def get_highest_priority_pointings(self, time, observer, horizon, number=1):
-        """Return the top X highest priority pointings."""
-        # If there are no pointings, return None
-        if len(self.pointings) == 0:
-            return [None] * number
-
-        # Apply constraints and calculate tiebreakers for all pointings
-        self.apply_constraints(time, observer, horizon)
-        self.calculate_tiebreakers(time, observer)
-
-        # Sort the pointings
-        #   - First is by validity
-        #   - Then by rank
-        #   - Then by ToO flag
-        #   - Then by number of times already observed
-        #   - Finally use the tiebreaker
-        pointings = list(self.pointings)  # make a copy
-        pointings.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
-
-        # Return the top X pointings as requested
-        if len(pointings) < number:
-            pointings += [None] * (number - len(pointings))
-        return pointings[0:number]
-
-    def write_to_file(self, time, observer, filename):
-        """Write any time-dependent pointing infomation to a file."""
-        # The queue should already have priorities calculated
-        if not hasattr(self.pointings[0], 'valid') or not hasattr(self.pointings[0], 'tiebreaker'):
-            raise ValueError('Queue has not yet had priorities calculated')
-
-        # get and sort pointings
-        pointings = list(self.pointings)  # make a copy
-        pointings.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
-
-        # now save as json file
-        with open(filename, 'w') as f:
-            json.dump(str(time), f)
-            f.write('\n')
-            json.dump(self.all_constraint_names, f)
-            f.write('\n')
-            for p in pointings:
-                valid_nonbool = [int(b) for b in p.valid_arr]
-                json.dump([p.db_id,
-                           p.name,
-                           1,
-                           p.rank,
-                           int(p.too),
-                           p.num_obs,
-                           p.tiebreaker,
-                           list(zip(p.constraint_names, valid_nonbool)),
-                           ],
-                          f)
-                f.write('\n')
+        """
+        return db.get_pointing_info(pointing_id)
 
 
-def what_to_do_next(current_pointing, highest_pointing, log=None):
-    """Decide whether to slew to a new target, remain on the current target or park the telescope.
-
-    Parameters
-    ----------
-    current_pointing : `Pointing`
-        The current pointing.
-        `None` if the telescope is idle.
-    highest_pointing : `Pointing`
-        The current highest priority pointing from the queue.
-        `None` if the queue is empty.
-
-    log: `logging.Logger`, optional
-        log object to direct output to
-
-    Returns
-    -------
-    new_pointing : `Pointing`
-        The new pointing to send to the pilot
-        Could be either:
-          current_pointing (remain on current target),
-          highest_pointing (slew to new target) or
-          `None`           (nothing to do, park).
-
-    """
-    # Create a logger if one isn't given
-    if log is None:
-        logging.basicConfig(level=logging.DEBUG)
-        log = logging.getLogger('scheduler')
-
-    # Deal with either being missing (telescope is idle or queue is empty)
-    if current_pointing is None and highest_pointing is None:
-        reason = 'Not doing anything; Nothing to do => Do nothing'
-        new_pointing = None
-    elif current_pointing is None:
-        if highest_pointing.valid:
-            reason = 'Not doing anything; HP valid => Do HP'
-            new_pointing = highest_pointing
-        else:
-            reason = 'Not doing anything; HP invalid => Do nothing'
-            new_pointing = None
-    elif highest_pointing is None:
-        if not current_pointing.valid:
-            reason = 'CP invalid; Nothing to do => Do nothing'
-            new_pointing = None
-        else:
-            reason = 'CP valid; Nothing to do => Do CP'  # TODO - is that right?
-            new_pointing = current_pointing
-
-    elif current_pointing == highest_pointing:
-        if not current_pointing.valid or not highest_pointing.valid:
-            reason = 'CP==HP and invalid => Do nothing'
-            new_pointing = None  # it's either finished or is now illegal
-        else:
-            reason = 'CP==HP and valid => Do HP'
-            new_pointing = highest_pointing
-
-    elif not current_pointing.valid:  # current pointing is illegal (finished)
-        if highest_pointing.valid:  # new pointing is legal
-            reason = 'CP invalid; HP valid => Do HP'
-            new_pointing = highest_pointing
-        else:
-            reason = 'CP invalid; HP invalid => Do nothing'
-            new_pointing = None
-    else:  # telescope is observing legally
-        if not highest_pointing.valid:  # no legal pointings
-            reason = 'CP valid; HP invalid => Do nothing'
-            new_pointing = None
-        else:  # both are legal
-            if highest_pointing.too:  # slew to a ToO, unless now is also a ToO
-                if not current_pointing.too:
-                    reason = 'CP < HP; CP is not ToO and HP is => Do HP'
-                    new_pointing = highest_pointing
-                else:
-                    reason = 'CP < HP; CP is is ToO and HP is ToO => Do CP'
-                    new_pointing = current_pointing
-            else:  # stay for normal pointings
-                reason = 'CP < HP; but not a ToO => Do CP'
-                new_pointing = current_pointing
-
-    # Log decision
-    if current_pointing:
-        current_str = '{}'.format(current_pointing.db_id)
-        if not current_pointing.valid:
-            current_str = '*' + current_str
-        if current_pointing.too:
-            current_str = current_str + '!'
-    else:
-        current_str = 'None'
-
-    if highest_pointing:
-        highest_str = '{}'.format(highest_pointing.db_id)
-        if not highest_pointing.valid:
-            highest_str = '*' + highest_str
-        if highest_pointing.too:
-            highest_str = highest_str + '!'
-    else:
-        highest_str = 'None'
-
-    if new_pointing:
-        new_str = '{}'.format(new_pointing.db_id)
-        if not new_pointing.valid:
-            new_str = '*' + new_str
-        if new_pointing.too:
-            new_str = new_str + '!'
-    else:
-        new_str = 'None'
-
-    log.debug('CP={} HP={}: NP={} ({})'.format(current_str, highest_str, new_str, reason))
-
-    return new_pointing
-
-
-def check_queue(time=None, location=None, horizon=None,
-                write_file=True, write_html=False, log=None):
-    """Check the queue and decide what to do.
-
-    Check the current pointings in the queue, find the highest priority at
-    the given time and decide whether to slew to it, stay on the current target
-    or park the telescope.
-
-    Parameters
-    ----------
-    time : `~astropy.time.Time`, optional
-        The time to calculate the priorities at.
-        Default is `astropy.time.Time.now()`.
-
-    location : `~astropy.coordinates.EarthLocation`, optional
-        The location of the observer on Earth.
-        Default is `EarthLocation.of_site('lapalma')`.
-
-    horizon : float, or tuple of (azs, alts), optional
-        The horizon limits at the given site, either a flat value or varying with azimuth.
-        Default is a flat horizon of 30 deg.
-
-    write_file : bool, optional
-        Should the scheduler write out the queue to a file?
-        Default is True.
-
-    write_html : bool, optional
-        Should the scheduler write the HTML queue webpage?
-        Default is False.
-
-    log: `logging.Logger`, optional
-        log object to direct output to
-
-    Returns
-    -------
-    new_pointing : `Pointing`
-        The pointing to send to the pilot.
-        Could be a new pointing, the current pointing or 'None' (park).
-
-    """
-    # Use current time if not given
-    if time is None:
-        time = Time.now()
-
-    # Create an observer and load horizon file if not given
-    if location is None:
-        location = EarthLocation.of_site('lapalma')
-    observer = Observer(location)
-    if horizon is None:
-        horizon = 30
-    if isinstance(horizon, (int, float)):
-        horizon = ([0, 90, 180, 270, 360], [horizon, horizon, horizon, horizon, horizon])
-
-    # Import the queue from the database
-    queue = PointingQueue.from_database(time, observer)
-    if len(queue) == 0:
-        return None
-
-    # Get the current pointing and the highest priority pointing
-    current_pointing = queue.get_current_pointing()
-    highest_pointing = queue.get_highest_priority_pointing(time, observer, horizon)
-
-    # Write out the queue file and web pages
-    if write_file:
-        queue_file = os.path.join(params.QUEUE_PATH, 'queue_info')
-        queue.write_to_file(time, observer, queue_file)
-    if write_html:
-        # TODO this could be run from elsewhere
-        write_queue_page(observer)
-
-    # Work out what to do next
-    new_pointing = what_to_do_next(current_pointing, highest_pointing, log)
-    return new_pointing
+def run():
+    """Start the scheduler."""
+    try:
+        send_slack_msg('Scheduler started')
+        scheduler = Scheduler()
+        scheduler.run(params.PYRO_HOST, params.PYRO_PORT, params.PYRO_TIMEOUT)
+    except Exception:
+        print('Error detected, shutting down')
+        traceback.print_exc()
+    except KeyboardInterrupt:
+        print('Interrupt detected, shutting down')
+    finally:
+        try:
+            scheduler.shutdown()
+        except UnboundLocalError:
+            # class was never created
+            pass
+        time.sleep(1)  # wait to stop threads
+        send_slack_msg('Scheduler shutdown')
+        print('Scheduler done')

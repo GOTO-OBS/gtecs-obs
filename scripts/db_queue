@@ -6,125 +6,174 @@ import argparse
 from astroplan import Observer
 
 from astropy import units as u
-from astropy.coordinates import EarthLocation
 from astropy.time import Time
 
 from gtecs.common.style import boldtxt, gtxt, rtxt, ytxt
-from gtecs.obs.scheduler import PointingQueue
+from gtecs.obs import database as db
+from gtecs.obs import params
+from gtecs.obs.scheduling import PointingQueue
+
+import numpy as np
 
 
-def run(time, observer, horizon, limit=None):
+def run(site_id, telescopes, time, horizon, readout_time, template_requirement, limit=None):
     """Print the current queue."""
-    # Create Queue from DB
-    queue = PointingQueue.from_database(time, observer)
-    if len(queue) == 0:
-        print('No pointings in queue')
-        return
+    # Load Queue from DB
+    queue = PointingQueue.from_database(site_id, time)
 
-    #  Apply constraints and calculate tiebreakers for all pointings
-    queue.apply_constraints(time, observer, horizon)
-    queue.calculate_tiebreakers(time, observer)
+    for telescope_id in telescopes:
+        print(boldtxt('Pointings queue for Telescope {}'.format(telescope_id)), end='')
+        print(boldtxt(' at {} UTC'.format(time.iso)), end='')
+        print(': ')
 
-    # Get the pointings, now with extra infomation
-    pointing_list = list(queue.pointings)
-    pointing_list.sort(key=lambda p: (not p.valid, p.rank, not p.too, p.num_obs, p.tiebreaker))
-    n_pointings = len(pointing_list)
-    n_valid = len([p for p in pointing_list if p.valid])
-    pointing_list = pointing_list[:limit]
+        if len(queue) == 0:
+            print('No pointings in queue')
+            return
 
-    # Get the max name length, for nicer formatting
-    name_len = int(max(len(p.name) for p in pointing_list)) + 2
+        # Calculate pointing validity
+        queue.calculate_priorities(telescope_id, horizon, readout_time, template_requirement)
 
-    # Print the pointings
-    all_cons = {}
-    print(boldtxt('Pointings queue at {} UTC'.format(time.iso)), end='')
-    print(': {} pointings, {} valid'.format(n_pointings, n_valid))
-    print('  db_id | {: >{w}} | Vld | Rnk | ToO | Nobs | TieBrk | Constraints'.format(
-          'Object name', w=name_len))
-    for pointing in pointing_list[:limit]:
+        # Get the pointings, now with extra information
+        pointing_list = queue.get_sorted_pointings()
+        n_pointings = len(pointing_list)
+        n_valid = len([p for p in pointing_list if p.valid])
+        print('{} pointings, {} valid'.format(n_pointings, n_valid))
 
-        if pointing.current:
-            print(ytxt('{: >7.0f}'.format(pointing.db_id)), end=' | ')
-            print(ytxt('{: >{w}}'.format(pointing.name, w=name_len)), end=' | ')
-        else:
-            print('{: >7.0f}'.format(pointing.db_id), end=' | ')
-            print('{: >{w}}'.format(pointing.name, w=name_len), end=' | ')
+        # Limit to the given limit
+        pointing_list = pointing_list[:limit]
 
-        print(gtxt(' Y ') if pointing.valid else rtxt(' N '), end=' | ')
+        # Get the max name length, for nicer formatting
+        name_len = int(max(len(p.name) for p in pointing_list)) + 2
 
-        print('{: >3.0f}'.format(pointing.rank), end=' | ')
-        print(' Y ' if pointing.too else ' N ', end=' | ')
-        print('{: >4.0f}'.format(pointing.num_obs), end=' | ')
-        print('{: >6.4f}'.format(pointing.tiebreaker), end=' | ')
+        # Print the pointings
+        all_cons = {}
+        print('  db_id | {: >{w}} | Vld | Rnk | ToO | Nobs | TieBrk | Constraints'.format(
+            'Object name', w=name_len))
+        for pointing in pointing_list[:limit]:
 
-        cons = [(name, valid) for name, valid in zip(pointing.constraint_names, pointing.valid_arr)]
-        cons.sort(key=lambda i: i[0])
-
-        for name, valid in cons:
-            short_name = ''.join(c for c in name if not c.islower())
-            if valid:
-                print(gtxt(short_name), end=' ')
+            if pointing.current_telescope == telescope_id:
+                print(ytxt('{: >7.0f}'.format(pointing.db_id)), end=' | ')
+                print(ytxt('{: >{w}}'.format(pointing.name, w=name_len)), end=' | ')
             else:
-                print(rtxt(short_name), end=' ')
-            if name not in all_cons:
-                all_cons[name] = short_name
+                print('{: >7.0f}'.format(pointing.db_id), end=' | ')
+                print('{: >{w}}'.format(pointing.name, w=name_len), end=' | ')
 
-        print(end='\n')
-    if limit != -1 and n_pointings > limit:
-        print(' ...and {} more'.format(n_pointings - limit))
+            print(gtxt(' Y ') if pointing.valid else rtxt(' N '), end=' | ')
 
-    print('Constraints: ', end='')
-    for name in sorted(all_cons):
-        if '_' not in name:
-            print('{}={}'.format(boldtxt(all_cons[name]), name), end='  ')
-    print('{}=mintime'.format(boldtxt('_')))
+            print('{: >3.0f}'.format(pointing.rank) if pointing.rank != np.inf else 'inf',
+                  end=' | ')
+            print(' Y ' if pointing.too else ' N ', end=' | ')
+            print('{: >4.0f}'.format(pointing.num_obs), end=' | ')
+            print('{: >6.4f}'.format(pointing.tiebreaker), end=' | ')
+
+            cons = [(name, valid) for name, valid in zip(pointing.constraint_names,
+                                                         pointing.valid_arr)]
+            cons.sort(key=lambda i: i[0])
+
+            for name, valid in cons:
+                short_name = ''.join(c for c in name if not c.islower())
+                if len(short_name) == 1:
+                    short_name = ''.join([c for c in name
+                                          if c not in ('a', 'e', 'i', 'o', 'u')])[:3]
+                if valid:
+                    print(gtxt(short_name), end=' ')
+                else:
+                    print(rtxt(short_name), end=' ')
+                if name not in all_cons:
+                    all_cons[name] = short_name
+
+            print(end='\n')
+        if limit != -1 and n_pointings > limit:
+            print(' ...and {} more'.format(n_pointings - limit))
+
+        print('Constraints: ', end='')
+        for name in sorted(all_cons):
+            if '_' not in name:
+                print('{}={}'.format(boldtxt(all_cons[name]), name), end='  ')
+        print('{}=end'.format(boldtxt('_')))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
+    location_group = parser.add_mutually_exclusive_group()
+    location_group.add_argument('-T', '--telescope', default=None,
+                                help='Telescope ID number to get the queue for (default=all)')
+    location_group.add_argument('-S', '--site', default=None,
+                                help='Site ID number to get the telescope queues for (default=all)')
     time_group = parser.add_mutually_exclusive_group()
-    time_group.add_argument('-t', '--time',
+    time_group.add_argument('-t', '--time', default=None,
                             help='Time to check the queue at (default=Now)')
     time_group.add_argument('-s', '--sunalt', default=None,
                             help='Sun altitude to check the queue at (next)')
-    parser.add_argument('-S', '--site', type=str, default='lapalma',
-                        help='Site to observe from (default="LaPalma")')
-    parser.add_argument('-l', '--horizon-limit', type=int, default=30,
-                        help='Telescope horizon limit (default=30 degrees)')
+    parser.add_argument('-H', '--horizon', type=int, default=1,
+                        help='Telescope horizon number to use (default=1)')
+    parser.add_argument('-r', '--readout-time', type=int, default=params.READOUT_TIME,
+                        help='The expected time between each exposure')
+    parser.add_argument('-p', '--templates', type=str, default=params.TEMPLATE_REQUIREMENT,
+                        help='Requirement for templates (ANY/SITE/TELESCOPE)')
     lines_group = parser.add_mutually_exclusive_group()
-    lines_group.add_argument('-n', '--lines', type=int, default=20,
+    lines_group.add_argument('-n', '--lines', type=int,
                              help='Number of lines to print (default=20)')
     lines_group.add_argument('-a', '--all', action='store_true', default=False,
                              help='Print all items in the queue')
     args = parser.parse_args()
 
-    location = EarthLocation.of_site(args.site)
-    observer = Observer(location)
+    # Get telescopes and sites
+    site_info = db.get_site_info()
+    if args.telescope is not None:
+        # Single telescope, single site
+        telescope_id = int(args.telescope)
+        telescopes = [[telescope_id]]
+        sites = [site_id for site_id in site_info
+                 if telescope_id in site_info[site_id]['telescopes']]
+        if len(sites) != 1:
+            raise ValueError('Invalid Telescope ID: {}'.format(telescope_id))
+    elif args.site is not None:
+        # All telescopes at a single site
+        site_id = int(args.site)
+        if site_id not in site_info:
+            raise ValueError('Invalid Site ID: {}'.format(site_id))
+        telescopes = [sorted(site_info[site_id]['telescopes'].keys())]
+        sites = [site_id]
+    else:
+        # All telescopes, all sites
+        telescopes = [sorted(site_info[site_id]['telescopes'].keys()) for site_id in site_info]
+        sites = sorted(site_info.keys())
 
-    if args.time:
+    # Get time
+    if args.time is not None:
         time = Time(args.time)
     elif args.sunalt:
         sunalt = float(args.sunalt) * u.deg
-        time = Time.now()
-        if observer.sun_altaz(time).alt > sunalt:
-            # Sun is above, get next time it sets below
-            time = observer.sun_set_time(time, which='next', horizon=sunalt)
-        else:
-            # Sun is below, get next time it rises above
-            time = observer.sun_rise_time(time, which='next', horizon=sunalt)
+        now = Time.now()
+        if len(telescopes) > 1:
+            raise ValueError('Cannot use --sunalt flag with multiple telescopes')  # TODO: per site?
+        with db.open_session() as session:
+            t = db.get_telescope_by_id(session, telescopes[0])
+            observer = Observer(t.site.location)
+            if observer.sun_altaz(now).alt > sunalt:
+                # Sun is above, get next time it sets below
+                time = observer.sun_set_time(now, which='next', horizon=sunalt)
+            else:
+                # Sun is below, get next time it rises above
+                time = observer.sun_rise_time(now, which='next', horizon=sunalt)
     else:
         time = Time.now()
     time.precision = 0
 
-    min_alt = args.horizon_limit
-    horizon = ([0, 90, 180, 270, 360], [min_alt, min_alt, min_alt, min_alt, min_alt])
+    # Get queue params
+    horizon = args.horizon
+    readout_time = args.readout_time
+    template_requirement = args.templates
 
+    # Get limit
     if args.all:
         limit = -1
     elif args.lines:
         limit = args.lines
     else:
-        limit = 20
+        limit = int(20 / sum(len(t) for t in telescopes))
 
-    run(time, observer, horizon, limit)
+    for i, site_id in enumerate(sites):
+        run(site_id, telescopes[i], time, horizon, readout_time, template_requirement, limit)

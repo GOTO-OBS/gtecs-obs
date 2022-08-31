@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Create a blank observing database."""
+
+import argparse
+import os
+import shutil
+
+from gototile.grid import SkyGrid
+
+from gtecs.obs import database as db
+from gtecs.obs import params
+
+
+def run(overwrite=False, add_defaults=False, verbose=False):
+    """Create and fill the database."""
+    # Create a blank database
+    print('Creating blank database...')
+    db.create_database(overwrite, verbose)
+
+    # Create the schema from the base
+    print('Filling database schema...')
+    db.fill_database(verbose)
+
+    if add_defaults:
+        # Create the default user (NB no password)
+        print('Creating default user...')
+        user = db.User('default', '', 'Default user')
+        with db.open_session() as session:
+            session.add(user)
+
+        # Add in default GOTO sites and telescopes
+        print('Creating entires for GOTO telescopes...')
+        site1 = db.Site.from_name('LaPalma')
+        site2 = db.Site.from_name('SSO')
+
+        if 'GOTO-8' in SkyGrid.get_named_grids():
+            skygrid = SkyGrid.from_name('GOTO-8')
+        else:
+            # Use provisional grid
+            skygrid = SkyGrid.from_name('GOTO-8p')
+        grid = db.Grid.from_skygrid(skygrid, name='GOTO-8_grid')
+        for coord, name in zip(skygrid.coords, skygrid.tilenames):
+            ra = coord.ra.value
+            dec = coord.dec.value
+            if abs(dec) < 0.00001:  # GOTO-tile rounding errors
+                dec = 0
+            grid_tile = db.GridTile(name=str(name),
+                                    ra=float(ra),
+                                    dec=float(dec),
+                                    grid=grid)
+            grid.grid_tiles.append(grid_tile)
+
+        # Copy default horizon files for each (if they don't already exist)
+        horizons = []
+        for telescope_id in [1, 2, 3, 4]:
+            horizon_paths = []
+            for filename in ['horizon', 'horizon_shielding']:
+                default_file = os.path.join(params.FILE_PATH, filename + '_default')
+                new_file = os.path.join(params.FILE_PATH, filename + f'_{telescope_id}')
+                if not os.path.exists(new_file):
+                    shutil.copy(default_file, new_file)
+                horizon_paths.append((new_file))
+            horizons.append(';'.join(horizon_paths))
+
+        # Create the telescopes
+        goto1 = db.Telescope(name='GOTO-1', horizon=horizons[0], site=site1, grid=grid)
+        goto2 = db.Telescope(name='GOTO-2', horizon=horizons[1], site=site1, grid=grid)
+        goto3 = db.Telescope(name='GOTO-3', horizon=horizons[2], site=site2, grid=grid)
+        goto4 = db.Telescope(name='GOTO-4', horizon=horizons[3], site=site2, grid=grid)
+
+        # We need to be specific about the order for the IDs to be correct...
+        for tel in [goto1, goto2, goto3, goto4]:
+            session.add(tel)
+            session.commit()
+
+    print('Done')
+
+
+if __name__ == '__main__':
+    description = """Create the G-TeCS observing database."""
+
+    parser = argparse.ArgumentParser(description=description,
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+                        help='Print SQL statements?')
+    parser.add_argument('-o', '--overwrite', action='store_true', default=False,
+                        help='Overwrite an existing database [WARNING: WILL LOSE DATA]?')
+    parser.add_argument('-d', '--add-defaults', action='store_true', default=False,
+                        help='Add default (GOTO) telescope definitions?')
+
+    args = parser.parse_args()
+
+    run(args.overwrite, args.add_defaults, args.verbose)

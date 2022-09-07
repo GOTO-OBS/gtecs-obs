@@ -32,7 +32,7 @@ def import_queue_file():
     """Import the queue file."""
     import json
     lines = []
-    with open(os.path.join(params.QUEUE_PATH, 'queue_info')) as f:
+    with open(os.path.join(params.FILE_PATH, 'queue_info')) as f:
         for line in f.readlines():
             lines.append(line)
 

@@ -12,7 +12,7 @@ from astropy import units as u
 from astropy.coordinates import AltAz, get_sun
 from astropy.time import Time
 
-from gtecs.common.logging import get_logger
+from gtecs.common import logging
 
 from . import database as db
 from . import params
@@ -31,10 +31,7 @@ class Scheduler:
 
     def __init__(self):
         # get a logger for the scheduler
-        self.log = get_logger('scheduler', params.LOG_PATH,
-                              log_stdout=True,
-                              log_to_file=params.FILE_LOGGING,
-                              log_to_stdout=params.STDOUT_LOGGING)
+        self.log = logging.get_logger('scheduler')
         self.log.info('Scheduler started')
 
         # scheduler variables
@@ -50,7 +47,7 @@ class Scheduler:
         self.readout_time = params.READOUT_TIME
         self.template_requirement = params.TEMPLATE_REQUIREMENT
         self.write_file = params.WRITE_QUEUE_FILE
-        self.queue_file = os.path.join(params.QUEUE_PATH, 'queue_info')
+        self.queue_file = os.path.join(params.FILE_PATH, 'queue_info')
         self.write_html = params.WRITE_QUEUE_PAGE
 
         # Get site data (only once, on init)

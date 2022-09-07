@@ -3,7 +3,6 @@
 
 import argparse
 import os
-import shutil
 
 from gototile.grid import SkyGrid
 
@@ -50,16 +49,23 @@ def run(overwrite=False, add_defaults=False, verbose=False):
                                     grid=grid)
             grid.grid_tiles.append(grid_tile)
 
-        # Copy default horizon files for each (if they don't already exist)
+        # Create default horizon files for each telescope
         horizons = []
         for telescope_id in [1, 2, 3, 4]:
             horizon_paths = []
             for filename in ['horizon', 'horizon_shielding']:
-                default_file = os.path.join(params.FILE_PATH, filename + '_default')
-                new_file = os.path.join(params.FILE_PATH, filename + f'_{telescope_id}')
-                if not os.path.exists(new_file):
-                    shutil.copy(default_file, new_file)
-                horizon_paths.append((new_file))
+                if not os.path.exists(params.FILE_PATH):
+                    os.mkdir(params.FILE_PATH)
+                horizon_file = os.path.join(params.FILE_PATH, filename + f'_{telescope_id}')
+                if not os.path.exists(horizon_file):
+                    # Write a default file
+                    with open(horizon_file, 'w') as f:
+                        f.write('# The artificial horizon used by the scheduler\n')
+                        for az in range(0, 361, 30):
+                            f.write(f'{az}\t30\tDome\n')
+                else:
+                    print(f'  Horizon file {horizon_file} already exists')
+                horizon_paths.append((horizon_file))
             horizons.append(';'.join(horizon_paths))
 
         # Create the telescopes

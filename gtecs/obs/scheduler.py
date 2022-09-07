@@ -1,6 +1,5 @@
 """Class for monitoring the obs database and finding pointings to observe."""
 
-import os
 import threading
 import time
 import traceback
@@ -46,9 +45,11 @@ class Scheduler:
 
         self.readout_time = params.READOUT_TIME
         self.template_requirement = params.TEMPLATE_REQUIREMENT
-        self.write_file = params.WRITE_QUEUE_FILE
-        self.queue_file = os.path.join(params.FILE_PATH, 'queue_info')
-        self.write_html = params.WRITE_QUEUE_PAGE
+        # # These aren't implmenented at the moment...
+        # self.write_file = params.WRITE_QUEUE_FILE
+        # self.queue_file = os.path.join(params.FILE_PATH, 'queue_info')
+        # self.write_html = params.WRITE_QUEUE_PAGE
+        # self.html_path = params.HTML_PATH
 
         # Get site data (only once, on init)
         self.site_data = db.get_site_info()

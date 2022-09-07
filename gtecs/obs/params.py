@@ -1,7 +1,5 @@
 """Package parameters."""
 
-import os
-
 from gtecs.common import config as pkg_config
 from gtecs.common.package import get_package_version, load_config
 
@@ -16,7 +14,6 @@ VERSION = get_package_version('obs')
 
 # File locations
 FILE_PATH = pkg_config.CONFIG_PATH / 'obs'
-HTML_PATH = os.path.join(FILE_PATH, 'html')
 
 ############################################################
 # Database parameters

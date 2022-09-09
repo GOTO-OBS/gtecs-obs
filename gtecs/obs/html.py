@@ -9,7 +9,6 @@ from astropy.coordinates import AltAz, ICRS, get_moon, get_sun
 from astropy.time import Time
 
 from . import database as db
-from . import params
 
 
 # setup
@@ -28,11 +27,11 @@ html_refresh_string = ('<meta http-equiv=\"refresh\" content=\"' +
                        str(html_refresh) + '\">\n')
 
 
-def import_queue_file():
+def import_queue_file(file_path):
     """Import the queue file."""
     import json
     lines = []
-    with open(os.path.join(params.QUEUE_PATH, 'queue_info')) as f:
+    with open(file_path) as f:
         for line in f.readlines():
             lines.append(line)
 
@@ -51,10 +50,10 @@ def import_queue_file():
     return time, all_constraint_names, pointing_list
 
 
-def write_flag_file(pointing, time, all_constraint_names, pointing_info):
+def write_flag_file(pointing, time, all_constraint_names, pointing_info, html_path):
     """Write flag file for a given pointing."""
     db_id, altaz_start, altaz_end, constraint_names, valid_arr = pointing_info
-    flag_filename = os.path.join(params.HTML_PATH, 'ID_{}_flags.html'.format(db_id))
+    flag_filename = os.path.join(html_path, 'ID_{}_flags.html'.format(db_id))
 
     with open(flag_filename, 'w') as f:
         f.write('<html><body>\n')
@@ -112,9 +111,9 @@ def write_flag_file(pointing, time, all_constraint_names, pointing_info):
         f.write("</body></html>")
 
 
-def write_exp_file(db_id, exposure_sets):
+def write_exp_file(db_id, exposure_sets, html_path):
     """Write exposure files for a pointing."""
-    exp_filename = os.path.join(params.HTML_PATH, 'ID_{}_exp.html'.format(db_id))
+    exp_filename = os.path.join(html_path, 'ID_{}_exp.html'.format(db_id))
 
     # unlike the flags, exposure info doesn't change
     # so don't re-write the files if they're already there!
@@ -147,12 +146,12 @@ def write_exp_file(db_id, exposure_sets):
             f.write("</table></body></html>")
 
 
-def write_queue_page(queue):
+def write_queue_page(queue, queue_file_path, html_path):
     """Write the GOTO queue page."""
-    # load any needed infomation saved by the scheduler
-    time, all_constraint_names, pointing_list = import_queue_file()
+    # load any needed information saved by the scheduler
+    time, all_constraint_names, pointing_list = import_queue_file(queue_file_path)
 
-    queue_filename = os.path.join(params.HTML_PATH, 'queue.html')
+    queue_filename = os.path.join(html_path, 'queue.html')
     with open(queue_filename, 'w') as f:
         f.write('<html><head>\n')
         f.write('<script src=\"jquery.tools.min.js\"></script>' +
@@ -239,12 +238,12 @@ def write_queue_page(queue):
             session.close()
 
             # create the small pointing files
-            write_flag_file(pointing, time, all_constraint_names, pointing_info)
+            write_flag_file(pointing, time, all_constraint_names, pointing_info, html_path)
             flag_link = 'ID_{}_flags.html'.format(db_id)
             flag_str = ('<a href=' + flag_link + ' rel=\"#overlay\">' +
                         'ID_' + str(db_id) + '</a>' + popup_str)
 
-            write_exp_file(db_id, exposure_sets)
+            write_exp_file(db_id, exposure_sets, html_path)
             exp_link = 'ID_{}_exp.html'.format(db_id)
             exp_str = ('<a href=' + exp_link + ' rel=\"#overlay\">' +
                        str(pointing.name) + '</a>' + popup_str)

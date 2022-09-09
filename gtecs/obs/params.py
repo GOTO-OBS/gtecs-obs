@@ -1,8 +1,7 @@
 """Package parameters."""
 
-import os
-
-from gtecs.common.package import load_config, get_package_version
+from gtecs.common import config as pkg_config
+from gtecs.common.package import get_package_version, load_config
 
 
 ############################################################
@@ -14,17 +13,7 @@ config, CONFIG_SPEC, CONFIG_FILE = load_config('obs', '.obs.conf')
 VERSION = get_package_version('obs')
 
 # File locations
-FILE_PATH = config['FILE_PATH']
-if FILE_PATH in ['path_not_set', '/path/goes/here/']:
-    raise ValueError('FILE_PATH not set, check config file ({})'.format(CONFIG_FILE))
-QUEUE_PATH = os.path.join(FILE_PATH, 'queue')
-HTML_PATH = os.path.join(FILE_PATH, 'html')
-LOG_PATH = os.path.join(FILE_PATH, 'logs')
-
-############################################################
-# Logging parameters
-FILE_LOGGING = config['FILE_LOGGING']
-STDOUT_LOGGING = config['STDOUT_LOGGING']
+FILE_PATH = pkg_config.CONFIG_PATH / 'obs'
 
 ############################################################
 # Database parameters

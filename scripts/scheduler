@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """A script to monitor the database and calculate which pointings to observe."""
 
-import os
 import sys
 
 import Pyro4
 
-from gtecs.control import misc  # Should be in common?
+from gtecs.common import logging
+from gtecs.common.system import execute_long_command, get_pid, kill_process, make_pid_file
 from gtecs.obs import database as db
 from gtecs.obs import params
 from gtecs.obs.scheduler import run
@@ -23,17 +23,17 @@ def query(command, args):
         try:
             with Pyro4.Proxy(params.PYRO_URI) as proxy:
                 uri = proxy.uri
-            pid = misc.get_pid('scheduler')
+            pid = get_pid('scheduler')
             print('Scheduler is already running ({}, PID={})'.format(uri, pid))
         except Pyro4.errors.CommunicationError:
-            with misc.make_pid_file('scheduler'):
+            with make_pid_file('scheduler'):
                 run()
 
     elif command == 'ping':
         try:
             with Pyro4.Proxy(params.PYRO_URI) as proxy:
                 uri = proxy.uri
-            pid = misc.get_pid('scheduler')
+            pid = get_pid('scheduler')
             print('Scheduler is running ({}, PID={})'.format(uri, pid))
         except Pyro4.errors.CommunicationError:
             print('Scheduler is not running')
@@ -47,15 +47,16 @@ def query(command, args):
             print('Scheduler is not running')
 
     elif command == 'kill':
-        if not misc.get_pid('scheduler'):
+        if not get_pid('scheduler'):
             print('Scheduler is not running')
-        misc.kill_process('scheduler')
+        kill_process('scheduler')
 
     elif command in ['log', 'tail']:
-        log_path = os.path.join(params.LOG_PATH, 'scheduler.log')
+        log_file = 'scheduler.log'
+        log_path = logging.get_log_path() / log_file
         tail_command = 'tail {} {}'.format(log_path, ' '.join(args))
 
-        misc.execute_long_command(tail_command)
+        execute_long_command(tail_command)
 
     elif command == 'info':
         # parse arguments
@@ -110,7 +111,9 @@ def print_instructions():
 
 if __name__ == '__main__':
     if len(sys.argv) == 1:
+        # No command: print help and exit
         print_instructions()
-    else:
-        command, *args = sys.argv[1:]
-        query(command, args)
+        sys.exit()
+
+    command, *args = sys.argv[1:]
+    query(command, args)

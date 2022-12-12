@@ -17,10 +17,10 @@ FILE_PATH = pkg_config.CONFIG_PATH / 'obs'
 
 ############################################################
 # Database parameters
+DATABASE_DIALECT = config['DATABASE_DIALECT']
 DATABASE_USER = config['DATABASE_USER']
 DATABASE_PASSWORD = config['DATABASE_PASSWORD']
 DATABASE_HOST = config['DATABASE_HOST']
-DATABASE_URL = '{}:{}@{}'.format(DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST)
 DATABASE_NAME = config['DATABASE_NAME']
 DATABASE_ECHO = bool(config['DATABASE_ECHO'])
 DATABASE_PRE_PING = bool(config['DATABASE_PRE_PING'])

@@ -25,15 +25,37 @@ pymysql.converters.conversions = pymysql.converters.encoders.copy()
 pymysql.converters.conversions.update(pymysql.converters.decoders)
 
 
-def get_engine(url=params.DATABASE_URL, db_name=params.DATABASE_NAME,
-               echo=params.DATABASE_ECHO, *args, **kwargs):
+def get_engine(user=params.DATABASE_USER,
+               password=params.DATABASE_PASSWORD,
+               host=params.DATABASE_HOST,
+               db_name=params.DATABASE_NAME,
+               dialect=params.DATABASE_DIALECT,
+               encoding='utf8',
+               echo=params.DATABASE_ECHO,
+               **kwargs):
     """Create the database engine."""
+    url = '{}:{}@{}'.format(user, password, host)
+
     if db_name:
         url = os.path.join(url, db_name)
-    engine = create_engine(f'mysql+pymysql://{url}?charset=utf8',
+    else:
+        # db_name = None is used when creating databases
+        if 'postgres' in dialect:
+            url = os.path.join(url, 'postgres')
+
+    if dialect == 'mysql':
+        dialect = 'mysql+pymysql'
+    elif dialect == 'postgres':
+        dialect = 'postgresql'
+    else:
+        raise ValueError(f'Unknown SQL dialect: {dialect}')
+    url = f'{dialect.lower()}://{url}?charset={encoding}'
+
+    engine = create_engine(url,
                            echo=echo,
                            pool_pre_ping=params.DATABASE_PRE_PING,
-                           *args, *kwargs)
+                           **kwargs,
+                           )
     return engine
 
 
@@ -54,18 +76,36 @@ def create_database(overwrite=False, verbose=False):
 
     """
     db_name = params.DATABASE_NAME
-    engine = get_engine(db_name=None, echo=verbose)
-    with engine.connect() as conn:
+    dialect = params.DATABASE_DIALECT
+    if dialect == 'mysql':
         create_command = f'CREATE DATABASE `{db_name}`'
         # Set default encoding to UTF8 (see https://dba.stackexchange.com/questions/76788)
         create_command += 'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+        drop_command = f'DROP DATABASE IF EXISTS `{db_name}`'
+    elif dialect == 'postgres':
+        create_command = f'CREATE DATABASE {db_name}'
+        drop_command = f'DROP DATABASE IF EXISTS {db_name}'
+    else:
+        raise ValueError(f'Unknown SQL dialect: {dialect}')
+
+    engine = get_engine(db_name=None, dialect=dialect, echo=verbose)
+    with engine.connect() as conn:
         if not overwrite:
             try:
+                if dialect == 'postgres':
+                    # postgres does not allow you to create/drop databases inside transactions
+                    # (https://stackoverflow.com/a/8977109)
+                    conn.execute('commit')
                 conn.execute(create_command)  # will raise if it exists
             except ProgrammingError as err:
-                raise ValueError(f'WARNING: Database "{db_name}" already exists!') from err
+                raise ValueError(f'Database "{db_name}" exists and overwrite=False') from err
         else:
-            conn.execute(f'DROP DATABASE IF EXISTS `{db_name}`')
+            if dialect == 'postgres':
+                conn.execute('commit')
+            conn.execute(drop_command)
+
+            if dialect == 'postgres':
+                conn.execute('commit')
             conn.execute(create_command)
 
 

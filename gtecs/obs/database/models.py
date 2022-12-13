@@ -2784,7 +2784,7 @@ class Survey(Base):
     # Secondary relationships
     pointings = relationship('Pointing',
                              secondary=f'{params.DATABASE_NAME}.targets',
-                             primaryjoin='Survey.db_id == Target.event_id',
+                             primaryjoin='Survey.db_id == Target.survey_id',
                              secondaryjoin='Pointing.target_id == Target.db_id',
                              back_populates='survey',
                              viewonly=True,

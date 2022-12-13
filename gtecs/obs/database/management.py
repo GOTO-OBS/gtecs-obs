@@ -7,11 +7,11 @@ import numpy as np
 
 import pymysql
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
-from .models import Base, TRIGGERS
+from .models import Base, SQL_CODE
 from .. import params
 
 __all__ = ['create_database', 'fill_database',
@@ -119,10 +119,10 @@ def fill_database(verbose=False):
             conn.execute(f"COMMENT ON SCHEMA {params.DATABASE_NAME} IS 'G-TeCS Observing Database'")
     Base.metadata.create_all(engine)
 
-    # Create triggers
-    for trigger in TRIGGERS:
+    # Execute any functions or triggers in pure SQL
+    for code in SQL_CODE:
         with engine.connect() as conn:
-            conn.execute(trigger)
+            conn.execute(text(code))
 
 
 @contextmanager

@@ -334,7 +334,7 @@ class Pointing(Base):
     dec : float, optional
         J2000 declination in decimal degrees
         (inherited from linked Target)
-    weight : int, optional
+    weight : float, optional
         weighting relative to other Targets in the same survey
         (inherited from linked Target)
     is_template : bool, optional
@@ -1425,7 +1425,7 @@ class Target(Base):
         if True, the Target's `current_rank` will increase by 10 for each completed Pointing
         (unless rank=None, can't increase from infinity)
         default = True
-    weight : int, optional
+    weight : float, optional
         weighting relative to other Targets in the same survey
         default = 1
     is_template : bool, optional
@@ -1539,7 +1539,7 @@ class Target(Base):
     # # Scheduling
     rank = Column(Integer, nullable=True)
     rank_decay = Column(Boolean, nullable=False, default=True)
-    weight = Column(Integer, nullable=False, default=1)
+    weight = Column(Float, nullable=False, default=1)
     is_template = Column(Boolean, nullable=False, default=False)
     # # Constraints
     start_time = Column(DateTime, nullable=False, index=True, server_default=func.now())

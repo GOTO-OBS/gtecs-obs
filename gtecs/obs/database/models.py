@@ -1060,6 +1060,7 @@ class Strategy(Base):
     def validate_times(self, key, field):
         """Use validators to allow various types of input for times."""
         if field is None:
+            # stop_time is nullable
             return None
 
         if isinstance(field, datetime.datetime):
@@ -1076,6 +1077,10 @@ class Strategy(Base):
     @validates('min_time')
     def validate_durations(self, key, field):
         """Use validators to allow various types of input for time periods."""
+        if field is None:
+            # min_time is nullable
+            return None
+
         if isinstance(field, u.Quantity):
             # Should have units of time
             if field.unit not in u.s.find_equivalent_units():
@@ -2892,6 +2897,10 @@ class Event(Base):
     @validates('time')
     def validate_times(self, key, field):
         """Use validators to allow various types of input for times."""
+        if field is None:
+            # time is nullable
+            return None
+
         if isinstance(field, datetime.datetime):
             value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):

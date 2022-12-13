@@ -45,11 +45,13 @@ def get_engine(user=params.DATABASE_USER,
 
     if dialect == 'mysql':
         dialect = 'mysql+pymysql'
+        encoding_arg = 'charset'
     elif dialect == 'postgres':
         dialect = 'postgresql'
+        encoding_arg = 'client_encoding'
     else:
         raise ValueError(f'Unknown SQL dialect: {dialect}')
-    url = f'{dialect.lower()}://{url}?charset={encoding}'
+    url = f'{dialect.lower()}://{url}?{encoding_arg}={encoding}'
 
     engine = create_engine(url,
                            echo=echo,

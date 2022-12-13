@@ -5,6 +5,7 @@ from setuptools import setup, find_namespace_packages
 
 REQUIRES = ['sqlalchemy>=1.4',
             'pymysql',
+            'psycopg2',
             'astropy',
             'astroplan',
             'numpy',

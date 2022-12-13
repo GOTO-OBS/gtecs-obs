@@ -61,14 +61,24 @@ def get_engine(user=params.DATABASE_USER,
     return engine
 
 
-def create_database(overwrite=False, verbose=False):
+def create_database(name=params.DATABASE_NAME, schema=params.SCHEMA_NAME,
+                    dialect=params.DATABASE_DIALECT,
+                    overwrite=False, verbose=False):
     """Create the blank database.
-
-    The name of the database is 'goto_obs' by default, it can be changed in
-    `gtecs.obs.params.DATABASE_NAME`.
 
     Parameters
     ----------
+    name : string, default=params.DATABASE_NAME
+        The name of the database to create.
+
+    schema : string, default=params.SCHEMA_NAME
+        The name of the schema to create.
+        (Only matters if dialect=postgres)
+
+    dialect : string, default=params.DATABASE_DIALECT
+        SQL dialect to use.
+        Must be either 'mysql' or 'postgres'.
+
     overwrite : bool, default=False
         If True and the database already exists then drop it before creating the new one.
         If False and the database already exists then an error is raised.
@@ -77,8 +87,6 @@ def create_database(overwrite=False, verbose=False):
         If True, echo SQL output.
 
     """
-    db_name = params.DATABASE_NAME
-    dialect = params.DATABASE_DIALECT
     if dialect not in ['mysql', 'postgres']:
         raise ValueError(f'Unknown SQL dialect: {dialect}')
 
@@ -87,36 +95,40 @@ def create_database(overwrite=False, verbose=False):
         # First drop the database, if overwrite is true
         if overwrite:
             if dialect == 'mysql':
-                conn.execute(f'DROP DATABASE IF EXISTS `{db_name}`')
+                conn.execute(f'DROP DATABASE IF EXISTS `{name}`')
             elif dialect == 'postgres':
                 # postgres does not allow you to create/drop databases inside transactions
                 # (https://stackoverflow.com/a/8977109)
                 conn.execute('commit')
-                conn.execute(f'DROP DATABASE IF EXISTS {db_name}')
+                conn.execute(f'DROP DATABASE IF EXISTS {name}')
 
         # Now try creating the new database
         try:
             if dialect == 'mysql':
-                create_command = f'CREATE DATABASE `{db_name}`'
+                create_command = f'CREATE DATABASE `{name}`'
                 # Set default encoding to UTF8 (see https://dba.stackexchange.com/questions/76788)
                 create_command += ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
                 conn.execute(create_command)
             elif dialect == 'postgres':
                 conn.execute('commit')
-                conn.execute(f'CREATE DATABASE {db_name}')
+                conn.execute(f'CREATE DATABASE {name}')
         except ProgrammingError as err:
-            raise ValueError(f'Database "{db_name}" exists and overwrite=False') from err
+            raise ValueError(f'Database "{name}" exists and overwrite=False') from err
+
+    # For postgres we want to create a specific schema
+    if dialect == 'postgres':
+        engine = get_engine(db_name=name, dialect=dialect, echo=verbose)
+        with engine.connect() as conn:
+            conn.execute(f'DROP SCHEMA IF EXISTS {schema}')
+            conn.execute(f'CREATE SCHEMA {schema}')
+            conn.execute('commit')
+            conn.execute(f"COMMENT ON SCHEMA {schema} IS 'G-TeCS Observing Database'")
 
 
 def fill_database(verbose=False):
     """Fill a blank database with the ObsDB metadata."""
     # Create the schema from the base
     engine = get_engine(echo=verbose)
-    if params.DATABASE_DIALECT == 'postgres':
-        with engine.connect() as conn:
-            conn.execute(f'CREATE SCHEMA {params.DATABASE_NAME}')
-            conn.execute('commit')
-            conn.execute(f"COMMENT ON SCHEMA {params.DATABASE_NAME} IS 'G-TeCS Observing Database'")
     Base.metadata.create_all(engine)
 
     # Execute any functions or triggers in pure SQL

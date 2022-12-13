@@ -30,6 +30,7 @@ __all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
 
 
 Base = declarative_base()
+Base.metadata.schema = params.DATABASE_NAME
 
 
 class User(Base):
@@ -193,7 +194,7 @@ class ExposureSet(Base):
 
     # Secondary relationships
     pointings = relationship('Pointing',
-                             secondary='targets',
+                             secondary=f'{params.DATABASE_NAME}.targets',
                              primaryjoin='ExposureSet.target_id == Target.db_id',
                              secondaryjoin='Pointing.target_id == Target.db_id',
                              back_populates='exposure_sets',
@@ -417,7 +418,7 @@ class Pointing(Base):
 
     # Secondary relationships
     exposure_sets = relationship('ExposureSet',
-                                 secondary='targets',
+                                 secondary=f'{params.DATABASE_NAME}.targets',
                                  primaryjoin='Pointing.target_id == Target.db_id',
                                  secondaryjoin='ExposureSet.target_id == Target.db_id',
                                  back_populates='pointings',
@@ -426,7 +427,7 @@ class Pointing(Base):
                                  )
     grid_tile = relationship('GridTile',
                              lazy='joined',
-                             secondary='targets',
+                             secondary=f'{params.DATABASE_NAME}.targets',
                              primaryjoin='Pointing.target_id == Target.db_id',
                              secondaryjoin='GridTile.db_id == Target.grid_tile_id',
                              back_populates='pointings',
@@ -436,7 +437,7 @@ class Pointing(Base):
     grid_tile_id = association_proxy('grid_tile', 'db_id')
     survey = relationship('Survey',
                           lazy='joined',
-                          secondary='targets',
+                          secondary=f'{params.DATABASE_NAME}.targets',
                           primaryjoin='Pointing.target_id == Target.db_id',
                           secondaryjoin='Survey.db_id == Target.survey_id',
                           back_populates='pointings',
@@ -446,7 +447,7 @@ class Pointing(Base):
     survey_id = association_proxy('survey', 'db_id')
     event = relationship('Event',
                          lazy='joined',
-                         secondary='targets',
+                         secondary=f'{params.DATABASE_NAME}.targets',
                          primaryjoin='Pointing.target_id == Target.db_id',
                          secondaryjoin='Event.db_id == Target.event_id',
                          back_populates='pointings',
@@ -1555,7 +1556,7 @@ class Target(Base):
     # Secondary relationships
     grid = relationship('Grid',
                         lazy='joined',
-                        secondary='grid_tiles',
+                        secondary=f'{params.DATABASE_NAME}.grid_tiles',
                         primaryjoin='Target.grid_tile_id == GridTile.db_id',
                         secondaryjoin='Grid.db_id == GridTile.grid_id',
                         back_populates='targets',
@@ -2455,7 +2456,7 @@ class Grid(Base):
 
     # Secondary relationships
     targets = relationship('Target',
-                           secondary='grid_tiles',
+                           secondary=f'{params.DATABASE_NAME}.grid_tiles',
                            primaryjoin='Grid.db_id == GridTile.grid_id',
                            secondaryjoin='Target.grid_tile_id == GridTile.db_id',
                            back_populates='grid',
@@ -2595,7 +2596,7 @@ class GridTile(Base):
 
     # Secondary relationships
     pointings = relationship('Pointing',
-                             secondary='targets',
+                             secondary=f'{params.DATABASE_NAME}.targets',
                              primaryjoin='GridTile.db_id == Target.grid_tile_id',
                              secondaryjoin='Pointing.target_id == Target.db_id',
                              back_populates='grid_tile',
@@ -2744,7 +2745,7 @@ class Survey(Base):
 
     # Secondary relationships
     pointings = relationship('Pointing',
-                             secondary='targets',
+                             secondary=f'{params.DATABASE_NAME}.targets',
                              primaryjoin='Survey.db_id == Target.event_id',
                              secondaryjoin='Pointing.target_id == Target.db_id',
                              back_populates='survey',
@@ -2835,7 +2836,7 @@ class Event(Base):
 
     # Secondary relationships
     pointings = relationship('Pointing',
-                             secondary='targets',
+                             secondary=f'{params.DATABASE_NAME}.targets',
                              primaryjoin='Event.db_id == Target.event_id',
                              secondaryjoin='Pointing.target_id == Target.db_id',
                              back_populates='event',

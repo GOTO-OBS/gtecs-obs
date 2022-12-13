@@ -79,42 +79,44 @@ def create_database(overwrite=False, verbose=False):
     """
     db_name = params.DATABASE_NAME
     dialect = params.DATABASE_DIALECT
-    if dialect == 'mysql':
-        create_command = f'CREATE DATABASE `{db_name}`'
-        # Set default encoding to UTF8 (see https://dba.stackexchange.com/questions/76788)
-        create_command += 'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-        drop_command = f'DROP DATABASE IF EXISTS `{db_name}`'
-    elif dialect == 'postgres':
-        create_command = f'CREATE DATABASE {db_name}'
-        drop_command = f'DROP DATABASE IF EXISTS {db_name}'
-    else:
+    if dialect not in ['mysql', 'postgres']:
         raise ValueError(f'Unknown SQL dialect: {dialect}')
 
     engine = get_engine(db_name=None, dialect=dialect, echo=verbose)
     with engine.connect() as conn:
-        if not overwrite:
-            try:
-                if dialect == 'postgres':
-                    # postgres does not allow you to create/drop databases inside transactions
-                    # (https://stackoverflow.com/a/8977109)
-                    conn.execute('commit')
-                conn.execute(create_command)  # will raise if it exists
-            except ProgrammingError as err:
-                raise ValueError(f'Database "{db_name}" exists and overwrite=False') from err
-        else:
-            if dialect == 'postgres':
+        # First drop the database, if overwrite is true
+        if overwrite:
+            if dialect == 'mysql':
+                conn.execute(f'DROP DATABASE IF EXISTS `{db_name}`')
+            elif dialect == 'postgres':
+                # postgres does not allow you to create/drop databases inside transactions
+                # (https://stackoverflow.com/a/8977109)
                 conn.execute('commit')
-            conn.execute(drop_command)
+                conn.execute(f'DROP DATABASE IF EXISTS {db_name}')
 
-            if dialect == 'postgres':
+        # Now try creating the new database
+        try:
+            if dialect == 'mysql':
+                create_command = f'CREATE DATABASE `{db_name}`'
+                # Set default encoding to UTF8 (see https://dba.stackexchange.com/questions/76788)
+                create_command += ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+                conn.execute(create_command)
+            elif dialect == 'postgres':
                 conn.execute('commit')
-            conn.execute(create_command)
+                conn.execute(f'CREATE DATABASE {db_name}')
+        except ProgrammingError as err:
+            raise ValueError(f'Database "{db_name}" exists and overwrite=False') from err
 
 
 def fill_database(verbose=False):
     """Fill a blank database with the ObsDB metadata."""
     # Create the schema from the base
     engine = get_engine(echo=verbose)
+    if params.DATABASE_DIALECT == 'postgres':
+        with engine.connect() as conn:
+            conn.execute(f'CREATE SCHEMA {params.DATABASE_NAME}')
+            conn.execute('commit')
+            conn.execute(f"COMMENT ON SCHEMA {params.DATABASE_NAME} IS 'G-TeCS Observing Database'")
     Base.metadata.create_all(engine)
 
     # Create triggers
@@ -127,7 +129,7 @@ def fill_database(verbose=False):
 def open_session(echo=params.DATABASE_ECHO):
     """Create a DB session context manager.
 
-    Automatically takes care of commiting changes
+    Automatically takes care of committing changes
     to DB when scope closes and rolls back on exceptions.
 
     Needless to say it also closes the session when it goes out of scope.

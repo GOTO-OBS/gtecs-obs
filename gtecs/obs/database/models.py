@@ -1932,7 +1932,7 @@ class Target(Base):
         self.deleted_time = time
 
         for pointing in self.pointings:
-            if pointing.status in ['upcoming', 'pending']:
+            if pointing.status_at_time(time) in ['upcoming', 'pending']:
                 pointing.mark_deleted(time=time)
 
     @hybrid_property

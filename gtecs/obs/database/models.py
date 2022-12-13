@@ -94,7 +94,11 @@ class User(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    targets = relationship('Target', back_populates='user')
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='user',
+    )
 
     def __init__(self, username, password, full_name, **kwargs):
         kwargs['username'] = username
@@ -199,17 +203,23 @@ class ExposureSet(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    target = relationship('Target', back_populates='exposure_sets')
+    target = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='exposure_sets',
+    )
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary=f'{Base.metadata.schema}.targets',
-                             primaryjoin='ExposureSet.target_id == Target.db_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='exposure_sets',
-                             viewonly=True,
-                             uselist=True,
-                             )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='ExposureSet.target_id == Target.db_id',
+        secondaryjoin='Pointing.target_id == Target.db_id',
+        back_populates='exposure_sets',
+        viewonly=True,
+        uselist=True,
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -423,49 +433,77 @@ class Pointing(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    target = relationship('Target', lazy='joined', back_populates='pointings')
-    time_block = relationship('TimeBlock', lazy='joined', back_populates='pointings')
-    strategy = relationship('Strategy', lazy='joined', back_populates='pointings')
-    telescope = relationship('Telescope', lazy='joined', back_populates='pointings')
+    target = relationship(
+        'Target',
+        order_by='Target.db_id',
+        lazy='joined',
+        back_populates='pointings',
+    )
+    time_block = relationship(
+        'TimeBlock',
+        order_by='TimeBlock.db_id',
+        lazy='joined',
+        back_populates='pointings',
+    )
+    strategy = relationship(
+        'Strategy',
+        order_by='Strategy.db_id',
+        lazy='joined',
+        back_populates='pointings',
+    )
+    telescope = relationship(
+        'Telescope',
+        order_by='Telescope.db_id',
+        lazy='joined',
+        back_populates='pointings',
+    )
 
     # Secondary relationships
-    exposure_sets = relationship('ExposureSet',
-                                 secondary=f'{Base.metadata.schema}.targets',
-                                 primaryjoin='Pointing.target_id == Target.db_id',
-                                 secondaryjoin='ExposureSet.target_id == Target.db_id',
-                                 back_populates='pointings',
-                                 viewonly=True,
-                                 uselist=True,
-                                 )
-    grid_tile = relationship('GridTile',
-                             lazy='joined',
-                             secondary=f'{Base.metadata.schema}.targets',
-                             primaryjoin='Pointing.target_id == Target.db_id',
-                             secondaryjoin='GridTile.db_id == Target.grid_tile_id',
-                             back_populates='pointings',
-                             viewonly=True,
-                             uselist=False,
-                             )
+    exposure_sets = relationship(
+        'ExposureSet',
+        order_by='ExposureSet.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Pointing.target_id == Target.db_id',
+        secondaryjoin='ExposureSet.target_id == Target.db_id',
+        back_populates='pointings',
+        viewonly=True,
+        uselist=True,
+    )
+    grid_tile = relationship(
+        'GridTile',
+        order_by='GridTile.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Pointing.target_id == Target.db_id',
+        secondaryjoin='GridTile.db_id == Target.grid_tile_id',
+        back_populates='pointings',
+        viewonly=True,
+        uselist=False,
+    )
     grid_tile_id = association_proxy('grid_tile', 'db_id')
-    survey = relationship('Survey',
-                          lazy='joined',
-                          secondary=f'{Base.metadata.schema}.targets',
-                          primaryjoin='Pointing.target_id == Target.db_id',
-                          secondaryjoin='Survey.db_id == Target.survey_id',
-                          back_populates='pointings',
-                          viewonly=True,
-                          uselist=False,
-                          )
+    survey = relationship(
+        'Survey',
+        order_by='Survey.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Pointing.target_id == Target.db_id',
+        secondaryjoin='Survey.db_id == Target.survey_id',
+        back_populates='pointings',
+        viewonly=True,
+        uselist=False,
+    )
     survey_id = association_proxy('survey', 'db_id')
-    event = relationship('Event',
-                         lazy='joined',
-                         secondary=f'{Base.metadata.schema}.targets',
-                         primaryjoin='Pointing.target_id == Target.db_id',
-                         secondaryjoin='Event.db_id == Target.event_id',
-                         back_populates='pointings',
-                         viewonly=True,
-                         uselist=False,
-                         )
+    event = relationship(
+        'Event',
+        order_by='Event.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Pointing.target_id == Target.db_id',
+        secondaryjoin='Event.db_id == Target.event_id',
+        back_populates='pointings',
+        viewonly=True,
+        uselist=False,
+    )
     event_id = association_proxy('event', 'db_id')
 
     # Proxy attributes
@@ -999,9 +1037,22 @@ class Strategy(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    target = relationship('Target', back_populates='strategies')
-    pointings = relationship('Pointing', back_populates='strategy')
-    time_blocks = relationship('TimeBlock', lazy='joined', back_populates='strategy')
+    target = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='strategies',
+    )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        back_populates='strategy',
+    )
+    time_blocks = relationship(
+        'TimeBlock',
+        order_by='TimeBlock.db_id',
+        lazy='joined',
+        back_populates='strategy',
+    )
 
     # Column properties
     num_completed = column_property(select([func.count(Pointing.db_id)])
@@ -1366,8 +1417,16 @@ class TimeBlock(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    strategy = relationship('Strategy', back_populates='time_blocks')
-    pointings = relationship('Pointing', back_populates='time_block')
+    strategy = relationship(
+        'Strategy',
+        order_by='Strategy.db_id',
+        back_populates='time_blocks',
+    )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        back_populates='time_block',
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1571,24 +1630,61 @@ class Target(Base):
 
     # Foreign relationships
     # (remember to add to __init__)
-    user = relationship('User', lazy='joined', back_populates='targets')
-    pointings = relationship('Pointing', lazy='joined', back_populates='target')
-    exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='target')
-    strategies = relationship('Strategy', lazy='joined', back_populates='target')
-    grid_tile = relationship('GridTile', lazy='joined', back_populates='targets')
-    survey = relationship('Survey', lazy='joined', back_populates='targets')
-    event = relationship('Event', lazy='joined', back_populates='targets')
+    user = relationship(
+        'User',
+        order_by='User.db_id',
+        lazy='joined',
+        back_populates='targets',
+    )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        lazy='joined',
+        back_populates='target',
+    )
+    exposure_sets = relationship(
+        'ExposureSet',
+        order_by='ExposureSet.db_id',
+        lazy='joined',
+        back_populates='target',
+    )
+    strategies = relationship(
+        'Strategy',
+        order_by='Strategy.db_id',
+        lazy='joined',
+        back_populates='target',
+    )
+    grid_tile = relationship(
+        'GridTile',
+        order_by='GridTile.db_id',
+        lazy='joined',
+        back_populates='targets',
+    )
+    survey = relationship(
+        'Survey',
+        order_by='Survey.db_id',
+        lazy='joined',
+        back_populates='targets',
+    )
+    event = relationship(
+        'Event',
+        order_by='Event.db_id',
+        lazy='joined',
+        back_populates='targets',
+    )
 
     # Secondary relationships
-    grid = relationship('Grid',
-                        lazy='joined',
-                        secondary=f'{Base.metadata.schema}.grid_tiles',
-                        primaryjoin='Target.grid_tile_id == GridTile.db_id',
-                        secondaryjoin='Grid.db_id == GridTile.grid_id',
-                        back_populates='targets',
-                        viewonly=True,
-                        uselist=False,
-                        )
+    grid = relationship(
+        'Grid',
+        order_by='Grid.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.grid_tiles',
+        primaryjoin='Target.grid_tile_id == GridTile.db_id',
+        secondaryjoin='Grid.db_id == GridTile.grid_id',
+        back_populates='targets',
+        viewonly=True,
+        uselist=False,
+    )
     grid_id = association_proxy('grid', 'db_id')
 
     # Column properties
@@ -2233,7 +2329,11 @@ class Site(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    telescopes = relationship('Telescope', back_populates='site')
+    telescopes = relationship(
+        'Telescope',
+        order_by='Telescope.db_id',
+        back_populates='site',
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2359,12 +2459,27 @@ class Telescope(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    site = relationship('Site', back_populates='telescopes')
-    grid = relationship('Grid', back_populates='telescopes')
-    pointings = relationship('Pointing', back_populates='telescope')
-    current_pointing = relationship('Pointing', viewonly=True, uselist=False,
-                                    primaryjoin='and_(Telescope.db_id==Pointing.telescope_id,'
-                                                'Pointing.status=="running")')
+    site = relationship(
+        'Site',
+        order_by='Site.db_id',
+        back_populates='telescopes',
+    )
+    grid = relationship(
+        'Grid',
+        order_by='Grid.db_id',
+        back_populates='telescopes',
+    )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        back_populates='telescope',
+    )
+    current_pointing = relationship(
+        'Pointing',
+        viewonly=True,
+        uselist=False,
+        primaryjoin='and_(Telescope.db_id==Pointing.telescope_id, Pointing.status=="running")',
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2486,18 +2601,28 @@ class Grid(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    grid_tiles = relationship('GridTile', back_populates='grid')
-    telescopes = relationship('Telescope', back_populates='grid')
+    grid_tiles = relationship(
+        'GridTile',
+        order_by='GridTile.db_id',
+        back_populates='grid',
+    )
+    telescopes = relationship(
+        'Telescope',
+        order_by='Telescope.db_id',
+        back_populates='grid',
+    )
 
     # Secondary relationships
-    targets = relationship('Target',
-                           secondary=f'{Base.metadata.schema}.grid_tiles',
-                           primaryjoin='Grid.db_id == GridTile.grid_id',
-                           secondaryjoin='Target.grid_tile_id == GridTile.db_id',
-                           back_populates='grid',
-                           viewonly=True,
-                           uselist=True,
-                           )
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        secondary=f'{Base.metadata.schema}.grid_tiles',
+        primaryjoin='Grid.db_id == GridTile.grid_id',
+        secondaryjoin='Target.grid_tile_id == GridTile.db_id',
+        back_populates='grid',
+        viewonly=True,
+        uselist=True,
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2629,18 +2754,28 @@ class GridTile(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    grid = relationship('Grid', back_populates='grid_tiles')
-    targets = relationship('Target', back_populates='grid_tile')
+    grid = relationship(
+        'Grid',
+        order_by='Grid.db_id',
+        back_populates='grid_tiles',
+    )
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='grid_tile',
+    )
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary=f'{Base.metadata.schema}.targets',
-                             primaryjoin='GridTile.db_id == Target.grid_tile_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='grid_tile',
-                             viewonly=True,
-                             uselist=True,
-                             )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='GridTile.db_id == Target.grid_tile_id',
+        secondaryjoin='Pointing.target_id == Target.db_id',
+        back_populates='grid_tile',
+        viewonly=True,
+        uselist=True,
+    )
 
     # Column properties
     last_observed = column_property(select([Target.last_observed])
@@ -2781,18 +2916,28 @@ class Survey(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    targets = relationship('Target', back_populates='survey')
-    event = relationship('Event', back_populates='surveys')
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='survey',
+    )
+    event = relationship(
+        'Event',
+        order_by='Event.db_id',
+        back_populates='surveys',
+    )
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary=f'{Base.metadata.schema}.targets',
-                             primaryjoin='Survey.db_id == Target.survey_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='survey',
-                             viewonly=True,
-                             uselist=True,
-                             )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Survey.db_id == Target.survey_id',
+        secondaryjoin='Pointing.target_id == Target.db_id',
+        back_populates='survey',
+        viewonly=True,
+        uselist=True,
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2875,18 +3020,28 @@ class Event(Base):
         ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    surveys = relationship('Survey', back_populates='event')
-    targets = relationship('Target', back_populates='event')
+    surveys = relationship(
+        'Survey',
+        order_by='Survey.db_id',
+        back_populates='event',
+    )
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='event',
+    )
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary=f'{Base.metadata.schema}.targets',
-                             primaryjoin='Event.db_id == Target.event_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='event',
-                             viewonly=True,
-                             uselist=True,
-                             )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Event.db_id == Target.event_id',
+        secondaryjoin='Pointing.target_id == Target.db_id',
+        back_populates='event',
+        viewonly=True,
+        uselist=True,
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),

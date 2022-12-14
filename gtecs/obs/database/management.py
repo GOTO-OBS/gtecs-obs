@@ -113,7 +113,10 @@ def create_database(name=params.DATABASE_NAME, schema=params.SCHEMA_NAME,
                 conn.execute('commit')
                 conn.execute(f'CREATE DATABASE {name}')
         except ProgrammingError as err:
-            raise ValueError(f'Database "{name}" exists and overwrite=False') from err
+            if 'already exists' in str(err):
+                raise ValueError(f'Database "{name}" already exists and overwrite=False') from err
+            else:
+                raise
 
     # For postgres we want to create a specific schema
     if dialect == 'postgres':

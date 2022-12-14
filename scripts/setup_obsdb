@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import sys
 
 from gototile.grid import SkyGrid
 
@@ -14,7 +15,15 @@ def run(overwrite=False, add_defaults=False, verbose=False):
     """Create and fill the database."""
     # Create a blank database
     print('Creating blank database...')
-    db.create_database(overwrite, verbose)
+    try:
+        db.create_database(overwrite=overwrite, verbose=verbose)
+    except ValueError as err:
+        if 'already exists' in str(err):
+            print('ERROR: Database already exists.')
+            print('       Rerun with -o/--overwrite to drop existing data.')
+            sys.exit()
+        else:
+            raise
 
     # Create the schema from the base
     print('Filling database schema...')

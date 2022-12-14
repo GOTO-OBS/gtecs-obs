@@ -32,11 +32,7 @@ def run(overwrite=False, add_defaults=False, verbose=False):
         site1 = db.Site.from_name('LaPalma')
         site2 = db.Site.from_name('SSO')
 
-        if 'GOTO-8' in SkyGrid.get_named_grids():
-            skygrid = SkyGrid.from_name('GOTO-8')
-        else:
-            # Use provisional grid
-            skygrid = SkyGrid.from_name('GOTO-8p')
+        skygrid = SkyGrid.from_name('GOTO-8')
         grid = db.Grid.from_skygrid(skygrid, name='GOTO-8_grid')
         for coord, name in zip(skygrid.coords, skygrid.tilenames):
             ra = coord.ra.value

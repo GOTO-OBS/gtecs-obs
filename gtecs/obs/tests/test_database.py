@@ -130,9 +130,8 @@ with db.open_session() as session:
     print('{} pointings in database'.format(n_pointings))
 
     # check how many are pending for each telescope
-    for telescope_id in [1, 2]:
-        n_queue = len(db.get_pending_pointings(session, telescope_id))
-        print('{} pointings in queue for telescope {}'.format(n_queue, telescope_id))
+    n_queue = len(db.get_pending_pointings(session))
+    print('{} pointings in queue'.format(n_queue))
 time.sleep(2)
 
 print('-------')

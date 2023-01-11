@@ -28,9 +28,9 @@ Several scripts from the `scripts` folder should also be added to your path, in 
 
 ### Setting up the database
 
-The database was initially defined for MySQL, but can now use in either MariaDB or PostgreSQL. The default is now Postgres, and it's possible that MariaDB support wil lbe dropped in the future.
+The database was initially defined for MySQL, but can now use in either MariaDB or PostgreSQL. The default is now Postgres, and it's possible that MariaDB support wil lbe dropped in the future. You can change between `postgres` and `mysql` using the `DATABASE_DIALECT` parameter in the `.obs.conf` config file (see below).
 
-You'll need to make sure either system is installed and configured before setting up the database. The config file (see below) contains parameters for the user and password to use when interacting with the database, make sure you create this user with rights first (e.g. `sudo -u postgres createuser -edP goto`). (a useful hint from https://stackoverflow.com/a/26735105:  edit `/etc/postgresql/12/main/pg_hba.conf` to change `local all all peer` to ` local all all md5` to remove the annoying user bits, then restart `sudo service postgresql restart`)
+You'll need to make sure either system is installed and configured before setting up the database. The config file contains parameters for the user and password to use when interacting with the database, make sure you create this user with rights first (e.g. `sudo -u postgres createuser -edP goto`). (a useful hint from https://stackoverflow.com/a/26735105:  edit `/etc/postgresql/12/main/pg_hba.conf` to change `local all all peer` to ` local all all md5` to remove the annoying user bits, then restart `sudo service postgresql restart`)
 
 Once the user is created run the `setup_obsdb` script to create a blank database with all the required tables. Note you can use the `-d/--add-defaults` option to add in definitions for the basic GOTO telescopes, otherwise the database will be entirely empty.
 

@@ -23,7 +23,8 @@ from sqlalchemy.sql import and_, case, or_
 from .. import params
 
 
-__all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
+__all__ = ['Base',
+           'User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
            'Site', 'Telescope', 'Grid', 'GridTile',
            'Survey', 'Event',
            'SQL_CODE']

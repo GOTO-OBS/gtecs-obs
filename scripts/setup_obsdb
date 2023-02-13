@@ -7,6 +7,7 @@ import sys
 
 from gototile.grid import SkyGrid
 
+from gtecs.common.database import create_database
 from gtecs.obs import database as db
 from gtecs.obs import params
 
@@ -14,9 +15,21 @@ from gtecs.obs import params
 def run(overwrite=False, add_defaults=False, verbose=False):
     """Create and fill the database."""
     # Create a blank database
-    print('Creating blank database...')
+    print(f'Creating blank {params.DATABASE_DIALECT} database...')
     try:
-        db.create_database(overwrite=overwrite, verbose=verbose)
+        create_database(
+            db.Base,
+            name=params.DATABASE_NAME,
+            user=params.DATABASE_USER,
+            password=params.DATABASE_PASSWORD,
+            host=params.DATABASE_HOST,
+            overwrite=overwrite,
+            dialect=params.DATABASE_DIALECT,
+            schema_name=params.SCHEMA_NAME,
+            schema_comment='G-TeCS Observing Database',
+            sql_code=db.SQL_CODE,
+            verbose=verbose,
+        )
     except ValueError as err:
         if 'already exists' in str(err):
             print('ERROR: Database already exists.')
@@ -24,10 +37,6 @@ def run(overwrite=False, add_defaults=False, verbose=False):
             sys.exit()
         else:
             raise
-
-    # Create the schema from the base
-    print('Filling database schema...')
-    db.fill_database(verbose)
 
     if add_defaults:
         # Create the default user (NB no password)

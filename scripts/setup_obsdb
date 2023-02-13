@@ -10,6 +10,7 @@ from gototile.grid import SkyGrid
 from gtecs.common.database import create_database
 from gtecs.obs import database as db
 from gtecs.obs import params
+from gtecs.obs.database.models import Base, SQL_CODE
 
 
 def run(overwrite=False, add_defaults=False, verbose=False):
@@ -18,16 +19,15 @@ def run(overwrite=False, add_defaults=False, verbose=False):
     print(f'Creating blank {params.DATABASE_DIALECT} database...')
     try:
         create_database(
-            db.Base,
-            name=params.DATABASE_NAME,
+            Base,
+            name='obs',
+            description='G-TeCS Observation Database',
             user=params.DATABASE_USER,
             password=params.DATABASE_PASSWORD,
             host=params.DATABASE_HOST,
-            overwrite=overwrite,
             dialect=params.DATABASE_DIALECT,
-            schema_name=params.SCHEMA_NAME,
-            schema_comment='G-TeCS Observing Database',
-            sql_code=db.SQL_CODE,
+            overwrite=overwrite,
+            sql_code=SQL_CODE,
             verbose=verbose,
         )
     except ValueError as err:

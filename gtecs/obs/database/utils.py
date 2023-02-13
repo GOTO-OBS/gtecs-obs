@@ -42,19 +42,22 @@ __all__ = ['open_session',
 
 @contextmanager
 def open_session():
-    """Create a session context manager connection to the Obs Database.
+    """Create a session context manager connection to the database.
 
     All arguments passed to `get_session()` are taken from `gtecs.obs.params`.
     """
+    if params.DATABASE_DIALECT == 'mysql':
+        db_name = 'gtecs_obs'
+    else:
+        db_name = 'gtecs'  # We don't need the schema name for the postgres connection
     session = get_session(
         user=params.DATABASE_USER,
         password=params.DATABASE_PASSWORD,
+        db_name=db_name,
         host=params.DATABASE_HOST,
-        db_name=params.DATABASE_NAME,
         dialect=params.DATABASE_DIALECT,
-        encoding='utf8',
         echo=params.DATABASE_ECHO,
-        pool_pre_ping=True
+        pool_pre_ping=params.DATABASE_PRE_PING,
     )
     try:
         yield session

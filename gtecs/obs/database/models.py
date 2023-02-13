@@ -23,18 +23,17 @@ from sqlalchemy.sql import and_, case, or_
 from .. import params
 
 
-__all__ = ['Base',
-           'User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
+__all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
            'Site', 'Telescope', 'Grid', 'GridTile',
            'Survey', 'Event',
-           'SQL_CODE']
+           ]
 
 
 Base = declarative_base()
 if params.DATABASE_DIALECT == 'mysql':
-    Base.metadata.schema = params.DATABASE_NAME
+    Base.metadata.schema = 'gtecs_obs'
 else:
-    Base.metadata.schema = params.SCHEMA_NAME
+    Base.metadata.schema = 'obs'
 
 
 class User(Base):

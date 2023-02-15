@@ -58,8 +58,8 @@ def query(command, args):
 
         execute_long_command(tail_command)
 
+    # Scheduler commands
     elif command == 'info':
-        # parse arguments
         if len(args) == 0:
             force = False
         elif len(args) == 1 and args[0] in ['f', 'F', '-f', '-F', '--force-update']:

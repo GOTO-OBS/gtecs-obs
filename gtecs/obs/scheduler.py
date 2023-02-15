@@ -139,10 +139,19 @@ class Scheduler:
                 self._check_night_times(check_time)
 
                 # Check the connection to the pilots
-                self._pilot_heartbeat(check_time)
+                try:
+                    self._pilot_heartbeat(check_time)
+                except Exception:
+                    self.log.error('Error checking pilot heartbeats')
+                    self.log.debug('', exc_info=True)
 
                 # Caretaker step to monitor and update the database
-                database_updated = self._caretaker(check_time)
+                try:
+                    database_updated = self._caretaker(check_time)
+                except Exception:
+                    database_updated = False
+                    self.log.error('Error checking database')
+                    self.log.debug('', exc_info=True)
                 if database_updated:
                     # If we just updated we need to wait to be sure that the timestamps are >1s
                     # in the past when we then get the Pointings queue.

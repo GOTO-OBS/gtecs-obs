@@ -26,10 +26,14 @@ from .. import params
 __all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
            'Site', 'Telescope', 'Grid', 'GridTile',
            'Survey', 'Event',
-           'TRIGGERS']
+           ]
 
 
 Base = declarative_base()
+if params.DATABASE_DIALECT == 'mysql':
+    Base.metadata.schema = 'gtecs_obs'
+else:
+    Base.metadata.schema = 'obs'
 
 
 class User(Base):
@@ -83,11 +87,18 @@ class User(Base):
     full_name = Column(Text, nullable=False)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    targets = relationship('Target', back_populates='user')
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='user',
+    )
 
     def __init__(self, username, password, full_name, **kwargs):
         kwargs['username'] = username
@@ -185,21 +196,30 @@ class ExposureSet(Base):
     target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    target = relationship('Target', back_populates='exposure_sets')
+    target = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='exposure_sets',
+    )
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary='targets',
-                             primaryjoin='ExposureSet.target_id == Target.db_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='exposure_sets',
-                             viewonly=True,
-                             uselist=True,
-                             )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='ExposureSet.target_id == Target.db_id',
+        secondaryjoin='Pointing.target_id == Target.db_id',
+        back_populates='exposure_sets',
+        viewonly=True,
+        uselist=True,
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -327,7 +347,7 @@ class Pointing(Base):
     dec : float, optional
         J2000 declination in decimal degrees
         (inherited from linked Target)
-    weight : int, optional
+    weight : float, optional
         weighting relative to other Targets in the same survey
         (inherited from linked Target)
     is_template : bool, optional
@@ -406,53 +426,84 @@ class Pointing(Base):
     telescope_id = Column(Integer, ForeignKey('telescopes.id'), nullable=True)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    target = relationship('Target', lazy='joined', back_populates='pointings')
-    time_block = relationship('TimeBlock', lazy='joined', back_populates='pointings')
-    strategy = relationship('Strategy', lazy='joined', back_populates='pointings')
-    telescope = relationship('Telescope', lazy='joined', back_populates='pointings')
+    target = relationship(
+        'Target',
+        order_by='Target.db_id',
+        lazy='joined',
+        back_populates='pointings',
+    )
+    time_block = relationship(
+        'TimeBlock',
+        order_by='TimeBlock.db_id',
+        lazy='joined',
+        back_populates='pointings',
+    )
+    strategy = relationship(
+        'Strategy',
+        order_by='Strategy.db_id',
+        lazy='joined',
+        back_populates='pointings',
+    )
+    telescope = relationship(
+        'Telescope',
+        order_by='Telescope.db_id',
+        lazy='joined',
+        back_populates='pointings',
+    )
 
     # Secondary relationships
-    exposure_sets = relationship('ExposureSet',
-                                 secondary='targets',
-                                 primaryjoin='Pointing.target_id == Target.db_id',
-                                 secondaryjoin='ExposureSet.target_id == Target.db_id',
-                                 back_populates='pointings',
-                                 viewonly=True,
-                                 uselist=True,
-                                 )
-    grid_tile = relationship('GridTile',
-                             lazy='joined',
-                             secondary='targets',
-                             primaryjoin='Pointing.target_id == Target.db_id',
-                             secondaryjoin='GridTile.db_id == Target.grid_tile_id',
-                             back_populates='pointings',
-                             viewonly=True,
-                             uselist=False,
-                             )
+    exposure_sets = relationship(
+        'ExposureSet',
+        order_by='ExposureSet.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Pointing.target_id == Target.db_id',
+        secondaryjoin='ExposureSet.target_id == Target.db_id',
+        back_populates='pointings',
+        viewonly=True,
+        uselist=True,
+    )
+    grid_tile = relationship(
+        'GridTile',
+        order_by='GridTile.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Pointing.target_id == Target.db_id',
+        secondaryjoin='GridTile.db_id == Target.grid_tile_id',
+        back_populates='pointings',
+        viewonly=True,
+        uselist=False,
+    )
     grid_tile_id = association_proxy('grid_tile', 'db_id')
-    survey = relationship('Survey',
-                          lazy='joined',
-                          secondary='targets',
-                          primaryjoin='Pointing.target_id == Target.db_id',
-                          secondaryjoin='Survey.db_id == Target.survey_id',
-                          back_populates='pointings',
-                          viewonly=True,
-                          uselist=False,
-                          )
+    survey = relationship(
+        'Survey',
+        order_by='Survey.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Pointing.target_id == Target.db_id',
+        secondaryjoin='Survey.db_id == Target.survey_id',
+        back_populates='pointings',
+        viewonly=True,
+        uselist=False,
+    )
     survey_id = association_proxy('survey', 'db_id')
-    event = relationship('Event',
-                         lazy='joined',
-                         secondary='targets',
-                         primaryjoin='Pointing.target_id == Target.db_id',
-                         secondaryjoin='Event.db_id == Target.event_id',
-                         back_populates='pointings',
-                         viewonly=True,
-                         uselist=False,
-                         )
+    event = relationship(
+        'Event',
+        order_by='Event.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Pointing.target_id == Target.db_id',
+        secondaryjoin='Event.db_id == Target.event_id',
+        back_populates='pointings',
+        viewonly=True,
+        uselist=False,
+    )
     event_id = association_proxy('event', 'db_id')
 
     # Proxy attributes
@@ -979,13 +1030,29 @@ class Strategy(Base):
     target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    target = relationship('Target', back_populates='strategies')
-    pointings = relationship('Pointing', back_populates='strategy')
-    time_blocks = relationship('TimeBlock', lazy='joined', back_populates='strategy')
+    target = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='strategies',
+    )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        back_populates='strategy',
+    )
+    time_blocks = relationship(
+        'TimeBlock',
+        order_by='TimeBlock.db_id',
+        lazy='joined',
+        back_populates='strategy',
+    )
 
     # Column properties
     num_completed = column_property(select([func.count(Pointing.db_id)])
@@ -1047,6 +1114,7 @@ class Strategy(Base):
     def validate_times(self, key, field):
         """Use validators to allow various types of input for times."""
         if field is None:
+            # stop_time is nullable
             return None
 
         if isinstance(field, datetime.datetime):
@@ -1063,6 +1131,10 @@ class Strategy(Base):
     @validates('min_time')
     def validate_durations(self, key, field):
         """Use validators to allow various types of input for time periods."""
+        if field is None:
+            # min_time is nullable
+            return None
+
         if isinstance(field, u.Quantity):
             # Should have units of time
             if field.unit not in u.s.find_equivalent_units():
@@ -1338,12 +1410,23 @@ class TimeBlock(Base):
     strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    strategy = relationship('Strategy', back_populates='time_blocks')
-    pointings = relationship('Pointing', back_populates='time_block')
+    strategy = relationship(
+        'Strategy',
+        order_by='Strategy.db_id',
+        back_populates='time_blocks',
+    )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        back_populates='time_block',
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1409,7 +1492,7 @@ class Target(Base):
         if True, the Target's `current_rank` will increase by 10 for each completed Pointing
         (unless rank=None, can't increase from infinity)
         default = True
-    weight : int, optional
+    weight : float, optional
         weighting relative to other Targets in the same survey
         default = 1
     is_template : bool, optional
@@ -1523,7 +1606,7 @@ class Target(Base):
     # # Scheduling
     rank = Column(Integer, nullable=True)
     rank_decay = Column(Boolean, nullable=False, default=True)
-    weight = Column(Integer, nullable=False, default=1)
+    weight = Column(Float, nullable=False, default=1)
     is_template = Column(Boolean, nullable=False, default=False)
     # # Constraints
     start_time = Column(DateTime, nullable=False, index=True, server_default=func.now())
@@ -1539,29 +1622,69 @@ class Target(Base):
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     # (remember to add to __init__)
-    user = relationship('User', lazy='joined', back_populates='targets')
-    pointings = relationship('Pointing', lazy='joined', back_populates='target')
-    exposure_sets = relationship('ExposureSet', lazy='joined', back_populates='target')
-    strategies = relationship('Strategy', lazy='joined', back_populates='target')
-    grid_tile = relationship('GridTile', lazy='joined', back_populates='targets')
-    survey = relationship('Survey', lazy='joined', back_populates='targets')
-    event = relationship('Event', lazy='joined', back_populates='targets')
+    user = relationship(
+        'User',
+        order_by='User.db_id',
+        lazy='joined',
+        back_populates='targets',
+    )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        lazy='joined',
+        back_populates='target',
+    )
+    exposure_sets = relationship(
+        'ExposureSet',
+        order_by='ExposureSet.db_id',
+        lazy='joined',
+        back_populates='target',
+    )
+    strategies = relationship(
+        'Strategy',
+        order_by='Strategy.db_id',
+        lazy='joined',
+        back_populates='target',
+    )
+    grid_tile = relationship(
+        'GridTile',
+        order_by='GridTile.db_id',
+        lazy='joined',
+        back_populates='targets',
+    )
+    survey = relationship(
+        'Survey',
+        order_by='Survey.db_id',
+        lazy='joined',
+        back_populates='targets',
+    )
+    event = relationship(
+        'Event',
+        order_by='Event.db_id',
+        lazy='joined',
+        back_populates='targets',
+    )
 
     # Secondary relationships
-    grid = relationship('Grid',
-                        lazy='joined',
-                        secondary='grid_tiles',
-                        primaryjoin='Target.grid_tile_id == GridTile.db_id',
-                        secondaryjoin='Grid.db_id == GridTile.grid_id',
-                        back_populates='targets',
-                        viewonly=True,
-                        uselist=False,
-                        )
+    grid = relationship(
+        'Grid',
+        order_by='Grid.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.grid_tiles',
+        primaryjoin='Target.grid_tile_id == GridTile.db_id',
+        secondaryjoin='Grid.db_id == GridTile.grid_id',
+        back_populates='targets',
+        viewonly=True,
+        uselist=False,
+    )
     grid_id = association_proxy('grid', 'db_id')
 
     # Column properties
@@ -1908,7 +2031,7 @@ class Target(Base):
         self.deleted_time = time
 
         for pointing in self.pointings:
-            if pointing.status in ['upcoming', 'pending']:
+            if pointing.status_at_time(time) in ['upcoming', 'pending']:
                 pointing.mark_deleted(time=time)
 
     @hybrid_property
@@ -2199,11 +2322,18 @@ class Site(Base):
     height = Column(Float, nullable=False)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    telescopes = relationship('Telescope', back_populates='site')
+    telescopes = relationship(
+        'Telescope',
+        order_by='Telescope.db_id',
+        back_populates='site',
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2322,16 +2452,34 @@ class Telescope(Base):
     grid_id = Column(Integer, ForeignKey('grids.id'), nullable=True)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    site = relationship('Site', back_populates='telescopes')
-    grid = relationship('Grid', back_populates='telescopes')
-    pointings = relationship('Pointing', back_populates='telescope')
-    current_pointing = relationship('Pointing', viewonly=True, uselist=False,
-                                    primaryjoin='and_(Telescope.db_id==Pointing.telescope_id,'
-                                                'Pointing.status=="running")')
+    site = relationship(
+        'Site',
+        order_by='Site.db_id',
+        back_populates='telescopes',
+    )
+    grid = relationship(
+        'Grid',
+        order_by='Grid.db_id',
+        back_populates='telescopes',
+    )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        back_populates='telescope',
+    )
+    current_pointing = relationship(
+        'Pointing',
+        viewonly=True,
+        uselist=False,
+        primaryjoin='and_(Telescope.db_id==Pointing.telescope_id, Pointing.status=="running")',
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2446,22 +2594,35 @@ class Grid(Base):
     algorithm = Column(String(255), nullable=False)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    grid_tiles = relationship('GridTile', back_populates='grid')
-    telescopes = relationship('Telescope', back_populates='grid')
+    grid_tiles = relationship(
+        'GridTile',
+        order_by='GridTile.db_id',
+        back_populates='grid',
+    )
+    telescopes = relationship(
+        'Telescope',
+        order_by='Telescope.db_id',
+        back_populates='grid',
+    )
 
     # Secondary relationships
-    targets = relationship('Target',
-                           secondary='grid_tiles',
-                           primaryjoin='Grid.db_id == GridTile.grid_id',
-                           secondaryjoin='Target.grid_tile_id == GridTile.db_id',
-                           back_populates='grid',
-                           viewonly=True,
-                           uselist=True,
-                           )
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        secondary=f'{Base.metadata.schema}.grid_tiles',
+        primaryjoin='Grid.db_id == GridTile.grid_id',
+        secondaryjoin='Target.grid_tile_id == GridTile.db_id',
+        back_populates='grid',
+        viewonly=True,
+        uselist=True,
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2586,22 +2747,35 @@ class GridTile(Base):
     grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    grid = relationship('Grid', back_populates='grid_tiles')
-    targets = relationship('Target', back_populates='grid_tile')
+    grid = relationship(
+        'Grid',
+        order_by='Grid.db_id',
+        back_populates='grid_tiles',
+    )
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='grid_tile',
+    )
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary='targets',
-                             primaryjoin='GridTile.db_id == Target.grid_tile_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='grid_tile',
-                             viewonly=True,
-                             uselist=True,
-                             )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='GridTile.db_id == Target.grid_tile_id',
+        secondaryjoin='Pointing.target_id == Target.db_id',
+        back_populates='grid_tile',
+        viewonly=True,
+        uselist=True,
+    )
 
     # Column properties
     last_observed = column_property(select([Target.last_observed])
@@ -2735,22 +2909,35 @@ class Survey(Base):
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    targets = relationship('Target', back_populates='survey')
-    event = relationship('Event', back_populates='surveys')
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='survey',
+    )
+    event = relationship(
+        'Event',
+        order_by='Event.db_id',
+        back_populates='surveys',
+    )
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary='targets',
-                             primaryjoin='Survey.db_id == Target.event_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='survey',
-                             viewonly=True,
-                             uselist=True,
-                             )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Survey.db_id == Target.survey_id',
+        secondaryjoin='Pointing.target_id == Target.db_id',
+        back_populates='survey',
+        viewonly=True,
+        uselist=True,
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2826,22 +3013,35 @@ class Event(Base):
     time = Column(DateTime, nullable=True, default=None)
 
     # Update timestamp
-    ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    if params.DATABASE_DIALECT == 'mysql':
+        ts = Column(TIMESTAMP(fsp=3), nullable=False,
+                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
+    elif params.DATABASE_DIALECT == 'postgres':
+        ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
-    surveys = relationship('Survey', back_populates='event')
-    targets = relationship('Target', back_populates='event')
+    surveys = relationship(
+        'Survey',
+        order_by='Survey.db_id',
+        back_populates='event',
+    )
+    targets = relationship(
+        'Target',
+        order_by='Target.db_id',
+        back_populates='event',
+    )
 
     # Secondary relationships
-    pointings = relationship('Pointing',
-                             secondary='targets',
-                             primaryjoin='Event.db_id == Target.event_id',
-                             secondaryjoin='Pointing.target_id == Target.db_id',
-                             back_populates='event',
-                             viewonly=True,
-                             uselist=True,
-                             )
+    pointings = relationship(
+        'Pointing',
+        order_by='Pointing.db_id',
+        secondary=f'{Base.metadata.schema}.targets',
+        primaryjoin='Event.db_id == Target.event_id',
+        secondaryjoin='Pointing.target_id == Target.db_id',
+        back_populates='event',
+        viewonly=True,
+        uselist=True,
+    )
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -2855,6 +3055,10 @@ class Event(Base):
     @validates('time')
     def validate_times(self, key, field):
         """Use validators to allow various types of input for times."""
+        if field is None:
+            # time is nullable
+            return None
+
         if isinstance(field, datetime.datetime):
             value = field.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(field, Time):
@@ -2866,4 +3070,26 @@ class Event(Base):
         return value
 
 
-TRIGGERS = []
+SQL_CODE = []
+if params.DATABASE_DIALECT == 'postgres':
+    # Create ts update triggers (https://stackoverflow.com/a/71072370)
+    ts_function = """
+    CREATE FUNCTION {schema}.update_ts()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql AS
+    $func$
+    BEGIN
+       NEW.ts := now();
+       RETURN NEW;
+    END
+    $func$;
+    """
+    SQL_CODE.append(ts_function.format(schema=Base.metadata.schema))
+
+    ts_trigger = """
+    CREATE TRIGGER trig_update_ts_{table} BEFORE UPDATE ON {schema}.{table}
+    FOR EACH ROW EXECUTE PROCEDURE {schema}.update_ts();
+    """
+    for table in Base.metadata.tables.values():
+        if 'ts' in table.columns:
+            SQL_CODE.append(ts_trigger.format(schema=Base.metadata.schema, table=table.name))

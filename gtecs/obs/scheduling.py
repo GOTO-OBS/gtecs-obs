@@ -165,9 +165,6 @@ class Pointing:
         except AttributeError:
             return False
 
-    def __ne__(self, other):
-        return self != other
-
     def __repr__(self):
         template = ('<Pointing: db_id={}, name="{}">')
         return template.format(self.db_id, self.name)

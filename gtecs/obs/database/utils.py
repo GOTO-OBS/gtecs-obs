@@ -3,7 +3,7 @@
 Functions that return database ORM model classes (e.g. `get_user` -> `User`,
 `get_pointing_by_id` -> `Pointing` etc) require a session to be passed as their first argument.
 The returned classes are then linked to this session, so any changes will have to be committed
-manually (if using `load_session`) or when the session is closed (if using `open_session`).
+manually or when the session is closed.
 
 Functions that either act on the database and return nothing (e.g. `mark_pointing_running`)
 or that query the database and return information instead of classes (e.g. `validate_user` -> bool,
@@ -11,18 +11,22 @@ or that query the database and return information instead of classes (e.g. `vali
 """
 
 import hashlib
+from contextlib import contextmanager
 
 from astropy import units as u
 from astropy.coordinates import Longitude
 from astropy.time import Time
 
+from gtecs.common.database import get_session
+
 from sqlalchemy import or_
 
-from .management import open_session
 from .models import Event, ExposureSet, Grid, GridTile, Pointing, Site, Target, Telescope, User
+from .. import params
 
 
-__all__ = ['get_user', 'validate_user',
+__all__ = ['open_session',
+           'get_user', 'validate_user',
            'get_pointings', 'get_pointing_by_id', 'get_pending_pointings', 'get_current_pointing',
            'mark_pointing_running', 'mark_pointing_completed', 'mark_pointing_interrupted',
            'mark_pointing_confirmed', 'mark_pointing_failed',
@@ -36,13 +40,42 @@ __all__ = ['get_user', 'validate_user',
            ]
 
 
+@contextmanager
+def open_session():
+    """Create a session context manager connection to the database.
+
+    All arguments passed to `get_session()` are taken from `gtecs.obs.params`.
+    """
+    if params.DATABASE_DIALECT == 'mysql':
+        db_name = 'gtecs_obs'
+    else:
+        db_name = 'gtecs'  # We don't need the schema name for the postgres connection
+    session = get_session(
+        user=params.DATABASE_USER,
+        password=params.DATABASE_PASSWORD,
+        db_name=db_name,
+        host=params.DATABASE_HOST,
+        dialect=params.DATABASE_DIALECT,
+        echo=params.DATABASE_ECHO,
+        pool_pre_ping=params.DATABASE_PRE_PING,
+    )
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 def get_user(session, username):
     """Return the `User` for a given username.
 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session`
+        a session object
     username : string
         short name of user
 
@@ -89,7 +122,7 @@ def get_pointings(session, pointing_ids=None, status=None, time=None):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     pointing_ids : int or list
         supply a pointing ID or list of IDs to filter by id
     status : string or list
@@ -124,7 +157,7 @@ def get_pointing_by_id(session, pointing_id):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     pointing_id : int
         the id number of the pointing
 
@@ -154,7 +187,7 @@ def get_pending_pointings(session, time=None, location=None, altitude_limit=20, 
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
 
     time : `~astropy.time.Time`
         If given, the time to fetch the queue at.
@@ -231,7 +264,7 @@ def get_current_pointing(session, telescope_id, time=None):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     telescope_id : int
         The telescope to fetch the pointing for.
 
@@ -511,7 +544,7 @@ def get_targets(session, target_ids=None, status=None, time=None):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     target_ids : int or list
         supply a ID or list of IDs to filter results
     status : string or list
@@ -546,7 +579,7 @@ def get_target_by_id(session, target_id):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     target_id : int
         the id number of the Target
 
@@ -568,7 +601,7 @@ def get_exposure_set_by_id(session, expset_id):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     expset_id : int
         the id number of the Exposure Set
 
@@ -590,7 +623,7 @@ def get_telescope_by_id(session, telescope_id):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     telescope_id : int
         the id number of the telescope
 
@@ -631,7 +664,7 @@ def get_site_by_id(session, site_id):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     site_id : int
         the id number of the site
 
@@ -676,7 +709,7 @@ def get_site_info(site_id=None):
 def get_current_grid(session):
     """Get the current (last-defined) Grid from the grids table."""
     # Get the final entry in the grids table, assuming that's the latest and therefore current one
-    # Note there's no query.last(), so need to order by id decending then take the first.
+    # Note there's no query.last(), so need to order by id descending then take the first.
     grid = session.query(Grid).order_by(Grid.db_id.desc()).first()
     if not grid:
         raise ValueError('No defined grids found')
@@ -689,7 +722,7 @@ def get_grid_tile_by_name(session, grid_name, tile_name):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     grid_name : str
         the name of the grid
     tile_name : str
@@ -718,7 +751,7 @@ def get_events(session, event_type=None, source=None):
     Parameters
     ----------
     session : `sqlalchemy.Session.session`
-        a session object - see `load_session` or `open_session` for details
+        a session object
     event_type: str or list of str, optional
         the type of event, e.g. GW, GRB
     source : str or list of str,, optional

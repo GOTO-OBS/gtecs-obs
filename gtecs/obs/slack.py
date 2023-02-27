@@ -160,7 +160,7 @@ def send_observation_report(date=None, location=None, alt_limit=30, sun_limit=-1
     with db.open_session() as session:
         # Get the current grid from the database and create a SkyGrid
         db_grid = db.get_current_grid(session)
-        grid = db_grid.get_skygrid()
+        grid = db_grid.skygrid
 
         # Use Astroplan to get all the tiles that would have been visible last night
         visible_tiles = grid.get_visible_tiles(location,

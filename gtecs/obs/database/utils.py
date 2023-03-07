@@ -21,7 +21,7 @@ from gtecs.common.database import get_session
 
 from sqlalchemy import or_
 
-from .models import Event, ExposureSet, Grid, GridTile, Pointing, Site, Target, Telescope, User
+from .models import ExposureSet, Grid, GridTile, Pointing, Site, Target, Telescope, User
 from .. import params
 
 
@@ -35,7 +35,6 @@ __all__ = ['open_session',
            'get_exposure_set_by_id',
            'get_telescope_by_id', 'get_telescope_info', 'get_site_by_id', 'get_site_info',
            'get_current_grid', 'get_grid_tile_by_name',
-           'get_events',
            'insert_items',
            ]
 
@@ -521,19 +520,20 @@ def get_pointing_info(pointing_id):
             pointing_info['skymap'] = None
 
         # Get Event info
-        event = pointing.event
-        if event is not None:
-            pointing_info['event_id'] = event.db_id
-            pointing_info['event_name'] = event.name
-            pointing_info['event_source'] = event.source
-            pointing_info['event_type'] = event.type
-            pointing_info['event_time'] = event.time
-        else:
-            pointing_info['event_id'] = None
-            pointing_info['event_name'] = None
-            pointing_info['event_source'] = None
-            pointing_info['event_type'] = None
-            pointing_info['event_time'] = None
+        # # TODO: HOW DO WE GET THIS FOR THE HEADERS NOW THAT EVENTS ARE IN THE ALERTDB?
+        # event = pointing.event
+        # if event is not None:
+        #     pointing_info['event_id'] = event.db_id
+        #     pointing_info['event_name'] = event.name
+        #     pointing_info['event_source'] = event.source
+        #     pointing_info['event_type'] = event.type
+        #     pointing_info['event_time'] = event.time
+        # else:
+        #     pointing_info['event_id'] = None
+        #     pointing_info['event_name'] = None
+        #     pointing_info['event_source'] = None
+        #     pointing_info['event_type'] = None
+        #     pointing_info['event_time'] = None
 
     return pointing_info
 
@@ -743,37 +743,6 @@ def get_grid_tile_by_name(session, grid_name, tile_name):
     if not grid_tile:
         raise ValueError('No matching GridTile found')
     return grid_tile
-
-
-def get_events(session, event_type=None, source=None):
-    """Get all events, filtered by type or source.
-
-    Parameters
-    ----------
-    session : `sqlalchemy.Session.session`
-        a session object
-    event_type: str or list of str, optional
-        the type of event, e.g. GW, GRB
-    source : str or list of str,, optional
-        the event's origin, e.g. LVC, Fermi, GAIA
-
-    Returns
-    -------
-    events : list of `Event`
-        a list of all matching Events
-
-    """
-    query = session.query(Event)
-    if event_type is not None:
-        if isinstance(event_type, str):
-            event_type = [event_type]
-        query = query.filter(Event.type.in_(event_type))
-    if source is not None:
-        if isinstance(source, str):
-            source = [source]
-        query = query.filter(Event.source.in_(source))
-    events = query.all()
-    return events
 
 
 def insert_items(session, items):

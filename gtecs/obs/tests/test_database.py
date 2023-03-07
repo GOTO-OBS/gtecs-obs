@@ -34,10 +34,10 @@ with db.open_session() as session:
     t2 = db.Telescope(name='South Telescope', site=si)
 
     # and create a grid
-    g = db.Grid(name='testgrid',
+    g = db.Grid(name='test_grid',
                 ra_fov=10, dec_fov=10,
                 ra_overlap=0.5, dec_overlap=0.5,
-                algorithm='minverlap')
+                algorithm='test')
     t1.grid = g
     t2.grid = g
 
@@ -45,15 +45,11 @@ with db.open_session() as session:
     gt1 = db.GridTile(name='T0001', ra=100, dec=20, grid=g)
     gt2 = db.GridTile(name='T0002', ra=100, dec=40, grid=g)
 
-    # create an event
-    e = db.Event(name='event', source='made-up', type='FAKE')
-
-    # and a survey
-    s = db.Survey(name='GOTO event survey', event=e)
-    s.event = e
+    # create a survey
+    s = db.Survey(name='GOTO test survey')
 
     # add them all
-    db.insert_items(session, [si, t1, t2, g, gt1, gt2, e, s])
+    db.insert_items(session, [si, t1, t2, g, gt1, gt2, s])
     session.commit()
 
     # print them to check __repr__
@@ -63,7 +59,6 @@ with db.open_session() as session:
     print(g, end='\n\n')
     print(gt1)
     print(gt2, end='\n\n')
-    print(e, end='\n\n')
     print(s, end='\n\n')
 time.sleep(2)
 

@@ -2008,6 +2008,9 @@ class Target(Base):
             if pointing.status_at_time(time) in ['upcoming', 'pending']:
                 pointing.mark_deleted(time=time)
 
+    def undelete():
+        raise NotImplementedError
+
     @hybrid_property
     def current_rank(self):
         """Calculate current rank for new Pointings.

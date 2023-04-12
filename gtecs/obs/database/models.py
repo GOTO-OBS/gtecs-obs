@@ -2435,12 +2435,12 @@ class Telescope(Base):
     # Foreign relationships
     site = relationship(
         'Site',
-        order_by='Site.db_id',
+        uselist=False,
         back_populates='telescopes',
     )
     grid = relationship(
         'Grid',
-        order_by='Grid.db_id',
+        uselist=False,
         back_populates='telescopes',
     )
     pointings = relationship(

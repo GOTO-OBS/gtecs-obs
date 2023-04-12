@@ -513,27 +513,34 @@ def get_pointing_info(pointing_id):
         if survey is not None:
             pointing_info['survey_id'] = survey.db_id
             pointing_info['survey_name'] = survey.name
-            pointing_info['skymap'] = survey.skymap
         else:
             pointing_info['survey_id'] = None
             pointing_info['survey_name'] = None
-            pointing_info['skymap'] = None
 
-        # Get Event info
-        # # TODO: HOW DO WE GET THIS FOR THE HEADERS NOW THAT EVENTS ARE IN THE ALERTDB?
-        # event = pointing.event
-        # if event is not None:
-        #     pointing_info['event_id'] = event.db_id
-        #     pointing_info['event_name'] = event.name
-        #     pointing_info['event_source'] = event.source
-        #     pointing_info['event_type'] = event.type
-        #     pointing_info['event_time'] = event.time
-        # else:
-        #     pointing_info['event_id'] = None
-        #     pointing_info['event_name'] = None
-        #     pointing_info['event_source'] = None
-        #     pointing_info['event_type'] = None
-        #     pointing_info['event_time'] = None
+        # Try to get details from the alertdb
+        # Because we import it in __init__, the backrefs should work
+        try:
+            # Get Notice info
+            notice = pointing.target.notice
+            pointing_info['notice_id'] = notice.db_id
+            pointing_info['notice_ivorn'] = notice.ivorn
+            pointing_info['notice_time'] = notice.received
+            # Get Event info
+            event = notice.event
+            pointing_info['event_id'] = event.db_id
+            pointing_info['event_name'] = event.name
+            pointing_info['event_type'] = event.type
+            pointing_info['event_origin'] = event.origin
+            pointing_info['event_time'] = event.time
+        except Exception:
+            pointing_info['notice_id'] = None
+            pointing_info['notice_ivorn'] = None
+            pointing_info['notice_time'] = None
+            pointing_info['event_id'] = None
+            pointing_info['event_name'] = None
+            pointing_info['event_type'] = None
+            pointing_info['event_origin'] = None
+            pointing_info['event_time'] = None
 
     return pointing_info
 

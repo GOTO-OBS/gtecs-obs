@@ -42,7 +42,7 @@ def run(overwrite=False, add_defaults=False, verbose=False):
         # Create the default user (NB no password)
         print('Creating default user...')
         user = db.User('default', '', 'Default user')
-        with db.open_session() as session:
+        with db.session_manager() as session:
             session.add(user)
 
         # Add in default GOTO sites and telescopes

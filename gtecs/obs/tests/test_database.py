@@ -12,7 +12,7 @@ from gtecs.obs import database as db
 
 
 # add a user
-with db.open_session() as session:
+with db.session_manager() as session:
     # create a test user
     user = db.User(username='test_user', password='password', full_name='GOTO Test Observer')
     print(user)
@@ -25,7 +25,7 @@ with db.open_session() as session:
         raise ValueError('Failed to validate user')
 
 print('-------')
-with db.open_session() as session:
+with db.session_manager() as session:
     # create a site
     si = db.Site.from_name('LaPalma')
 
@@ -63,7 +63,7 @@ with db.open_session() as session:
 time.sleep(2)
 
 print('-------')
-with db.open_session() as session:
+with db.session_manager() as session:
     user = db.get_user(session, username='test_user')
 
     # let's make an Target with ExposureSets in different filters
@@ -98,7 +98,7 @@ with db.open_session() as session:
     print(B, end='\n\n')
 
 print('-------')
-with db.open_session() as session:
+with db.session_manager() as session:
     user = db.get_user(session, username='test_user')
 
     # new session, add random targets
@@ -130,7 +130,7 @@ with db.open_session() as session:
 time.sleep(2)
 
 print('-------')
-with db.open_session() as session:
+with db.session_manager() as session:
     def print_summary(target, now):
         """Print a summary of the database."""
         print(now, end=' ')
@@ -208,7 +208,7 @@ print('-------')
 now = Time('2020-01-01 00:00')
 
 # First create a new, basic Target
-with db.open_session() as session:
+with db.session_manager() as session:
     user = db.get_user(session, username='test_user')
 
     # Let's make an Target with ExposureSets in different filters
@@ -236,7 +236,7 @@ with db.open_session() as session:
 
 # ~~~~~~~~~~~
 # The first pointing should have been created and be pending
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()
@@ -253,7 +253,7 @@ with db.open_session() as session:
 now = Time('2020-01-01 00:10')
 db.mark_pointing_running(pointing_id, telescope_id=1, time=now)
 
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()
@@ -269,7 +269,7 @@ with db.open_session() as session:
 now = Time('2020-01-01 00:15')
 db.mark_pointing_completed(pointing_id, time=now)
 
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()
@@ -293,7 +293,7 @@ with db.open_session() as session:
 now = Time('2020-01-01 01:20')
 db.mark_pointing_running(pointing_id, telescope_id=1, time=now)
 
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()
@@ -309,7 +309,7 @@ with db.open_session() as session:
 now = Time('2020-01-01 01:23')
 db.mark_pointing_interrupted(pointing_id, time=now)
 
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()
@@ -333,7 +333,7 @@ with db.open_session() as session:
 now = Time('2020-01-01 01:25')
 db.mark_pointing_running(pointing_id, telescope_id=1, time=now)
 
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()
@@ -349,7 +349,7 @@ with db.open_session() as session:
 now = Time('2020-01-01 01:30')
 db.mark_pointing_completed(pointing_id, time=now)
 
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()
@@ -370,7 +370,7 @@ with db.open_session() as session:
 now = Time('2020-01-01 01:35')
 db.mark_pointing_failed(pointing_id, time=now, delay=3600)
 
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()
@@ -393,7 +393,7 @@ with db.open_session() as session:
 # Finally let's wait for a day so the last Target should have expired
 now = Time('2020-01-02 01:35')
 
-with db.open_session() as session:
+with db.session_manager() as session:
     target = db.get_target_by_id(session, target_id)
     print(now, target.status_at_time(now), [p.status_at_time(now) for p in target.pointings])
     print()

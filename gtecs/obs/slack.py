@@ -40,7 +40,7 @@ def send_slack_msg(text, channel=None, *args, **kwargs):
 def send_database_report(slack_channel=None):
     """Send a Slack message containing the pending pointings in the database."""
     attachments = []
-    with db.open_session() as session:
+    with db.session_manager() as session:
         pointings = session.query(db.Pointing).filter(db.Pointing.status == 'pending').all()
         msg = '*There are {} pending pointings in the database*'.format(len(pointings))
 
@@ -122,7 +122,7 @@ def send_observation_report(date=None, location=None, alt_limit=30, sun_limit=-1
     midday_yesterday = datetime.datetime.strptime(date + ' 12:00:00', '%Y-%m-%d %H:%M:%S')
     midday_today = midday_yesterday + datetime.timedelta(days=1)
 
-    with db.open_session() as session:
+    with db.session_manager() as session:
         # Get the current grid from the database and create a SkyGrid
         db_grid = db.get_current_grid(session)
         grid = db_grid.skygrid
@@ -205,7 +205,7 @@ def send_observation_report(date=None, location=None, alt_limit=30, sun_limit=-1
         if n_obs_allsky > 0:
             msg = 'All-sky survey coverage plot'
 
-            with db.open_session() as session:
+            with db.session_manager() as session:
                 # Get the current survey from the database
                 db_grid = db.get_current_grid(session)
                 db_survey = db_grid.surveys[0]

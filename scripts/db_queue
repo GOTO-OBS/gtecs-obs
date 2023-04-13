@@ -149,7 +149,7 @@ if __name__ == '__main__':
         now = Time.now()
         if len(telescopes) > 1:
             raise ValueError('Cannot use --sunalt flag with multiple telescopes')  # TODO: per site?
-        with db.open_session() as session:
+        with db.session_manager() as session:
             t = db.get_telescope_by_id(session, telescopes[0])
             observer = Observer(t.site.location)
             if observer.sun_altaz(now).alt > sunalt:

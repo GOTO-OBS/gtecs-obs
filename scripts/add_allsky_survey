@@ -67,7 +67,7 @@ def fill_exposure_set():
 
 def run():
     """Create the targets and add them to the database."""
-    with db.open_session() as session:
+    with db.session_manager() as session:
         # Get default User
         user = db.get_user(session, username='default')
 

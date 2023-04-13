@@ -235,7 +235,7 @@ class Scheduler:
 
     def _pilot_heartbeat(self, check_time):
         """Keep track of if we loose connection to any of the telescopes during the night."""
-        with db.open_session() as session:
+        with db.session_manager() as session:
             for telescope_id in self.telescopes:
                 # Check how long it's been since we had a query from this telescope.
                 if self.pilot_query_time[telescope_id] is None:
@@ -264,7 +264,7 @@ class Scheduler:
     def _caretaker(self, check_time):
         """Monitor the database and update any Pointings."""
         database_updated = False
-        with db.open_session() as session:
+        with db.session_manager() as session:
             # Process any Pointings that need updating
             while len(self.update_queue) > 0:
                 pointing = self.update_queue.pop()

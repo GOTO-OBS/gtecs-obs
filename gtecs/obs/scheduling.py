@@ -304,7 +304,7 @@ class PointingQueue:
         if hourangle_limit is None:
             hourangle_limit = params.HARD_HA_LIM
 
-        with db.open_session() as session:
+        with db.session_manager() as session:
             # Get the site
             site = db.get_site_by_id(session, site_id)
 

@@ -230,7 +230,7 @@ def write_queue_page(queue, queue_file_path, html_path):
             db_id = pointing_info[0]
 
             # find database info
-            with db.open_session() as session:
+            with db.session_manager() as session:
                 pointing = db.get_pointing_by_id(session, db_id)
                 if pointing.exposure_sets is not None:
                     exposure_sets = pointing.exposure_sets

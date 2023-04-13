@@ -17,7 +17,7 @@ from astropy import units as u
 from astropy.coordinates import Longitude
 from astropy.time import Time
 
-from gtecs.common.database import get_session
+from gtecs.common.database import get_session as get_session_common
 
 from sqlalchemy import or_
 
@@ -25,7 +25,7 @@ from .models import ExposureSet, Grid, GridTile, Pointing, Site, Target, Telesco
 from .. import params
 
 
-__all__ = ['open_session',
+__all__ = ['get_session', 'session_manager',
            'get_user', 'validate_user',
            'get_pointings', 'get_pointing_by_id', 'get_pending_pointings', 'get_current_pointing',
            'mark_pointing_running', 'mark_pointing_completed', 'mark_pointing_interrupted',
@@ -39,25 +39,48 @@ __all__ = ['open_session',
            ]
 
 
-@contextmanager
-def open_session():
-    """Create a session context manager connection to the database.
+def get_session(user=None, password=None, host=None, dialect=None, echo=None, pool_pre_ping=None):
+    """Create a database connection session.
 
-    All arguments passed to `get_session()` are taken from `gtecs.obs.params`.
+    All arguments are passed to `gtecs.common.database.get_session()`,
+    with the defaults taken from the module parameters.
+
+    Note it is generally better to use the session_manager() context manager,
+    which will automatically commit or rollback changes when done.
     """
-    if params.DATABASE_DIALECT == 'mysql':
+    # This means the user doesn't need to worry about the params, but can overwrite if needed.
+    if user is None:
+        user = params.DATABASE_USER
+    if password is None:
+        password = params.DATABASE_PASSWORD
+    if host is None:
+        host = params.DATABASE_HOST
+    if dialect is None:
+        dialect = params.DATABASE_DIALECT
+    if dialect == 'mysql':
         db_name = 'gtecs_obs'
     else:
         db_name = 'gtecs'  # We don't need the schema name for the postgres connection
-    session = get_session(
-        user=params.DATABASE_USER,
-        password=params.DATABASE_PASSWORD,
+    if echo is None:
+        echo = params.DATABASE_ECHO
+    if pool_pre_ping is None:
+        pool_pre_ping = params.DATABASE_PRE_PING
+    session = get_session_common(
+        user=user,
+        password=password,
         db_name=db_name,
-        host=params.DATABASE_HOST,
-        dialect=params.DATABASE_DIALECT,
-        echo=params.DATABASE_ECHO,
-        pool_pre_ping=params.DATABASE_PRE_PING,
+        host=host,
+        dialect=dialect,
+        echo=echo,
+        pool_pre_ping=pool_pre_ping,
     )
+    return session
+
+
+@contextmanager
+def session_manager(**kwargs):
+    """Create a session context manager connection to the database."""
+    session = get_session(**kwargs)
     try:
         yield session
         session.commit()
@@ -110,7 +133,7 @@ def validate_user(username, password):
         True if the user exists and the password is correct
 
     """
-    with open_session() as session:
+    with session_manager() as session:
         user = get_user(session, username)
         return user.password_hash == hashlib.sha512(password.encode()).hexdigest()
 
@@ -300,7 +323,7 @@ def mark_pointing_running(pointing_id, telescope_id, time=None):
         If given, the time to mark the Pointing as interrupted at.
 
     """
-    with open_session() as session:
+    with session_manager() as session:
         pointing = get_pointing_by_id(session, pointing_id)
         telescope = get_telescope_by_id(session, telescope_id)
         pointing.mark_running(telescope, time=time)
@@ -323,7 +346,7 @@ def mark_pointing_completed(pointing_id, schedule_next=True, time=None):
         If given, the time to mark the Pointing as completed at.
 
     """
-    with open_session() as session:
+    with session_manager() as session:
         pointing = get_pointing_by_id(session, pointing_id)
         pointing.mark_finished(completed=True, time=time)
         session.commit()
@@ -355,7 +378,7 @@ def mark_pointing_interrupted(pointing_id, schedule_next=True, delay=None, time=
         If given, the time to mark the Pointing as interrupted at.
 
     """
-    with open_session() as session:
+    with session_manager() as session:
         pointing = get_pointing_by_id(session, pointing_id)
         pointing.mark_finished(completed=False, time=time)
         session.commit()
@@ -379,7 +402,7 @@ def mark_pointing_confirmed(pointing_id, time=None):
         If given, the time to mark the Pointing as interrupted at.
 
     """
-    with open_session() as session:
+    with session_manager() as session:
         pointing = get_pointing_by_id(session, pointing_id)
         pointing.mark_validated(good=True, time=time)
         session.commit()
@@ -405,7 +428,7 @@ def mark_pointing_failed(pointing_id, schedule_next=True, delay=None, time=None)
         If given, the time to mark the Pointing as failed at.
 
     """
-    with open_session() as session:
+    with session_manager() as session:
         pointing = get_pointing_by_id(session, pointing_id)
         pointing.mark_validated(good=False, time=time)
         session.commit()
@@ -431,7 +454,7 @@ def get_pointing_info(pointing_id):
     """
     pointing_info = {}
 
-    with open_session() as session:
+    with session_manager() as session:
         # Get the Pointing from the database
         pointing = get_pointing_by_id(session, pointing_id)
 
@@ -649,7 +672,7 @@ def get_telescope_by_id(session, telescope_id):
 def get_telescope_info():
     """Get the key info on all the telescopes defined in the database."""
     data = {}
-    with open_session() as session:
+    with session_manager() as session:
         telescopes = session.query(Telescope).all()
         for telescope in telescopes:
             tel_data = {}
@@ -690,7 +713,7 @@ def get_site_by_id(session, site_id):
 def get_site_info(site_id=None):
     """Get the key info on one or all of the sites and telescopes defined in the database."""
     data = {}
-    with open_session() as session:
+    with session_manager() as session:
         sites = session.query(Site).all()
         for site in sites:
             site_data = {}

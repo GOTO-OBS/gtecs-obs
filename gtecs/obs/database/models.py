@@ -15,9 +15,8 @@ from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, St
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.mysql import TIMESTAMP
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
-from sqlalchemy.orm import column_property, relationship, validates
+from sqlalchemy.orm import column_property, declarative_base, relationship, validates
 from sqlalchemy.sql import and_, case, or_
 
 from .. import params
@@ -641,22 +640,22 @@ class Pointing(Base):
     @status.expression
     def status(self):
         time = datetime.datetime.utcnow()
-        return case([(and_(self.running_time.is_(None), self.finished_time.isnot(None)),
-                      'deleted'),
-                     (and_(self.running_time.isnot(None), self.finished_time.is_(None)),
-                      'running'),
-                     (and_(self.validated_time.isnot(None), self.valid.is_(False)),
-                      'failed'),
-                     (and_(self.finished_time.isnot(None), self.completed.is_(True)),
-                      'completed'),
-                     (and_(self.finished_time.isnot(None), self.completed.is_(False)),
-                      'interrupted'),
-                     (time < self.start_time,
-                      'upcoming'),
-                     (and_(self.stop_time.isnot(None), time > self.stop_time),
-                      'expired'),
-                     ],
-                    else_='pending')
+        return case(
+            (and_(self.running_time.is_(None), self.finished_time.isnot(None)),
+             'deleted'),
+            (and_(self.running_time.isnot(None), self.finished_time.is_(None)),
+             'running'),
+            (and_(self.validated_time.isnot(None), self.valid.is_(False)),
+             'failed'),
+            (and_(self.finished_time.isnot(None), self.completed.is_(True)),
+             'completed'),
+            (and_(self.finished_time.isnot(None), self.completed.is_(False)),
+             'interrupted'),
+            (time < self.start_time,
+             'upcoming'),
+            (and_(self.stop_time.isnot(None), time > self.stop_time),
+             'expired'),
+            else_='pending')
 
     @hybrid_method
     def status_at_time(self, time):
@@ -702,29 +701,34 @@ class Pointing(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        c = case([(time < self.creation_time,
-                   None),
-                  (and_(self.running_time.is_(None), self.finished_time.isnot(None),
-                        time >= self.finished_time),
-                   'deleted'),
-                  (and_(self.running_time.isnot(None), time >= self.running_time,
-                        or_(self.finished_time.is_(None), time < self.finished_time)),
-                   'running'),
-                  (and_(self.validated_time.isnot(None), time >= self.validated_time,
-                        self.valid.is_(False)),
-                   'failed'),
-                  (and_(self.finished_time.isnot(None), time >= self.finished_time,
-                        self.completed.is_(True)),
-                   'completed'),
-                  (and_(self.finished_time.isnot(None), time >= self.finished_time,
-                        self.completed.is_(False)),
-                   'interrupted'),
-                  (time < self.start_time,
-                   'upcoming'),
-                  (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                   'expired'),
-                  ],
-                 else_='pending')
+        c = case(
+            (time < self.creation_time,
+             None),
+            (and_(self.running_time.is_(None),
+                  self.finished_time.isnot(None),
+                  time >= self.finished_time),
+             'deleted'),
+            (and_(self.running_time.isnot(None),
+                  time >= self.running_time,
+                  or_(self.finished_time.is_(None), time < self.finished_time)),
+             'running'),
+            (and_(self.validated_time.isnot(None),
+                  time >= self.validated_time,
+                  self.valid.is_(False)),
+             'failed'),
+            (and_(self.finished_time.isnot(None),
+                  time >= self.finished_time,
+                  self.completed.is_(True)),
+             'completed'),
+            (and_(self.finished_time.isnot(None),
+                  time >= self.finished_time,
+                  self.completed.is_(False)),
+             'interrupted'),
+            (time < self.start_time,
+             'upcoming'),
+            (and_(self.stop_time.isnot(None), time >= self.stop_time),
+             'expired'),
+            else_='pending')
         return c
 
     @property
@@ -1040,7 +1044,7 @@ class Strategy(Base):
     )
 
     # Column properties
-    num_completed = column_property(select([func.count(Pointing.db_id)])
+    num_completed = column_property(select(func.count(Pointing.db_id))
                                     .where(and_(Pointing.strategy_id == db_id,
                                                 Pointing.status == 'completed',
                                                 )
@@ -1146,7 +1150,7 @@ class Strategy(Base):
 
     # @num_completed.expression
     # def num_completed(self):
-    #     return select([func.count(Pointing.db_id)]).\
+    #     return select(func.count(Pointing.db_id)).\
     #         where(and_(Pointing.strategy_id == self.db_id,
     #                    Pointing.status == 'completed',
     #                    )).scalar_subquery()
@@ -1162,7 +1166,7 @@ class Strategy(Base):
     def num_completed_at_time(self, time):
         if time is None:
             return self.num_completed
-        return select([func.count(Pointing.db_id)]).\
+        return select(func.count(Pointing.db_id)).\
             where(and_(Pointing.strategy_id == self.db_id,
                        Pointing.status_at_time(time) == 'completed',
                        )).scalar_subquery()
@@ -1183,7 +1187,7 @@ class Strategy(Base):
 
     @num_remaining.expression
     def num_remaining(self):
-        return case([(self.infinite, -1)],
+        return case((self.infinite, -1),
                     else_=self.num_todo - self.num_completed)
 
     @hybrid_method
@@ -1203,7 +1207,7 @@ class Strategy(Base):
     def num_remaining_at_time(self, time):
         if time is None:
             return self.num_remaining
-        return case([(self.infinite, -1)],
+        return case((self.infinite, -1),
                     else_=self.num_todo - self.num_completed_at_time(time))
 
     @hybrid_property
@@ -1223,11 +1227,8 @@ class Strategy(Base):
     @finished.expression
     def finished(self):
         time = datetime.datetime.utcnow()
-        return case([(self.num_remaining == 0,
-                      True),
-                     (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                      True),
-                     ],
+        return case((self.num_remaining == 0, True),
+                    (and_(self.stop_time.isnot(None), time >= self.stop_time), True),
                     else_=False)
 
     @hybrid_method
@@ -1251,11 +1252,8 @@ class Strategy(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        c = case([(self.num_remaining_at_time(time) == 0,
-                   True),
-                  (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                   True),
-                  ],
+        c = case((self.num_remaining_at_time(time) == 0, True),
+                 (and_(self.stop_time.isnot(None), time >= self.stop_time), True),
                  else_=False)
         return c
 
@@ -1289,7 +1287,7 @@ class Strategy(Base):
 
     @tel_is_valid.expression
     def tel_is_valid(self, telescope_id):
-        return case([(self.tel_mask.is_(None), True)],
+        return case((self.tel_mask.is_(None), True),
                     else_=self.tel_mask.op('&', precedence=2, is_comparison=True)(1)
                                        .op('<<', precedence=1)(telescope_id - 1)
                     )
@@ -1673,7 +1671,7 @@ class Target(Base):
                                        )
                                 .correlate_except(Pointing)
                                 )
-    num_completed = column_property(select([func.count(Pointing.db_id)])
+    num_completed = column_property(select(func.count(Pointing.db_id))
                                     .where(and_(Pointing.target_id == db_id,
                                                 Pointing.status == 'completed',
                                                 )
@@ -1681,7 +1679,7 @@ class Target(Base):
                                     .correlate_except(Pointing)
                                     .scalar_subquery()
                                     )
-    last_observed = column_property(select([Pointing.finished_time])
+    last_observed = column_property(select(Pointing.finished_time)
                                     .where(and_(Pointing.target_id == db_id,
                                                 Pointing.status == 'completed',
                                                 )
@@ -1692,7 +1690,6 @@ class Target(Base):
                                     .scalar_subquery()
                                     )
     # Have to invert and return if any are incomplete, no way to do all()
-    # Also note we need to use text() because Strategies aren't defined yet
     completed = column_property(~exists()
                                 .where(and_(Strategy.target_id == db_id,
                                             Strategy.finished.is_(False),
@@ -1827,7 +1824,7 @@ class Target(Base):
 
     # @num_completed.expression
     # def num_completed(self):
-    #     return select([func.count(Pointing.db_id)]).\
+    #     return select(func.count(Pointing.db_id)).\
     #         where(and_(Pointing.target_id == self.db_id,
     #                    Pointing.status == 'completed',
     #                    )).scalar_subquery()
@@ -1843,7 +1840,7 @@ class Target(Base):
     def num_completed_at_time(self, time):
         if time is None:
             return self.num_completed
-        return select([func.count(Pointing.db_id)]).\
+        return select(func.count(Pointing.db_id)).\
             where(and_(Pointing.target_id == self.db_id,
                        Pointing.status_at_time(time) == 'completed',
                        )).scalar_subquery()
@@ -1919,18 +1916,18 @@ class Target(Base):
     @status.expression
     def status(self):
         time = datetime.datetime.utcnow()
-        return case([(self.deleted_time.isnot(None),
-                      'deleted'),
-                     (self.completed,
-                      'completed'),
-                     (and_(self.start_time.isnot(None), time < self.start_time),
-                      'upcoming'),
-                     (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                      'expired'),
-                     (self.scheduled.is_(False),
-                      'unscheduled'),
-                     ],
-                    else_='scheduled')
+        return case(
+            (self.deleted_time.isnot(None),
+             'deleted'),
+            (self.completed,
+             'completed'),
+            (and_(self.start_time.isnot(None), time < self.start_time),
+             'upcoming'),
+            (and_(self.stop_time.isnot(None), time >= self.stop_time),
+             'expired'),
+            (self.scheduled.is_(False),
+             'unscheduled'),
+            else_='scheduled')
 
     @hybrid_method
     def status_at_time(self, time):
@@ -1967,20 +1964,20 @@ class Target(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        c = case([(time < self.creation_time,
-                   None),
-                  (and_(self.deleted_time.isnot(None), time >= self.deleted_time),
-                   'deleted'),
-                  (self.completed_at_time(time),
-                   'completed'),
-                  (and_(self.start_time.isnot(None), time < self.start_time),
-                   'upcoming'),
-                  (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                   'expired'),
-                  (self.scheduled_at_time(time).is_(False),
-                   'unscheduled'),
-                  ],
-                 else_='scheduled')
+        c = case(
+            (time < self.creation_time,
+             None),
+            (and_(self.deleted_time.isnot(None), time >= self.deleted_time),
+             'deleted'),
+            (self.completed_at_time(time),
+             'completed'),
+            (and_(self.start_time.isnot(None), time < self.start_time),
+             'upcoming'),
+            (and_(self.stop_time.isnot(None), time >= self.stop_time),
+             'expired'),
+            (self.scheduled_at_time(time).is_(False),
+             'unscheduled'),
+            else_='scheduled')
         return c
 
     def mark_deleted(self, time=None):
@@ -2029,9 +2026,8 @@ class Target(Base):
 
     @current_rank.expression
     def current_rank(self):
-        return case([(and_(self.rank.isnot(None), self.rank_decay.is_(True)),
-                      self.rank + 10 * self.num_completed),
-                     ],
+        return case((and_(self.rank.isnot(None), self.rank_decay.is_(True)),
+                     self.rank + 10 * self.num_completed),
                     else_=self.rank)
 
     @hybrid_method
@@ -2058,9 +2054,8 @@ class Target(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        return case([(and_(self.rank.isnot(None), self.rank_decay.is_(True)),
-                      self.rank + 10 * self.num_completed_at_time(time)),
-                     ],
+        return case((and_(self.rank.isnot(None), self.rank_decay.is_(True)),
+                     self.rank + 10 * self.num_completed_at_time(time)),
                     else_=self.rank)
 
     def get_current_strategy(self, time=None):
@@ -2477,7 +2472,7 @@ class Telescope(Base):
 
     @status.expression
     def status(self):
-        return case([(self.current_pointing.isnot(None), 'observing')],
+        return case((self.current_pointing.isnot(None), 'observing'),
                     else_='idle')
 
     @property
@@ -2755,7 +2750,7 @@ class GridTile(Base):
     )
 
     # Column properties
-    last_observed = column_property(select([Target.last_observed])
+    last_observed = column_property(select(Target.last_observed)
                                     .where(Target.grid_tile_id == db_id,
                                            )
                                     .order_by(Target.last_observed.desc())

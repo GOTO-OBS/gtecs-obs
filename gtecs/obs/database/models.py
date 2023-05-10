@@ -191,7 +191,7 @@ class ExposureSet(Base):
     ut_mask = Column(Integer, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
+    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -416,10 +416,10 @@ class Pointing(Base):
     validated_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=False)
-    time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=False)
-    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
-    telescope_id = Column(Integer, ForeignKey('telescopes.id'), nullable=True)
+    target_id = Column(Integer, ForeignKey('targets.id'), nullable=False, index=True)
+    time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=False, index=True)
+    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False, index=True)
+    telescope_id = Column(Integer, ForeignKey('telescopes.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -1016,7 +1016,7 @@ class Strategy(Base):
     tel_mask = Column(Integer, nullable=True, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
+    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -1141,7 +1141,7 @@ class Strategy(Base):
         """Return True if the number of Pointings to generate is infinite."""
         return self.num_todo < 0
 
-    # These have been replaced by a column property, which is a lot faster
+    # Replaced with a column property:
 
     # @hybrid_property
     # def num_completed(self):
@@ -1390,7 +1390,7 @@ class TimeBlock(Base):
     valid_time = Column(Float, nullable=True)
 
     # Foreign keys
-    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
+    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -1596,9 +1596,9 @@ class Target(Base):
     deleted_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True)
-    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True, index=True)
+    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -1780,7 +1780,7 @@ class Target(Base):
 
         return value
 
-    # These have been replaced by a column property, which is a lot faster
+    # Replaced with a column property:
 
     # @hybrid_property
     # def scheduled(self):
@@ -1815,7 +1815,7 @@ class Target(Base):
                                        )
                                    ))
 
-    # These have been replaced by a column property, which is a lot faster
+    # Replaced with a column property:
 
     # @hybrid_property
     # def num_completed(self):
@@ -1845,7 +1845,7 @@ class Target(Base):
                        Pointing.status_at_time(time) == 'completed',
                        )).scalar_subquery()
 
-    # These have been replaced by a column property, which is a lot faster
+    # Replaced with a column property:
 
     # @hybrid_property
     # def completed(self):
@@ -2420,8 +2420,8 @@ class Telescope(Base):
     horizon = Column(Text, nullable=True)
 
     # Foreign keys
-    site_id = Column(Integer, ForeignKey('sites.id'), nullable=False)
-    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=True)
+    site_id = Column(Integer, ForeignKey('sites.id'), nullable=False, index=True)
+    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -2716,7 +2716,7 @@ class GridTile(Base):
     dec = Column(Float, nullable=False)
 
     # Foreign keys
-    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
+    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':

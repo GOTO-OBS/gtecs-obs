@@ -182,28 +182,25 @@ class Pointing:
         stop_time = db_pointing.stop_time
 
         # Get linked Target properties
-        db_target = db_pointing.target
-        name = db_target.name
-        ra = db_target.ra
-        dec = db_target.dec
-        weight = db_target.weight
-        num_completed = db_target.num_completed
+        name = db_pointing.name
+        ra = db_pointing.ra
+        dec = db_pointing.dec
+        weight = db_pointing.weight
+        num_completed = db_pointing.target.num_completed
 
         # Get linked Strategy properties
-        db_strategy = db_pointing.strategy
-        too = db_strategy.too
-        min_time = db_strategy.min_time
-        max_sunalt = db_strategy.max_sunalt
-        min_alt = db_strategy.min_alt
-        max_moon = db_strategy.max_moon
-        min_moonsep = db_strategy.min_moonsep
-        valid_telescopes = db_strategy.valid_telescopes
+        too = db_pointing.too
+        min_time = db_pointing.min_time
+        max_sunalt = db_pointing.max_sunalt
+        min_alt = db_pointing.min_alt
+        max_moon = db_pointing.max_moon
+        min_moonsep = db_pointing.min_moonsep
+        valid_telescopes = db_pointing.strategy.valid_telescopes
 
         # Get linked GridTile properties
-        if db_strategy.requires_template:
-            db_grid_tile = db_pointing.grid_tile
-            if db_grid_tile is not None:
-                template_telescopes = db_grid_tile.get_template_telescopes()
+        if db_pointing.requires_template:
+            if db_pointing.grid_tile is not None:
+                template_telescopes = db_pointing.grid_tile.get_template_telescopes()
             else:
                 template_telescopes = []
         else:
@@ -211,7 +208,7 @@ class Pointing:
 
         # Get linked ExposureSet properties
         # (from target not pointing, it's much quicker!)
-        exp_sets = [(es.num_exp, es.exptime) for es in db_target.exposure_sets]
+        exp_sets = [(es.num_exp, es.exptime) for es in db_pointing.exposure_sets]
 
         # Create Pointing object
         pointing = cls(db_id=db_id,

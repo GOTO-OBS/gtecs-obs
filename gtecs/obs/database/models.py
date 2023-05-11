@@ -438,7 +438,6 @@ class Pointing(Base):
     time_block = relationship(
         'TimeBlock',
         order_by='TimeBlock.db_id',
-        lazy='joined',
         back_populates='pointings',
     )
     strategy = relationship(
@@ -450,7 +449,6 @@ class Pointing(Base):
     telescope = relationship(
         'Telescope',
         order_by='Telescope.db_id',
-        lazy='joined',
         back_populates='pointings',
     )
 
@@ -458,6 +456,7 @@ class Pointing(Base):
     exposure_sets = relationship(
         'ExposureSet',
         order_by='ExposureSet.db_id',
+        lazy='joined',
         secondary=f'{Base.metadata.schema}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='ExposureSet.target_id == Target.db_id',
@@ -468,7 +467,6 @@ class Pointing(Base):
     grid_tile = relationship(
         'GridTile',
         order_by='GridTile.db_id',
-        lazy='joined',
         secondary=f'{Base.metadata.schema}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='GridTile.db_id == Target.grid_tile_id',
@@ -480,7 +478,6 @@ class Pointing(Base):
     survey = relationship(
         'Survey',
         order_by='Survey.db_id',
-        lazy='joined',
         secondary=f'{Base.metadata.schema}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='Survey.db_id == Target.survey_id',
@@ -1039,7 +1036,6 @@ class Strategy(Base):
     time_blocks = relationship(
         'TimeBlock',
         order_by='TimeBlock.db_id',
-        lazy='joined',
         back_populates='strategy',
     )
 
@@ -1612,37 +1608,31 @@ class Target(Base):
     user = relationship(
         'User',
         order_by='User.db_id',
-        lazy='joined',
         back_populates='targets',
     )
     pointings = relationship(
         'Pointing',
         order_by='Pointing.db_id',
-        lazy='joined',
         back_populates='target',
     )
     exposure_sets = relationship(
         'ExposureSet',
         order_by='ExposureSet.db_id',
-        lazy='joined',
         back_populates='target',
     )
     strategies = relationship(
         'Strategy',
         order_by='Strategy.db_id',
-        lazy='joined',
         back_populates='target',
     )
     grid_tile = relationship(
         'GridTile',
         order_by='GridTile.db_id',
-        lazy='joined',
         back_populates='targets',
     )
     survey = relationship(
         'Survey',
         order_by='Survey.db_id',
-        lazy='joined',
         back_populates='targets',
     )
 
@@ -1650,7 +1640,6 @@ class Target(Base):
     grid = relationship(
         'Grid',
         order_by='Grid.db_id',
-        lazy='joined',
         secondary=f'{Base.metadata.schema}.grid_tiles',
         primaryjoin='Target.grid_tile_id == GridTile.db_id',
         secondaryjoin='Grid.db_id == GridTile.grid_id',

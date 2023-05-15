@@ -106,15 +106,15 @@ if __name__ == '__main__':
                             help='Time to check the queue at (default=Now)')
     time_group.add_argument('-s', '--sunalt', default=None,
                             help='Sun altitude to check the queue at (next)')
-    parser.add_argument('-H', '--horizon', type=int, default=1,
-                        help='Telescope horizon number to use (default=1)')
+    parser.add_argument('-H', '--horizon', type=int, default=0,
+                        help='Telescope horizon number to use (default=%(default)d)')
     parser.add_argument('-r', '--readout-time', type=int, default=params.READOUT_TIME,
-                        help='The expected time between each exposure')
+                        help='The expected time between each exposure (default=%(default)d)')
     parser.add_argument('-p', '--templates', type=str, default=params.TEMPLATE_REQUIREMENT,
-                        help='Requirement for templates (ANY/SITE/TELESCOPE)')
+                        help='Requirement for templates <ANY|SITE|TELESCOPE> (default=%(default)s)')
     lines_group = parser.add_mutually_exclusive_group()
-    lines_group.add_argument('-n', '--lines', type=int,
-                             help='Number of lines to print (default=20)')
+    lines_group.add_argument('-n', '--lines', type=int, default=5,
+                             help='Number of lines to print per telescope (default=%(default)d)')
     lines_group.add_argument('-a', '--all', action='store_true', default=False,
                              help='Print all items in the queue')
     args = parser.parse_args()
@@ -163,6 +163,7 @@ if __name__ == '__main__':
     time.precision = 0
 
     # Get queue params
+    # TODO - could we show both horizons somehow?
     horizon = args.horizon
     readout_time = args.readout_time
     template_requirement = args.templates
@@ -172,8 +173,6 @@ if __name__ == '__main__':
         limit = -1
     elif args.lines:
         limit = args.lines
-    else:
-        limit = int(20 / sum(len(t) for t in telescopes))
 
     for i, site_id in enumerate(sites):
         run(site_id, telescopes[i], time, horizon, readout_time, template_requirement, limit)

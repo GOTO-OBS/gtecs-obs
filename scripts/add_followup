@@ -25,7 +25,7 @@ EXPS_PARAMS = [{'num_exp': 3, 'exptime': 60, 'filt': 'L'},
 
 def run(name, coord):
     """Create the target and add it to the database."""
-    with db.open_session() as session:
+    with db.session_manager() as session:
         # Get the current grid
         db_grid = db.get_current_grid(session)
 

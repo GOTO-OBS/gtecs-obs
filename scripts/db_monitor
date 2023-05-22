@@ -30,7 +30,7 @@ if len(sys.argv) > 1:
 else:
     show_all = False
 
-with db.open_session() as session:
+with db.session_manager() as session:
     all_pointings = db.get_pointings(session)
     n_all = len(all_pointings)
     print('{} points in database'.format(n_all))

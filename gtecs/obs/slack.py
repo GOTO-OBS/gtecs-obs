@@ -4,7 +4,6 @@ import datetime
 import os
 from collections import Counter
 
-import astropy.units as u
 from astropy.coordinates import EarthLocation
 from astropy.time import Time
 
@@ -41,13 +40,13 @@ def send_slack_msg(text, channel=None, *args, **kwargs):
 def send_database_report(slack_channel=None):
     """Send a Slack message containing the pending pointings in the database."""
     attachments = []
-    with db.open_session() as session:
+    with db.session_manager() as session:
         pointings = session.query(db.Pointing).filter(db.Pointing.status == 'pending').all()
         msg = '*There are {} pending pointings in the database*'.format(len(pointings))
 
-        # Pending pointings that are associated with a non-event survey
+        # Pending pointings that are associated with a survey
         surveys = [pointing.survey for pointing in pointings
-                   if pointing.survey is not None and pointing.survey.event_id is None]
+                   if pointing.survey is not None]
         if len(surveys) > 0:
             # Print number of pointings and surveys
             survey_counter = Counter(surveys)
@@ -66,48 +65,14 @@ def send_database_report(slack_channel=None):
                 text += ', rank={}{}'.format(ranks[0], '+' if len(ranks) > 1 else '')
                 text += '_)\n'
         else:
-            title = '0 pointings from sky surveys'
+            title = '0 pointings from surveys'
             text = ''
         attach = {'fallback': title,
                   'text': title + text,
                   }
         attachments.append(attach)
 
-        # Pending pointings that are associated with an event survey
-        surveys = [pointing.survey for pointing in pointings
-                   if pointing.survey is not None and pointing.survey.event_id is not None]
-        if len(surveys) > 0:
-            # Print number of pointings and surveys
-            survey_counter = Counter(surveys)
-            title = '{} pointing{} from {} event follow-up survey{}:'.format(
-                len(surveys), 's' if len(surveys) != 1 else '',
-                len(survey_counter), 's' if len(survey_counter) != 1 else '')
-            # Print info for all surveys
-            text = '\n'
-            for survey, count in survey_counter.most_common():
-                text += '- `{}`'.format(survey.name)
-                text += ' (_'
-                text += '{} pointing{}'.format(count, 's' if count != 1 else '')
-                survey_pointings = [pointing for pointing in pointings
-                                    if pointing.survey == survey]
-                ranks = sorted({p.rank for p in survey_pointings})
-                text += ', rank={}{}'.format(ranks[0], '+' if len(ranks) > 1 else '')
-                text += '_)'
-                start_time = survey.mpointings[0].start_time
-                if start_time is not None:
-                    start_time = Time(start_time, format='datetime')
-                    event_age = (Time.now() - start_time)
-                    text += ' - {:.1f} hours since detection'.format(event_age.to(u.hour).value)
-                text += '\n'
-        else:
-            title = '0 pointings from event follow-up surveys'
-            text = ''
-        attach = {'fallback': title,
-                  'text': title + text,
-                  }
-        attachments.append(attach)
-
-        # Remaining pending pointings
+        # Other pending pointings
         objects = [pointing.object_name for pointing in pointings
                    if pointing.survey is None]
         if len(objects) > 0:
@@ -157,7 +122,7 @@ def send_observation_report(date=None, location=None, alt_limit=30, sun_limit=-1
     midday_yesterday = datetime.datetime.strptime(date + ' 12:00:00', '%Y-%m-%d %H:%M:%S')
     midday_today = midday_yesterday + datetime.timedelta(days=1)
 
-    with db.open_session() as session:
+    with db.session_manager() as session:
         # Get the current grid from the database and create a SkyGrid
         db_grid = db.get_current_grid(session)
         grid = db_grid.skygrid
@@ -240,7 +205,7 @@ def send_observation_report(date=None, location=None, alt_limit=30, sun_limit=-1
         if n_obs_allsky > 0:
             msg = 'All-sky survey coverage plot'
 
-            with db.open_session() as session:
+            with db.session_manager() as session:
                 # Get the current survey from the database
                 db_grid = db.get_current_grid(session)
                 db_survey = db_grid.surveys[0]

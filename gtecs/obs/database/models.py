@@ -15,17 +15,15 @@ from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, St
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.mysql import TIMESTAMP
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
-from sqlalchemy.orm import column_property, relationship, validates
+from sqlalchemy.orm import column_property, declarative_base, relationship, validates
 from sqlalchemy.sql import and_, case, or_
 
 from .. import params
 
 
 __all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
-           'Site', 'Telescope', 'Grid', 'GridTile',
-           'Survey', 'Event',
+           'Site', 'Telescope', 'Grid', 'GridTile', 'Survey',
            ]
 
 
@@ -193,7 +191,7 @@ class ExposureSet(Base):
     ut_mask = Column(Integer, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
+    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -330,8 +328,6 @@ class Pointing(Base):
         the GridTile the Target this Pointing was generated from covers, if any
     survey : `Survey`
         the Survey the Target this Pointing was generated from was part of, if any
-    event : `Event`
-        the Event the Target this Pointing was generated from was part of, if any
 
     The following proxy attributes are attributes of related classes, and are included
     as a useful shortcut (e.g. `pointing.ra` is the same as `pointing.target.ra`)
@@ -420,10 +416,10 @@ class Pointing(Base):
     validated_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=False)
-    time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=False)
-    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
-    telescope_id = Column(Integer, ForeignKey('telescopes.id'), nullable=True)
+    target_id = Column(Integer, ForeignKey('targets.id'), nullable=False, index=True)
+    time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=False, index=True)
+    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False, index=True)
+    telescope_id = Column(Integer, ForeignKey('telescopes.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -442,7 +438,6 @@ class Pointing(Base):
     time_block = relationship(
         'TimeBlock',
         order_by='TimeBlock.db_id',
-        lazy='joined',
         back_populates='pointings',
     )
     strategy = relationship(
@@ -454,7 +449,6 @@ class Pointing(Base):
     telescope = relationship(
         'Telescope',
         order_by='Telescope.db_id',
-        lazy='joined',
         back_populates='pointings',
     )
 
@@ -462,6 +456,7 @@ class Pointing(Base):
     exposure_sets = relationship(
         'ExposureSet',
         order_by='ExposureSet.db_id',
+        lazy='joined',
         secondary=f'{Base.metadata.schema}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='ExposureSet.target_id == Target.db_id',
@@ -472,7 +467,6 @@ class Pointing(Base):
     grid_tile = relationship(
         'GridTile',
         order_by='GridTile.db_id',
-        lazy='joined',
         secondary=f'{Base.metadata.schema}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='GridTile.db_id == Target.grid_tile_id',
@@ -484,7 +478,6 @@ class Pointing(Base):
     survey = relationship(
         'Survey',
         order_by='Survey.db_id',
-        lazy='joined',
         secondary=f'{Base.metadata.schema}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='Survey.db_id == Target.survey_id',
@@ -493,18 +486,6 @@ class Pointing(Base):
         uselist=False,
     )
     survey_id = association_proxy('survey', 'db_id')
-    event = relationship(
-        'Event',
-        order_by='Event.db_id',
-        lazy='joined',
-        secondary=f'{Base.metadata.schema}.targets',
-        primaryjoin='Pointing.target_id == Target.db_id',
-        secondaryjoin='Event.db_id == Target.event_id',
-        back_populates='pointings',
-        viewonly=True,
-        uselist=False,
-    )
-    event_id = association_proxy('event', 'db_id')
 
     # Proxy attributes
     name = association_proxy('target', 'name')
@@ -656,22 +637,22 @@ class Pointing(Base):
     @status.expression
     def status(self):
         time = datetime.datetime.utcnow()
-        return case([(and_(self.running_time.is_(None), self.finished_time.isnot(None)),
-                      'deleted'),
-                     (and_(self.running_time.isnot(None), self.finished_time.is_(None)),
-                      'running'),
-                     (and_(self.validated_time.isnot(None), self.valid.is_(False)),
-                      'failed'),
-                     (and_(self.finished_time.isnot(None), self.completed.is_(True)),
-                      'completed'),
-                     (and_(self.finished_time.isnot(None), self.completed.is_(False)),
-                      'interrupted'),
-                     (time < self.start_time,
-                      'upcoming'),
-                     (and_(self.stop_time.isnot(None), time > self.stop_time),
-                      'expired'),
-                     ],
-                    else_='pending')
+        return case(
+            (and_(self.running_time.is_(None), self.finished_time.isnot(None)),
+             'deleted'),
+            (and_(self.running_time.isnot(None), self.finished_time.is_(None)),
+             'running'),
+            (and_(self.validated_time.isnot(None), self.valid.is_(False)),
+             'failed'),
+            (and_(self.finished_time.isnot(None), self.completed.is_(True)),
+             'completed'),
+            (and_(self.finished_time.isnot(None), self.completed.is_(False)),
+             'interrupted'),
+            (time < self.start_time,
+             'upcoming'),
+            (and_(self.stop_time.isnot(None), time > self.stop_time),
+             'expired'),
+            else_='pending')
 
     @hybrid_method
     def status_at_time(self, time):
@@ -717,29 +698,34 @@ class Pointing(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        c = case([(time < self.creation_time,
-                   None),
-                  (and_(self.running_time.is_(None), self.finished_time.isnot(None),
-                        time >= self.finished_time),
-                   'deleted'),
-                  (and_(self.running_time.isnot(None), time >= self.running_time,
-                        or_(self.finished_time.is_(None), time < self.finished_time)),
-                   'running'),
-                  (and_(self.validated_time.isnot(None), time >= self.validated_time,
-                        self.valid.is_(False)),
-                   'failed'),
-                  (and_(self.finished_time.isnot(None), time >= self.finished_time,
-                        self.completed.is_(True)),
-                   'completed'),
-                  (and_(self.finished_time.isnot(None), time >= self.finished_time,
-                        self.completed.is_(False)),
-                   'interrupted'),
-                  (time < self.start_time,
-                   'upcoming'),
-                  (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                   'expired'),
-                  ],
-                 else_='pending')
+        c = case(
+            (time < self.creation_time,
+             None),
+            (and_(self.running_time.is_(None),
+                  self.finished_time.isnot(None),
+                  time >= self.finished_time),
+             'deleted'),
+            (and_(self.running_time.isnot(None),
+                  time >= self.running_time,
+                  or_(self.finished_time.is_(None), time < self.finished_time)),
+             'running'),
+            (and_(self.validated_time.isnot(None),
+                  time >= self.validated_time,
+                  self.valid.is_(False)),
+             'failed'),
+            (and_(self.finished_time.isnot(None),
+                  time >= self.finished_time,
+                  self.completed.is_(True)),
+             'completed'),
+            (and_(self.finished_time.isnot(None),
+                  time >= self.finished_time,
+                  self.completed.is_(False)),
+             'interrupted'),
+            (time < self.start_time,
+             'upcoming'),
+            (and_(self.stop_time.isnot(None), time >= self.stop_time),
+             'expired'),
+            else_='pending')
         return c
 
     @property
@@ -1027,7 +1013,7 @@ class Strategy(Base):
     tel_mask = Column(Integer, nullable=True, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True)
+    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -1050,12 +1036,11 @@ class Strategy(Base):
     time_blocks = relationship(
         'TimeBlock',
         order_by='TimeBlock.db_id',
-        lazy='joined',
         back_populates='strategy',
     )
 
     # Column properties
-    num_completed = column_property(select([func.count(Pointing.db_id)])
+    num_completed = column_property(select(func.count(Pointing.db_id))
                                     .where(and_(Pointing.strategy_id == db_id,
                                                 Pointing.status == 'completed',
                                                 )
@@ -1152,7 +1137,7 @@ class Strategy(Base):
         """Return True if the number of Pointings to generate is infinite."""
         return self.num_todo < 0
 
-    # These have been replaced by a column property, which is a lot faster
+    # Replaced with a column property:
 
     # @hybrid_property
     # def num_completed(self):
@@ -1161,7 +1146,7 @@ class Strategy(Base):
 
     # @num_completed.expression
     # def num_completed(self):
-    #     return select([func.count(Pointing.db_id)]).\
+    #     return select(func.count(Pointing.db_id)).\
     #         where(and_(Pointing.strategy_id == self.db_id,
     #                    Pointing.status == 'completed',
     #                    )).scalar_subquery()
@@ -1177,7 +1162,7 @@ class Strategy(Base):
     def num_completed_at_time(self, time):
         if time is None:
             return self.num_completed
-        return select([func.count(Pointing.db_id)]).\
+        return select(func.count(Pointing.db_id)).\
             where(and_(Pointing.strategy_id == self.db_id,
                        Pointing.status_at_time(time) == 'completed',
                        )).scalar_subquery()
@@ -1198,7 +1183,7 @@ class Strategy(Base):
 
     @num_remaining.expression
     def num_remaining(self):
-        return case([(self.infinite, -1)],
+        return case((self.infinite, -1),
                     else_=self.num_todo - self.num_completed)
 
     @hybrid_method
@@ -1218,7 +1203,7 @@ class Strategy(Base):
     def num_remaining_at_time(self, time):
         if time is None:
             return self.num_remaining
-        return case([(self.infinite, -1)],
+        return case((self.infinite, -1),
                     else_=self.num_todo - self.num_completed_at_time(time))
 
     @hybrid_property
@@ -1238,11 +1223,8 @@ class Strategy(Base):
     @finished.expression
     def finished(self):
         time = datetime.datetime.utcnow()
-        return case([(self.num_remaining == 0,
-                      True),
-                     (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                      True),
-                     ],
+        return case((self.num_remaining == 0, True),
+                    (and_(self.stop_time.isnot(None), time >= self.stop_time), True),
                     else_=False)
 
     @hybrid_method
@@ -1266,11 +1248,8 @@ class Strategy(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        c = case([(self.num_remaining_at_time(time) == 0,
-                   True),
-                  (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                   True),
-                  ],
+        c = case((self.num_remaining_at_time(time) == 0, True),
+                 (and_(self.stop_time.isnot(None), time >= self.stop_time), True),
                  else_=False)
         return c
 
@@ -1304,7 +1283,7 @@ class Strategy(Base):
 
     @tel_is_valid.expression
     def tel_is_valid(self, telescope_id):
-        return case([(self.tel_mask.is_(None), True)],
+        return case((self.tel_mask.is_(None), True),
                     else_=self.tel_mask.op('&', precedence=2, is_comparison=True)(1)
                                        .op('<<', precedence=1)(telescope_id - 1)
                     )
@@ -1407,7 +1386,7 @@ class TimeBlock(Base):
     valid_time = Column(Float, nullable=True)
 
     # Foreign keys
-    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False)
+    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -1541,9 +1520,6 @@ class Target(Base):
     survey : `Survey`, optional
         the Survey this Target is part of, if any
         can also be added with the survey_id parameter
-    event : `Event`, optional
-        the Event this Target is part of, if any
-        can also be added with the event_id parameter
 
     Attributes
     ----------
@@ -1616,10 +1592,9 @@ class Target(Base):
     deleted_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True)
-    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True)
-    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True, index=True)
+    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -1633,43 +1608,31 @@ class Target(Base):
     user = relationship(
         'User',
         order_by='User.db_id',
-        lazy='joined',
         back_populates='targets',
     )
     pointings = relationship(
         'Pointing',
         order_by='Pointing.db_id',
-        lazy='joined',
         back_populates='target',
     )
     exposure_sets = relationship(
         'ExposureSet',
         order_by='ExposureSet.db_id',
-        lazy='joined',
         back_populates='target',
     )
     strategies = relationship(
         'Strategy',
         order_by='Strategy.db_id',
-        lazy='joined',
         back_populates='target',
     )
     grid_tile = relationship(
         'GridTile',
         order_by='GridTile.db_id',
-        lazy='joined',
         back_populates='targets',
     )
     survey = relationship(
         'Survey',
         order_by='Survey.db_id',
-        lazy='joined',
-        back_populates='targets',
-    )
-    event = relationship(
-        'Event',
-        order_by='Event.db_id',
-        lazy='joined',
         back_populates='targets',
     )
 
@@ -1677,7 +1640,6 @@ class Target(Base):
     grid = relationship(
         'Grid',
         order_by='Grid.db_id',
-        lazy='joined',
         secondary=f'{Base.metadata.schema}.grid_tiles',
         primaryjoin='Target.grid_tile_id == GridTile.db_id',
         secondaryjoin='Grid.db_id == GridTile.grid_id',
@@ -1698,7 +1660,7 @@ class Target(Base):
                                        )
                                 .correlate_except(Pointing)
                                 )
-    num_completed = column_property(select([func.count(Pointing.db_id)])
+    num_completed = column_property(select(func.count(Pointing.db_id))
                                     .where(and_(Pointing.target_id == db_id,
                                                 Pointing.status == 'completed',
                                                 )
@@ -1706,7 +1668,7 @@ class Target(Base):
                                     .correlate_except(Pointing)
                                     .scalar_subquery()
                                     )
-    last_observed = column_property(select([Pointing.finished_time])
+    last_observed = column_property(select(Pointing.finished_time)
                                     .where(and_(Pointing.target_id == db_id,
                                                 Pointing.status == 'completed',
                                                 )
@@ -1717,7 +1679,6 @@ class Target(Base):
                                     .scalar_subquery()
                                     )
     # Have to invert and return if any are incomplete, no way to do all()
-    # Also note we need to use text() because Strategies aren't defined yet
     completed = column_property(~exists()
                                 .where(and_(Strategy.target_id == db_id,
                                             Strategy.finished.is_(False),
@@ -1776,7 +1737,6 @@ class Target(Base):
                    'user_id={}'.format(self.user_id),
                    'grid_tile_id={}'.format(self.grid_tile_id),
                    'survey_id={}'.format(self.survey_id),
-                   'event_id={}'.format(self.event_id),
                    ]
         return 'Target({})'.format(', '.join(strings))
 
@@ -1809,7 +1769,7 @@ class Target(Base):
 
         return value
 
-    # These have been replaced by a column property, which is a lot faster
+    # Replaced with a column property:
 
     # @hybrid_property
     # def scheduled(self):
@@ -1844,7 +1804,7 @@ class Target(Base):
                                        )
                                    ))
 
-    # These have been replaced by a column property, which is a lot faster
+    # Replaced with a column property:
 
     # @hybrid_property
     # def num_completed(self):
@@ -1853,7 +1813,7 @@ class Target(Base):
 
     # @num_completed.expression
     # def num_completed(self):
-    #     return select([func.count(Pointing.db_id)]).\
+    #     return select(func.count(Pointing.db_id)).\
     #         where(and_(Pointing.target_id == self.db_id,
     #                    Pointing.status == 'completed',
     #                    )).scalar_subquery()
@@ -1869,12 +1829,12 @@ class Target(Base):
     def num_completed_at_time(self, time):
         if time is None:
             return self.num_completed
-        return select([func.count(Pointing.db_id)]).\
+        return select(func.count(Pointing.db_id)).\
             where(and_(Pointing.target_id == self.db_id,
                        Pointing.status_at_time(time) == 'completed',
                        )).scalar_subquery()
 
-    # These have been replaced by a column property, which is a lot faster
+    # Replaced with a column property:
 
     # @hybrid_property
     # def completed(self):
@@ -1945,18 +1905,18 @@ class Target(Base):
     @status.expression
     def status(self):
         time = datetime.datetime.utcnow()
-        return case([(self.deleted_time.isnot(None),
-                      'deleted'),
-                     (self.completed,
-                      'completed'),
-                     (and_(self.start_time.isnot(None), time < self.start_time),
-                      'upcoming'),
-                     (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                      'expired'),
-                     (self.scheduled.is_(False),
-                      'unscheduled'),
-                     ],
-                    else_='scheduled')
+        return case(
+            (self.deleted_time.isnot(None),
+             'deleted'),
+            (self.completed,
+             'completed'),
+            (and_(self.start_time.isnot(None), time < self.start_time),
+             'upcoming'),
+            (and_(self.stop_time.isnot(None), time >= self.stop_time),
+             'expired'),
+            (self.scheduled.is_(False),
+             'unscheduled'),
+            else_='scheduled')
 
     @hybrid_method
     def status_at_time(self, time):
@@ -1993,20 +1953,20 @@ class Target(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        c = case([(time < self.creation_time,
-                   None),
-                  (and_(self.deleted_time.isnot(None), time >= self.deleted_time),
-                   'deleted'),
-                  (self.completed_at_time(time),
-                   'completed'),
-                  (and_(self.start_time.isnot(None), time < self.start_time),
-                   'upcoming'),
-                  (and_(self.stop_time.isnot(None), time >= self.stop_time),
-                   'expired'),
-                  (self.scheduled_at_time(time).is_(False),
-                   'unscheduled'),
-                  ],
-                 else_='scheduled')
+        c = case(
+            (time < self.creation_time,
+             None),
+            (and_(self.deleted_time.isnot(None), time >= self.deleted_time),
+             'deleted'),
+            (self.completed_at_time(time),
+             'completed'),
+            (and_(self.start_time.isnot(None), time < self.start_time),
+             'upcoming'),
+            (and_(self.stop_time.isnot(None), time >= self.stop_time),
+             'expired'),
+            (self.scheduled_at_time(time).is_(False),
+             'unscheduled'),
+            else_='scheduled')
         return c
 
     def mark_deleted(self, time=None):
@@ -2018,7 +1978,7 @@ class Target(Base):
 
         current_status = self.status_at_time(time)
         if current_status == 'deleted':
-            msg = f'Target {self.db_id}  is already deleted (at={self.deleted_time})'
+            msg = f'Target {self.db_id} is already deleted (at={self.deleted_time})'
             raise ValueError(msg)
         elif current_status == 'expired':
             msg = f'Target {self.db_id} is already expired (at {self.stop_time})'
@@ -2033,6 +1993,9 @@ class Target(Base):
         for pointing in self.pointings:
             if pointing.status_at_time(time) in ['upcoming', 'pending']:
                 pointing.mark_deleted(time=time)
+
+    def undelete():
+        raise NotImplementedError
 
     @hybrid_property
     def current_rank(self):
@@ -2052,9 +2015,8 @@ class Target(Base):
 
     @current_rank.expression
     def current_rank(self):
-        return case([(and_(self.rank.isnot(None), self.rank_decay.is_(True)),
-                      self.rank + 10 * self.num_completed),
-                     ],
+        return case((and_(self.rank.isnot(None), self.rank_decay.is_(True)),
+                     self.rank + 10 * self.num_completed),
                     else_=self.rank)
 
     @hybrid_method
@@ -2081,9 +2043,8 @@ class Target(Base):
         if isinstance(time, Time):
             time = time.datetime
 
-        return case([(and_(self.rank.isnot(None), self.rank_decay.is_(True)),
-                      self.rank + 10 * self.num_completed_at_time(time)),
-                     ],
+        return case((and_(self.rank.isnot(None), self.rank_decay.is_(True)),
+                     self.rank + 10 * self.num_completed_at_time(time)),
                     else_=self.rank)
 
     def get_current_strategy(self, time=None):
@@ -2448,8 +2409,8 @@ class Telescope(Base):
     horizon = Column(Text, nullable=True)
 
     # Foreign keys
-    site_id = Column(Integer, ForeignKey('sites.id'), nullable=False)
-    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=True)
+    site_id = Column(Integer, ForeignKey('sites.id'), nullable=False, index=True)
+    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=True, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -2461,12 +2422,12 @@ class Telescope(Base):
     # Foreign relationships
     site = relationship(
         'Site',
-        order_by='Site.db_id',
+        uselist=False,
         back_populates='telescopes',
     )
     grid = relationship(
         'Grid',
-        order_by='Grid.db_id',
+        uselist=False,
         back_populates='telescopes',
     )
     pointings = relationship(
@@ -2500,7 +2461,7 @@ class Telescope(Base):
 
     @status.expression
     def status(self):
-        return case([(self.current_pointing.isnot(None), 'observing')],
+        return case((self.current_pointing.isnot(None), 'observing'),
                     else_='idle')
 
     @property
@@ -2744,7 +2705,7 @@ class GridTile(Base):
     dec = Column(Float, nullable=False)
 
     # Foreign keys
-    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False)
+    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False, index=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -2778,7 +2739,7 @@ class GridTile(Base):
     )
 
     # Column properties
-    last_observed = column_property(select([Target.last_observed])
+    last_observed = column_property(select(Target.last_observed)
                                     .where(Target.grid_tile_id == db_id,
                                            )
                                     .order_by(Target.last_observed.desc())
@@ -2852,7 +2813,8 @@ class GridTile(Base):
 class Survey(Base):
     """A class to represent a Survey.
 
-    A Survey is a way to group Targets, usually from a particular Event.
+    A Survey is a way to group multiple Targets together,
+    usually covering a particular area of the sky.
 
     Like all SQLAlchemy model classes, this object links to the
     underlying database. You can create an instance, and set its attributes
@@ -2865,9 +2827,6 @@ class Survey(Base):
     name : string
         a human-readable identifier for the survey
 
-    skymap : string, optional
-        the location of the source skymap for this survey
-
     When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
 
@@ -2875,9 +2834,6 @@ class Survey(Base):
     ---------------------
     targets : list of `Target`, optional
         the Targets that are part of this Survey, if any
-    event : `Event`, optional
-        the Event this Survey is part of, if any
-        can also be added with the event_id parameter
 
     Attributes
     ----------
@@ -2903,10 +2859,6 @@ class Survey(Base):
 
     # Columns
     name = Column(String(255), nullable=False, index=True)
-    skymap = Column(String(255), nullable=True, default=None)
-
-    # Foreign keys
-    event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     # Update timestamp
     if params.DATABASE_DIALECT == 'mysql':
@@ -2920,11 +2872,6 @@ class Survey(Base):
         'Target',
         order_by='Target.db_id',
         back_populates='survey',
-    )
-    event = relationship(
-        'Event',
-        order_by='Event.db_id',
-        back_populates='surveys',
     )
 
     # Secondary relationships
@@ -2942,132 +2889,8 @@ class Survey(Base):
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
                    'name={}'.format(self.name),
-                   'skymap={}'.format(self.skymap),
-                   'event_id={}'.format(self.event_id),
                    ]
         return 'Survey({})'.format(', '.join(strings))
-
-
-class Event(Base):
-    """A class to represent a transient Event.
-
-    Events can be linked to specific Surveys made of Targets, usually weighted
-    based on a skymap. A specific astrophysical event (e.g. GW170817) might
-    produce multiple Surveys as the skymap is updated, which will all be linked
-    to the one Event.
-
-    Like all SQLAlchemy model classes, this object links to the
-    underlying database. You can create an instance, and set its attributes
-    without a database session. Accessing some attributes may require
-    an active database session, and some properties (like the db_id)
-    will be None until the instance is added to the database.
-
-    Parameters
-    ----------
-    name : string
-        a unique, human-readable identifier for the event
-    source : string
-        the event's origin, e.g. LVC, Fermi, GAIA
-
-    type : string, optional
-        the type of event, e.g. GW, GRB
-    time : string, `astropy.time.Time` or datetime.datetime, optional
-        time the event occurred
-
-    When created the instance can be linked to the following other tables as parameters,
-    otherwise they are populated when it is added to the database:
-
-    Primary relationships
-    ---------------------
-    surveys : list of `Survey`, optional
-        the Surveys created for this Event, if any
-    targets : list of `Target`, optional
-        the Targets created for this Event, if any
-
-    Attributes
-    ----------
-    db_id : int
-        primary database key
-        only populated when the instance is added to the database
-
-    The following secondary relationships are not settable directly,
-    but are populated through the primary relationships and are available as attributes:
-
-    Secondary relationships
-    -----------------------
-    pointings : list of `Pointing`
-        the Pointings created for this Event, if any
-
-    """
-
-    # Set corresponding SQL table name
-    __tablename__ = 'events'
-
-    # Primary key
-    db_id = Column('id', Integer, primary_key=True)
-
-    # Columns
-    name = Column(String(255), nullable=False, unique=True, index=True)
-    source = Column(String(255), nullable=False)
-    type = Column(String(255), nullable=True, index=True, default=None)  # noqa: A003
-    time = Column(DateTime, nullable=True, default=None)
-
-    # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
-
-    # Foreign relationships
-    surveys = relationship(
-        'Survey',
-        order_by='Survey.db_id',
-        back_populates='event',
-    )
-    targets = relationship(
-        'Target',
-        order_by='Target.db_id',
-        back_populates='event',
-    )
-
-    # Secondary relationships
-    pointings = relationship(
-        'Pointing',
-        order_by='Pointing.db_id',
-        secondary=f'{Base.metadata.schema}.targets',
-        primaryjoin='Event.db_id == Target.event_id',
-        secondaryjoin='Pointing.target_id == Target.db_id',
-        back_populates='event',
-        viewonly=True,
-        uselist=True,
-    )
-
-    def __repr__(self):
-        strings = ['db_id={}'.format(self.db_id),
-                   'name={}'.format(self.name),
-                   'source={}'.format(self.source),
-                   'type={}'.format(self.type),
-                   'time={}'.format(self.time),
-                   ]
-        return 'Event({})'.format(', '.join(strings))
-
-    @validates('time')
-    def validate_times(self, key, field):
-        """Use validators to allow various types of input for times."""
-        if field is None:
-            # time is nullable
-            return None
-
-        if isinstance(field, datetime.datetime):
-            value = field.strftime('%Y-%m-%d %H:%M:%S')
-        elif isinstance(field, Time):
-            field.precision = 0  # no D.P on seconds
-            value = field.iso
-        else:
-            # just hope the string works!
-            value = str(field)
-        return value
 
 
 SQL_CODE = []

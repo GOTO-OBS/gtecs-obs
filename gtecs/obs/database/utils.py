@@ -472,7 +472,6 @@ def get_pointing_info(pointing_id):
         pointing_info['ra'] = target.ra
         pointing_info['dec'] = target.dec
         pointing_info['start_rank'] = target.rank
-        pointing_info['rank_decay'] = target.rank_decay
         pointing_info['weight'] = target.weight
         pointing_info['is_template'] = target.is_template
         pointing_info['num_completed'] = target.num_completed
@@ -498,6 +497,7 @@ def get_pointing_info(pointing_id):
         pointing_info['block_num'] = time_block.block_num
         pointing_info['wait_time'] = time_block.wait_time
         pointing_info['valid_time'] = time_block.valid_time
+        pointing_info['rank_change'] = time_block.rank_change
 
         # Get ExposureSet info
         pointing_info['exposure_sets'] = []

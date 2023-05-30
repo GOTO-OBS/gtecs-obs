@@ -74,11 +74,12 @@ with db.session_manager() as session:
     strategy = db.Strategy(num_todo=5,
                            wait_time=[1 * u.hour, 120 * u.min],
                            valid_time=[None, 1 * u.hour, -1, 60],
+                           rank_change=[-1, 11]
                            )
     target = db.Target(name='M31',
                        ra=10.685,
                        dec=41.2875,
-                       rank=9,
+                       rank=11,
                        start_time=Time('2020-01-01 00:00'),
                        stop_time=None,
                        creation_time=Time('2020-01-01 00:00'),  # Need to fake
@@ -137,7 +138,7 @@ with db.session_manager() as session:
         print(f'Target is {target.status.upper()}', end=', ')
         print(f'completed {target.num_completed} pointings')
         print('                    ', end='')
-        print('Pointings:', [p.status_at_time(now) for p in target.pointings])
+        print('Pointings:', [(p.rank, p.status_at_time(now)) for p in target.pointings])
         # print('                    Time blocks:')
         # for block in target.time_blocks:
         #     print('                    \t', (block.block_num, block.valid_time, block.wait_time,

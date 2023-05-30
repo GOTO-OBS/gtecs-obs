@@ -59,11 +59,11 @@ def get_tiles_from_file(filename):
 def fill_target():
     """Fill out a target frame with user input."""
     target_params = {'rank': None,
-                     'rank_decay': None,
                      }
     strategy_params = {'num_todo': None,
                        'wait_time': None,
                        'valid_time': None,  # Rarely ever not infinitely valid
+                       'rank_change': None,
                        'too': False,  # Never ToO
                        'min_alt': None,
                        'max_sunalt': None,
@@ -79,12 +79,13 @@ def fill_target():
         except Exception:
             print('Invalid input')
 
-    while target_params['rank_decay'] is None:
-        rank_decay = input('Should pointing ranks decrease with time? [y/n]: ')
-        if rank_decay in ['y', 'Y']:
-            target_params['rank_decay'] = True
-        elif rank_decay in ['n', 'N']:
-            target_params['rank_decay'] = False
+    while strategy_params['rank_change'] is None:
+        rank_change = input('Should pointing ranks decrease with time? [y/n]: ')
+        # Keep things simple, only allow default +10 or no change
+        if rank_change in ['y', 'Y']:
+            strategy_params['rank_change'] = 10
+        elif rank_change in ['n', 'N']:
+            strategy_params['rank_change'] = 0
         else:
             print('Invalid input')
 

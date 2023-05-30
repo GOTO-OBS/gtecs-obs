@@ -2145,7 +2145,7 @@ class Target(Base):
         if latest_pointing is None:
             # We haven't observed anything yet, so use the start_time from the Target
             start_time = self.start_time
-            # The "next" block should be the first one in the list
+            # The "next" block should be the first one in the Strategy list
             next_block = strategy.time_blocks[0]
         elif latest_pointing.status_at_time(time) in ['interrupted', 'failed']:
             # The Pointing was interrupted before it could complete or expire,
@@ -2181,7 +2181,17 @@ class Target(Base):
                               latest_pointing.time_block.wait_time * u.s)
 
             # Get the next TimeBlock after the one this Pointing used
-            next_block = strategy.get_next_block(latest_pointing.time_block)
+            # Since the "current" strategy might be different from the one this Pointing was
+            # observed under (e.g. that Strategy might have expired or been completed) we need
+            # to check if the Strategy has changed.
+            if latest_pointing.strategy == strategy:
+                # The Pointing was observed under the current Strategy, so we can just use
+                # the next block in the list.
+                next_block = strategy.get_next_block(latest_pointing.time_block)
+            else:
+                # The Strategy has changed, so the new Pointing should take the first block from
+                # the new Strategy.
+                next_block = strategy.time_blocks[0]
 
         # Find the Pointing stop_time
         if next_block.valid_time is not None:

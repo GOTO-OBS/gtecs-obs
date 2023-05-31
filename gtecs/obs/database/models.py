@@ -1381,9 +1381,6 @@ class TimeBlock(Base):
         required before addition to the database
         can also be added with the target_id parameter
 
-    target : `Target`, optional
-        the Target associated with this Time Block, if any
-        can also be added with the target_id parameter
     pointings : list of `Pointing`, optional
         the Pointings associated with this Time Block, if any
 
@@ -1392,6 +1389,14 @@ class TimeBlock(Base):
     db_id : int
         primary database key
         only populated when the instance is added to the database
+
+    The following secondary relationships are not settable directly,
+    but are populated through the primary relationships and are available as attributes:
+
+    Secondary relationships
+    -----------------------
+    target : `Target`
+        the Target linked to the Strategy this Time Block was generated from
 
     """
 
@@ -1428,6 +1433,20 @@ class TimeBlock(Base):
         order_by='Pointing.db_id',
         back_populates='time_block',
     )
+
+    # Secondary relationships
+    target = relationship(
+        'Target',
+        order_by='Target.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.strategies',
+        primaryjoin='TimeBlock.strategy_id == Strategy.db_id',
+        secondaryjoin='Target.db_id == Strategy.target_id',
+        back_populates='time_blocks',
+        viewonly=True,
+        uselist=False,
+    )
+    target_id = association_proxy('target', 'db_id')
 
     def __repr__(self):
         strings = ['db_id={}'.format(self.db_id),
@@ -1567,6 +1586,8 @@ class Target(Base):
 
     Secondary relationships
     -----------------------
+    time_blocks : list of `TimeBlock`
+        the Time Blocks linked to any Strategies associated with this Target
     grid : `Grid`
         the Grid that the GridTile this Target covers, if any, is part of
 
@@ -1653,6 +1674,17 @@ class Target(Base):
     )
 
     # Secondary relationships
+    time_blocks = relationship(
+        'TimeBlock',
+        order_by='TimeBlock.db_id',
+        lazy='joined',
+        secondary=f'{Base.metadata.schema}.strategies',
+        primaryjoin='Target.db_id == Strategy.target_id',
+        secondaryjoin='TimeBlock.strategy_id == Strategy.db_id',
+        back_populates='target',
+        viewonly=True,
+        uselist=True,
+    )
     grid = relationship(
         'Grid',
         order_by='Grid.db_id',

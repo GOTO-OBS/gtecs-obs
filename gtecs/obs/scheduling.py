@@ -493,9 +493,8 @@ class PointingQueue:
 
         Sorting metrics
             - First is by validity
-            - Then by rank
+            - Then by rank (or just number of observations for infinite tiles)
             - Then by ToO flag
-            - Then by number of times already observed
             - Finally use the tiebreaker
         """
         if not self.priorities_calculated:
@@ -503,8 +502,8 @@ class PointingQueue:
         pointings = self.pointings.copy()
         pointings.sort(key=lambda p: (not p.valid,
                                       p.rank,
+                                      p.num_obs if p.rank == np.inf else 0,
                                       not p.too,
-                                      p.num_obs,
                                       p.tiebreaker))
         return pointings
 

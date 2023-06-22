@@ -252,8 +252,7 @@ class Pointing(Base):
     Parameters
     ----------
     rank : int or None
-        rank to use when scheduling (should be the current_rank of the linked target)
-        lower values are prioritised first by the scheduler
+        rank to use when scheduling (lower values are prioritised first by the scheduler)
         rank=None means infinite rank, will always be at the bottom of the queue (queue-fillers)
 
     start_time : string, `astropy.time.Time` or datetime.datetime, optional
@@ -432,7 +431,7 @@ class Pointing(Base):
     target = relationship(
         'Target',
         order_by='Target.db_id',
-        lazy='joined',
+        lazy='joined',  # SAVE TIME IN SCHEDULER
         back_populates='pointings',
     )
     time_block = relationship(
@@ -443,7 +442,7 @@ class Pointing(Base):
     strategy = relationship(
         'Strategy',
         order_by='Strategy.db_id',
-        lazy='joined',
+        lazy='joined',  # SAVE TIME IN SCHEDULER
         back_populates='pointings',
     )
     telescope = relationship(
@@ -456,7 +455,7 @@ class Pointing(Base):
     exposure_sets = relationship(
         'ExposureSet',
         order_by='ExposureSet.db_id',
-        lazy='joined',
+        lazy='joined',  # SAVE TIME IN SCHEDULER
         secondary=f'{Base.metadata.schema}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='ExposureSet.target_id == Target.db_id',
@@ -912,6 +911,11 @@ class Strategy(Base):
         less than zero or None means valid indefinitely
         if the given `num_todo` is greater than times given the list will be looped.
         default = None (indefinitely valid)
+    rank_change : int, list of int, or None, optional
+        the amount to change the rank of Pointings as they get completed.
+        the starting rank is defined by the Target.
+        if the given `num_todo` is greater than changes given the list will be looped.
+        default = 10 (add 10 to the start rank each time a Pointing is completed)
     min_time : float or `astropy.units.Quantity`, optional
         minimum time desired when observing a Pointing.
         if a Quantity it should have units of time, if a float assume in seconds.
@@ -1001,6 +1005,7 @@ class Strategy(Base):
     # # TimeBlock properties
     # wait_time - not stored in database (use TimeBlocks)
     # valid_time - not stored in database (use TimeBlocks)
+    # rank_change - not stored in database (use TimeBlocks)
     # # Scheduling
     min_time = Column(Float, nullable=True, default=None)
     too = Column(Boolean, nullable=False, default=False)
@@ -1053,6 +1058,7 @@ class Strategy(Base):
         # Get extra arguments (need to remove from kwargs before super init)
         wait_times = kwargs.pop('wait_time') if 'wait_time' in kwargs else 0
         valid_times = kwargs.pop('valid_time') if 'valid_time' in kwargs else None
+        rank_changes = kwargs.pop('rank_change') if 'rank_change' in kwargs else None
         try:
             len(wait_times)
         except TypeError:
@@ -1061,21 +1067,31 @@ class Strategy(Base):
             len(valid_times)
         except TypeError:
             valid_times = [valid_times]
+        try:
+            len(rank_changes)
+        except TypeError:
+            rank_changes = [rank_changes]
 
         # Init base class
         super().__init__(**kwargs)
 
         # Create TimeBlocks (if none were given)
         if len(self.time_blocks) == 0:
-            for i in range(max(len(wait_times), len(valid_times))):
+            for i in range(max(len(wait_times), len(valid_times), len(rank_changes))):
                 # Loop through lists to get values
-                wait = wait_times[i % len(wait_times)]
-                valid = valid_times[i % len(valid_times)]
+                wait_time = wait_times[i % len(wait_times)]
+                valid_time = valid_times[i % len(valid_times)]
+                rank_change = rank_changes[i % len(rank_changes)]
                 # Allow negative values as None
-                if valid is not None and valid < 0:
-                    valid = None
+                if valid_time is not None and valid_time < 0:
+                    valid_time = None
                 # Create the block and add to list
-                block = TimeBlock(block_num=i + 1, wait_time=wait, valid_time=valid)
+                block = TimeBlock(
+                    block_num=i + 1,
+                    wait_time=wait_time,
+                    valid_time=valid_time,
+                    rank_change=rank_change,
+                    )
                 self.time_blocks.append(block)
 
     def __repr__(self):
@@ -1349,6 +1365,11 @@ class TimeBlock(Base):
         if a Quantity it should have units of time, if a float assume in seconds.
         less than zero or None means valid indefinitely.
         default = None (indefinitely valid)
+    rank_change : int, optional, or None
+        the amount to change the rank of the next pointing after this block is completed.
+        0 or None means no change, positive integers will increase the rank (lower priority),
+        negative integers will decrease the rank (higher priority).
+        default = 10 (increasing rank i.e. lower priority as each pointing is observed)
 
     When created the instance can be linked to the following other tables as parameters,
     otherwise they are populated when it is added to the database:
@@ -1360,9 +1381,6 @@ class TimeBlock(Base):
         required before addition to the database
         can also be added with the target_id parameter
 
-    target : `Target`, optional
-        the Target associated with this Time Block, if any
-        can also be added with the target_id parameter
     pointings : list of `Pointing`, optional
         the Pointings associated with this Time Block, if any
 
@@ -1382,8 +1400,9 @@ class TimeBlock(Base):
 
     # Columns
     block_num = Column(Integer, nullable=False, index=True)
-    wait_time = Column(Float, nullable=False)
-    valid_time = Column(Float, nullable=True)
+    wait_time = Column(Float, nullable=False, default=0)
+    valid_time = Column(Float, nullable=True, default=None)
+    rank_change = Column(Integer, nullable=True, default=10)
 
     # Foreign keys
     strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False, index=True)
@@ -1412,6 +1431,7 @@ class TimeBlock(Base):
                    'block_num={}'.format(self.block_num),
                    'wait_time={}'.format(self.wait_time),
                    'valid_time={}'.format(self.valid_time),
+                   'rank_change={}'.format(self.rank_change),
                    'strategy_id={}'.format(self.strategy_id),
                    ]
         return 'TimeBlock({})'.format(', '.join(strings))
@@ -1464,13 +1484,10 @@ class Target(Base):
         then the dec will be extracted from the GridTile
 
     rank : int or None
-        rank to use for Pointings generated by this Target (or start if rank_decay is True)
+        rank to use for Pointings generated by this Target
+        (modified by any rank_change values in the associated Strategy)
         lower values are prioritised first by the scheduler
         rank=None means infinite rank, will always be at the bottom of the queue (queue-fillers)
-    rank_decay : bool, optional
-        if True, the Target's `current_rank` will increase by 10 for each completed Pointing
-        (unless rank=None, can't increase from infinity)
-        default = True
     weight : float, optional
         weighting relative to other Targets in the same survey
         default = 1
@@ -1532,9 +1549,6 @@ class Target(Base):
     scheduled : bool
         returns True if the Target is scheduled (has a pending Pointing)
         see also the `scheduled_at_time()` method
-    current_rank : int
-        rank for next Pointing to be scheduled (it will increase as Pointings are observed)
-        see also the `current_rank_at_time()` method
     num_completed : int
         number of successfully completed Pointings generated from this Target
         (across all Strategies)
@@ -1581,7 +1595,6 @@ class Target(Base):
     dec = Column(Float, nullable=False)
     # # Scheduling
     rank = Column(Integer, nullable=True)
-    rank_decay = Column(Boolean, nullable=False, default=True)
     weight = Column(Float, nullable=False, default=1)
     is_template = Column(Boolean, nullable=False, default=False)
     # # Constraints
@@ -1726,7 +1739,6 @@ class Target(Base):
                    'name={}'.format(self.name),
                    'ra={}'.format(self.ra),
                    'dec={}'.format(self.dec),
-                   'current_rank={}'.format(self.current_rank),
                    'rank={}'.format(self.rank),
                    'weight={}'.format(self.weight),
                    'num_completed={}'.format(self.num_completed),
@@ -1997,56 +2009,6 @@ class Target(Base):
     def undelete():
         raise NotImplementedError
 
-    @hybrid_property
-    def current_rank(self):
-        """Calculate current rank for new Pointings.
-
-        If rank_decay is True, this is the Target rank + 10 * the number of completed Pointings.
-        If False then it's just the Target's rank.
-
-        """
-        if self.rank is not None and self.rank_decay:
-            if self.num_completed is not None:
-                return self.rank + 10 * self.num_completed
-            else:
-                return self.rank
-        else:
-            return self.rank
-
-    @current_rank.expression
-    def current_rank(self):
-        return case((and_(self.rank.isnot(None), self.rank_decay.is_(True)),
-                     self.rank + 10 * self.num_completed),
-                    else_=self.rank)
-
-    @hybrid_method
-    def current_rank_at_time(self, time):
-        """Calculate current rank for new Pointings at the given time.
-
-        If rank_decay is True, this is the Target rank + 10 * the number of completed Pointings.
-        If False then it's just the Target's rank.
-
-        """
-        if time is None:
-            return self.current_rank
-        if self.rank is not None and self.rank_decay:
-            return self.rank + 10 * self.num_completed_at_time(time)
-        else:
-            return self.rank
-
-    @current_rank_at_time.expression
-    def current_rank_at_time(self, time):
-        if time is None:
-            return self.current_rank
-        if isinstance(time, str):
-            time = Time(time)
-        if isinstance(time, Time):
-            time = time.datetime
-
-        return case((and_(self.rank.isnot(None), self.rank_decay.is_(True)),
-                     self.rank + 10 * self.num_completed_at_time(time)),
-                    else_=self.rank)
-
     def get_current_strategy(self, time=None):
         """Get the currently valid Strategy, or at the given time."""
         if time is None:
@@ -2145,7 +2107,7 @@ class Target(Base):
         if latest_pointing is None:
             # We haven't observed anything yet, so use the start_time from the Target
             start_time = self.start_time
-            # The "next" block should be the first one in the list
+            # The "next" block should be the first one in the Strategy list
             next_block = strategy.time_blocks[0]
         elif latest_pointing.status_at_time(time) in ['interrupted', 'failed']:
             # The Pointing was interrupted before it could complete or expire,
@@ -2181,7 +2143,17 @@ class Target(Base):
                               latest_pointing.time_block.wait_time * u.s)
 
             # Get the next TimeBlock after the one this Pointing used
-            next_block = strategy.get_next_block(latest_pointing.time_block)
+            # Since the "current" strategy might be different from the one this Pointing was
+            # observed under (e.g. that Strategy might have expired or been completed) we need
+            # to check if the Strategy has changed.
+            if latest_pointing.strategy == strategy:
+                # The Pointing was observed under the current Strategy, so we can just use
+                # the next block in the list.
+                next_block = strategy.get_next_block(latest_pointing.time_block)
+            else:
+                # The Strategy has changed, so the new Pointing should take the first block from
+                # the new Strategy.
+                next_block = strategy.time_blocks[0]
 
         # Find the Pointing stop_time
         if next_block.valid_time is not None:
@@ -2205,8 +2177,25 @@ class Target(Base):
             # In this case there is no valid Pointing, so we have to return None.
             return None
 
+        # Find the Pointing rank
+        if latest_pointing is None:
+            # This is the first Pointing for this Target, so use the base rank from the Target.
+            rank = self.rank
+        else:
+            # For Pointings after the first take the rank from the previous Pointing.
+            # If it was completed add any rank_change from that Pointing's TimeBlock
+            # (the default is increasing by 10 after each Pointing).
+            # If it was interrupted, failed or expired then keep the same rank and re-observe.
+            # Only applies if the rank and rank change are both not None.
+            if (latest_pointing.status_at_time(time) == 'completed' and
+                    latest_pointing.rank is not None and
+                    latest_pointing.time_block.rank_change is not None):
+                rank = latest_pointing.rank + latest_pointing.time_block.rank_change
+            else:
+                rank = latest_pointing.rank
+
         # Now create the pointing
-        new_pointing = Pointing(rank=self.current_rank,
+        new_pointing = Pointing(rank=rank,
                                 start_time=start_time,
                                 stop_time=stop_time,
                                 target=self,

@@ -76,6 +76,7 @@ class Scheduler:
         self.server_host = params.SERVER_HOST
         self.server_port = params.SERVER_PORT
         self.server_path = params.SERVER_PATH
+        self.server_api_key = params.SERVER_API_KEY
 
     def __del__(self):
         self.shutdown()
@@ -250,26 +251,31 @@ class Scheduler:
         @app.route(self.server_path + '/update_schedule/<int:telescope_id>', methods=['GET'])
         def update_schedule(telescope_id):
             try:
-                # Get args
-                args = request.args
-                current_pointing_id = args['current_pointing_id']
+                # Check API key
+                if 'api_key' not in request.args:
+                    return '<h1>400 Bad Request</h1> No API key provided', 400
+                if request.args['api_key'] != self.server_api_key:
+                    return '<h1>403 Forbidden</h1> Invalid API key', 403
+
+                # Get function args
+                current_pointing_id = request.args['current_pointing_id']
                 if current_pointing_id == 'None':
                     current_pointing_id = None
                 else:
                     current_pointing_id = int(current_pointing_id)
-                current_status = args['current_status']
+                current_status = request.args['current_status']
                 if current_status == 'None':
                     current_status = None
-                if 'horizon' in args:
-                    horizon = int(args['horizon'])
+                if 'horizon' in request.args:
+                    horizon = int(request.args['horizon'])
                 else:
                     horizon = 0
-                if 'return_new' in args:
-                    return_new = bool(int(args['return_new']))
+                if 'return_new' in request.args:
+                    return_new = bool(int(request.args['return_new']))
                 else:
                     return_new = True
-                if 'force_update' in args:
-                    force_update = bool(int(args['force_update']))
+                if 'force_update' in request.args:
+                    force_update = bool(int(request.args['force_update']))
                 else:
                     force_update = False
 
@@ -296,10 +302,15 @@ class Scheduler:
         @app.route(self.server_path + '/check_queue', methods=['GET'])
         def check_queue():
             try:
-                # Get args
-                args = request.args
-                if 'force_update' in args:
-                    force_update = bool(int(args['force_update']))
+                # Check API key
+                if 'api_key' not in request.args:
+                    return '<h1>400 Bad Request</h1> No API key provided', 400
+                if request.args['api_key'] != self.server_api_key:
+                    return '<h1>403 Forbidden</h1> Invalid API key', 403
+
+                # Get function args
+                if 'force_update' in request.args:
+                    force_update = bool(int(request.args['force_update']))
                 else:
                     force_update = False
 
@@ -319,6 +330,12 @@ class Scheduler:
         @app.route(self.server_path + '/pointing_info/<int:pointing_id>', methods=['GET'])
         def get_pointing_info(pointing_id):
             try:
+                # Check API key
+                if 'api_key' not in request.args:
+                    return '<h1>400 Bad Request</h1> No API key provided', 400
+                if request.args['api_key'] != self.server_api_key:
+                    return '<h1>403 Forbidden</h1> Invalid API key', 403
+
                 # Call the internal function
                 pointing_info = self.get_pointing_info(pointing_id)
 

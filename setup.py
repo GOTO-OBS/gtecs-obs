@@ -11,6 +11,8 @@ REQUIRES = ['sqlalchemy>=2',
             'numpy',
             'scipy',
             'Pyro4',
+            'flask',
+            'webtest',
             ]
 
 setup(name='gtecs-obs',

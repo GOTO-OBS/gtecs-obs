@@ -451,6 +451,8 @@ def get_pointing_info(pointing_id):
     """Get a dictionary of info for the given Pointing.
 
     This should contain all the information needed for an image FITS header.
+
+    Note the dict needs to be JSON-serializable, so we can't include any datetimes or other classes.
     """
     pointing_info = {}
 
@@ -462,8 +464,9 @@ def get_pointing_info(pointing_id):
         pointing_info['id'] = pointing.db_id
         # pointing_info['status'] = pointing.status  # Don't include anything time-dependent
         pointing_info['rank'] = pointing.rank
-        pointing_info['start_time'] = pointing.start_time
-        pointing_info['stop_time'] = pointing.stop_time
+        pointing_info['start_time'] = pointing.start_time.isoformat(sep=' ')
+        t = pointing.stop_time.isoformat(sep=' ') if pointing.stop_time is not None else None
+        pointing_info['stop_time'] = t
 
         # Get Target info
         target = pointing.target
@@ -475,8 +478,9 @@ def get_pointing_info(pointing_id):
         pointing_info['weight'] = target.weight
         pointing_info['is_template'] = target.is_template
         pointing_info['num_completed'] = target.num_completed
-        pointing_info['target_start_time'] = target.start_time
-        pointing_info['target_stop_time'] = target.stop_time
+        pointing_info['target_start_time'] = target.start_time.isoformat(sep=' ')
+        t = target.stop_time.isoformat(sep=' ') if target.stop_time is not None else None
+        pointing_info['target_stop_time'] = t
 
         # Get Strategy info
         strategy = pointing.strategy
@@ -547,14 +551,14 @@ def get_pointing_info(pointing_id):
             notice = pointing.target.notice
             pointing_info['notice_id'] = notice.db_id
             pointing_info['notice_ivorn'] = notice.ivorn
-            pointing_info['notice_time'] = notice.received
+            pointing_info['notice_time'] = notice.received.isoformat(sep=' ')
             # Get Event info
             event = notice.event
             pointing_info['event_id'] = event.db_id
             pointing_info['event_name'] = event.name
             pointing_info['event_type'] = event.type
             pointing_info['event_origin'] = event.origin
-            pointing_info['event_time'] = event.time
+            pointing_info['event_time'] = event.time.isoformat(sep=' ')
         except Exception:
             pointing_info['notice_id'] = None
             pointing_info['notice_ivorn'] = None

@@ -12,7 +12,13 @@ from astropy import units as u
 from astropy.coordinates import AltAz, get_sun
 from astropy.time import Time
 
+from flask import Flask, abort, request
+
 from gtecs.common import logging
+
+import json
+
+from webtest.http import StopableWSGIServer
 
 from . import database as db
 from . import params
@@ -66,6 +72,11 @@ class Scheduler:
         self.pilot_query_time = {telescope_id: None for telescope_id in self.telescopes}
         self.database_update_time = 0
 
+        # Web server params
+        self.server_host = params.SERVER_HOST
+        self.server_port = params.SERVER_PORT
+        self.server_path = params.SERVER_PATH
+
     def __del__(self):
         self.shutdown()
 
@@ -73,10 +84,15 @@ class Scheduler:
         """Run the scheduler as a Pyro daemon."""
         self.running = True
 
-        # Start thread
+        # Start monitor thread
         t = threading.Thread(target=self._monitor_thread)
         t.daemon = True
         t.start()
+
+        # Start server thread
+        t2 = threading.Thread(target=self._server_thread)
+        t2.daemon = True
+        t2.start()
 
         # Check the Pyro address is available
         try:
@@ -119,7 +135,7 @@ class Scheduler:
         """Shut down the running threads."""
         self.running = False
 
-    # Internal thread
+    # Internal threads
     def _monitor_thread(self):
         """Monitor the database and find priority Pointings."""
         self.log.info('Database monitor thread started')
@@ -218,6 +234,113 @@ class Scheduler:
             time.sleep(0.1)
 
         self.log.info('Database monitor thread stopped')
+        return
+
+    def _server_thread(self):
+        """Access the scheduler through a Flask server."""
+        self.log.info('Web server thread started')
+
+        # Create the Flask application
+        app = Flask('scheduler')
+
+        @app.route(self.server_path + '/update_schedule/<int:telescope_id>', methods=['GET'])
+        def update_schedule(telescope_id):
+            try:
+                # Get args
+                args = request.args
+                current_pointing_id = args['current_pointing_id']
+                if current_pointing_id == 'None':
+                    current_pointing_id = None
+                else:
+                    current_pointing_id = int(current_pointing_id)
+                current_status = args['current_status']
+                if current_status == 'None':
+                    current_status = None
+                if 'horizon' in args:
+                    horizon = int(args['horizon'])
+                else:
+                    horizon = 0
+                if 'return_new' in args:
+                    return_new = bool(int(args['return_new']))
+                else:
+                    return_new = True
+                if 'force_update' in args:
+                    force_update = bool(int(args['force_update']))
+                else:
+                    force_update = False
+
+                # Call the internal function
+                pointing_info = self.update_schedule(
+                    telescope_id,
+                    current_pointing_id,
+                    current_status,
+                    horizon=horizon,
+                    return_new=return_new,
+                    force_update=force_update,
+                )
+
+                # Return the info as a JSON dict
+                response = app.response_class(
+                        response=json.dumps(pointing_info),
+                        mimetype='application/json'
+                )
+                return response
+            except Exception:
+                self.log.exception(f'HTTP request failed (from {request.path})')
+                abort(500)
+
+        @app.route(self.server_path + '/check_queue', methods=['GET'])
+        def check_queue():
+            try:
+                # Get args
+                args = request.args
+                if 'force_update' in args:
+                    force_update = bool(int(args['force_update']))
+                else:
+                    force_update = False
+
+                # Call the internal function
+                pointing_info = self.check_queue(force_update)
+
+                # Return the info as a JSON dict
+                response = app.response_class(
+                        response=json.dumps(pointing_info),
+                        mimetype='application/json'
+                )
+                return response
+            except Exception:
+                self.log.exception(f'HTTP request failed (from {request.path})')
+                abort(500)
+
+        @app.route(self.server_path + '/pointing_info/<int:pointing_id>', methods=['GET'])
+        def get_pointing_info(pointing_id):
+            try:
+                # Call the internal function
+                pointing_info = self.get_pointing_info(pointing_id)
+
+                # Return the info as a JSON dict
+                response = app.response_class(
+                        response=json.dumps(pointing_info),
+                        mimetype='application/json'
+                )
+                return response
+            except Exception:
+                self.log.exception(f'HTTP request failed (from {request.path})')
+                abort(500)
+
+        # Create and start the server
+        server = StopableWSGIServer.create(app, host=self.server_host, port=self.server_port)
+        server.wait()
+        addr = f'http://{self.server_host}:{self.server_port}{self.server_path}/'
+        self.log.info(f'Server started at {addr}')
+        while self.running:
+            time.sleep(1)
+
+        # Stop the server nicely when shutting down
+        self.log.info('Stopping server')
+        server.shutdown()
+
+        self.log.info('Web server thread stopped')
         return
 
     # Internal functions

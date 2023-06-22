@@ -243,6 +243,10 @@ class Scheduler:
         # Create the Flask application
         app = Flask('scheduler')
 
+        @app.route(self.server_path)
+        def homepage():
+            return 'This is the homepage for the GOTO central scheduler'
+
         @app.route(self.server_path + '/update_schedule/<int:telescope_id>', methods=['GET'])
         def update_schedule(telescope_id):
             try:

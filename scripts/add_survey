@@ -7,6 +7,7 @@ import time
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 
 from gtecs.obs import database as db
 from gtecs.obs import params
@@ -59,6 +60,8 @@ def get_tiles_from_file(filename):
 def fill_target():
     """Fill out a target frame with user input."""
     target_params = {'rank': None,
+                     'start_time': None,
+                     'stop_time': None,
                      }
     strategy_params = {'num_todo': None,
                        'wait_time': None,
@@ -102,6 +105,30 @@ def fill_target():
             strategy_params['wait_time'] = float(wait_time) * u.hour
         except Exception:
             print('Invalid input')
+
+    start_time = 'unknown'
+    while start_time == 'unknown':
+        input_time = input('Observation start datetime (blank for immediate): ')
+        if input_time == '':
+            start_time = None
+        else:
+            try:
+                start_time = Time(input_time)
+            except Exception:
+                print('Invalid input')
+    target_params['start_time'] = start_time
+
+    stop_time = 'unknown'
+    while stop_time == 'unknown':
+        input_time = input('Observation end datetime (blank for valid indefinitely): ')
+        if input_time == '':
+            stop_time = None
+        else:
+            try:
+                stop_time = Time(input_time)
+            except Exception:
+                print('Invalid input')
+    target_params['stop_time'] = stop_time
 
     # Constraints
     default_cons = None

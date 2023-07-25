@@ -302,7 +302,7 @@ def run(filename, coords_or_tiles='coords', on_grid=True):
         print('Creating targets...')
         start = time.time()
         targets = []
-        for i in range(len(weights)):
+        for i in range(len(tilenames)):
             if tilenames is not None:
                 # Get the current grid
                 db_grid = db.get_current_grid(session)
@@ -324,6 +324,11 @@ def run(filename, coords_or_tiles='coords', on_grid=True):
             else:
                 # shouldn't happen?
                 name = survey.name + '_' + str(int(i))
+
+            # Check if the Survey already has a Target with that name
+            if name in [t.name for t in survey.targets]:
+                print('  WARNING: Target "{}" already exists in the Survey!'.format(name))
+                continue
 
             target = db.Target(ra=ras[i] if ras is not None else None,
                                dec=decs[i] if decs is not None else None,

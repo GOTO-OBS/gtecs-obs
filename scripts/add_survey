@@ -175,13 +175,26 @@ def fill_target():
                 print('Invalid input')
 
     telescope_data = db.get_telescope_info()
+    site_data = db.get_site_info()
     tel_mask = 'unknown'  # Can't test on None, since it's a valid mask!
     while tel_mask == 'unknown':
-        telescope_id = input('Restrict to a single telescope? [<int>/n]: ')
+        msg = 'Restrict to one telescope (1,2,3,4) or one site (A=LP, B=SSO)? [<int>/A/B/n]: '
+        telescope_id = input(msg)
         if telescope_id in ['n', 'N']:
-            strategy_params['tel_mask'] = None
-        elif int(telescope_id) in telescope_data:
-            strategy_params['tel_mask'] = 2 ** (int(telescope_id) - 1)
+            tel_mask = None
+        elif telescope_id.lower() in ['a', 'b']:
+            site_id = ['a', 'b'].index(telescope_id.lower()) + 1
+            telescope_ids = [t for t in site_data[site_id]['telescopes']]
+            tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
+        else:
+            try:
+                if int(telescope_id) in telescope_data:
+                    tel_mask = 2 ** (int(telescope_id) - 1)
+                else:
+                    print('Invalid input')
+            except Exception:
+                print('Invalid input')
+    strategy_params['tel_mask'] = tel_mask
 
     return target_params, strategy_params
 

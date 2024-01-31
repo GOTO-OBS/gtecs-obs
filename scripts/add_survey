@@ -7,6 +7,7 @@ import time
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 
 from gtecs.obs import database as db
 from gtecs.obs import params
@@ -43,7 +44,7 @@ def get_tiles_from_file(filename):
     weights = []
     with open(filename, 'r') as file:
         for line in file:
-            if line[0] == '#':
+            if line[0] in ['#', '\n']:
                 continue
             try:
                 tilename, weight = line.split()
@@ -51,7 +52,7 @@ def get_tiles_from_file(filename):
                 weights.append(int(weight))
             except Exception:
                 tilename = line.split()
-                tilenames.append(tilename)
+                tilenames.append(tilename[0])
                 weights.append(1)
     return tilenames, weights
 
@@ -59,6 +60,8 @@ def get_tiles_from_file(filename):
 def fill_target():
     """Fill out a target frame with user input."""
     target_params = {'rank': None,
+                     'start_time': None,
+                     'stop_time': None,
                      }
     strategy_params = {'num_todo': None,
                        'wait_time': None,
@@ -102,6 +105,30 @@ def fill_target():
             strategy_params['wait_time'] = float(wait_time) * u.hour
         except Exception:
             print('Invalid input')
+
+    start_time = 'unknown'
+    while start_time == 'unknown':
+        input_time = input('Observation start datetime (blank for immediate): ')
+        if input_time == '':
+            start_time = None
+        else:
+            try:
+                start_time = Time(input_time)
+            except Exception:
+                print('Invalid input')
+    target_params['start_time'] = start_time
+
+    stop_time = 'unknown'
+    while stop_time == 'unknown':
+        input_time = input('Observation end datetime (blank for valid indefinitely): ')
+        if input_time == '':
+            stop_time = None
+        else:
+            try:
+                stop_time = Time(input_time)
+            except Exception:
+                print('Invalid input')
+    target_params['stop_time'] = stop_time
 
     # Constraints
     default_cons = None
@@ -148,13 +175,26 @@ def fill_target():
                 print('Invalid input')
 
     telescope_data = db.get_telescope_info()
+    site_data = db.get_site_info()
     tel_mask = 'unknown'  # Can't test on None, since it's a valid mask!
     while tel_mask == 'unknown':
-        telescope_id = input('Restrict to a single telescope? [<int>/n]: ')
+        msg = 'Restrict to one telescope (1,2,3,4) or one site (A=LP, B=SSO)? [<int>/A/B/n]: '
+        telescope_id = input(msg)
         if telescope_id in ['n', 'N']:
-            strategy_params['tel_mask'] = None
-        elif int(telescope_id) in telescope_data:
-            strategy_params['tel_mask'] = 2 ** (int(telescope_id) - 1)
+            tel_mask = None
+        elif telescope_id.lower() in ['a', 'b']:
+            site_id = ['a', 'b'].index(telescope_id.lower()) + 1
+            telescope_ids = [t for t in site_data[site_id]['telescopes']]
+            tel_mask = sum(2 ** (t - 1) for t in telescope_ids)
+        else:
+            try:
+                if int(telescope_id) in telescope_data:
+                    tel_mask = 2 ** (int(telescope_id) - 1)
+                else:
+                    print('Invalid input')
+            except Exception:
+                print('Invalid input')
+    strategy_params['tel_mask'] = tel_mask
 
     return target_params, strategy_params
 
@@ -262,7 +302,7 @@ def run(filename, coords_or_tiles='coords', on_grid=True):
         print('Creating targets...')
         start = time.time()
         targets = []
-        for i in range(len(weights)):
+        for i in range(len(tilenames)):
             if tilenames is not None:
                 # Get the current grid
                 db_grid = db.get_current_grid(session)
@@ -284,6 +324,11 @@ def run(filename, coords_or_tiles='coords', on_grid=True):
             else:
                 # shouldn't happen?
                 name = survey.name + '_' + str(int(i))
+
+            # Check if the Survey already has a Target with that name
+            if name in [t.name for t in survey.targets]:
+                print('  WARNING: Target "{}" already exists in the Survey!'.format(name))
+                continue
 
             target = db.Target(ra=ras[i] if ras is not None else None,
                                dec=decs[i] if decs is not None else None,

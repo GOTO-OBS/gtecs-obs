@@ -47,8 +47,10 @@ def run(site_id, telescopes, time, horizon, readout_time, template_requirement, 
 
         # Print the pointings
         all_cons = {}
-        print('  db_id | {: >{w}} | Vld | Rnk | ToO | Nobs | TieBrk | Constraints'.format(
-            'Object name', w=name_len))
+        head = '  db_id | {: >{w}} '.format('Object name', w=name_len)
+        head += '|    RA |   Dec |   Alt |    Az '
+        head += '| Vld | Rnk | ToO | Nobs | TieBrk | Constraints'
+        print(head)
         for pointing in pointing_list[:limit]:
 
             if pointing.current_telescope == telescope_id:
@@ -57,6 +59,11 @@ def run(site_id, telescopes, time, horizon, readout_time, template_requirement, 
             else:
                 print('{: >7.0f}'.format(pointing.db_id), end=' | ')
                 print('{: >{w}}'.format(pointing.name, w=name_len), end=' | ')
+
+            print('{: >5.1f}'.format(pointing.ra), end=' | ')
+            print('{: >+5.1f}'.format(pointing.dec), end=' | ')
+            print('{: >+5.1f}'.format(pointing.altaz.alt.deg), end=' | ')
+            print('{: >5.1f}'.format(pointing.altaz.az.deg), end=' | ')
 
             print(gtxt(' Y ') if pointing.valid else rtxt(' N '), end=' | ')
 

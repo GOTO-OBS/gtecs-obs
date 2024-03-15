@@ -466,9 +466,10 @@ class PointingQueue:
         for i, pointing in enumerate(self.pointings):
             pointing.altaz = altaz[i]
             pointing.altaz_end = altaz_end[i]
-            pointing.weight = weight_arr[i]
-            pointing.airmass = airmass_arr[i]
-            pointing.tts = tts_arr[i]
+            pointing.scaled_weight = weight_arr[i]  # Don't overwrite the existing .weight with 1-!
+            pointing.secz = secz_arr[i]
+            pointing.scaled_airmass = airmass_arr[i]
+            pointing.scaled_tts = tts_arr[i]
             pointing.tiebreaker = tiebreak_arr[i]
 
     def calculate_priorities(self, telescope_id, horizon, readout_time, template_requirement):

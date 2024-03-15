@@ -411,7 +411,7 @@ class Scheduler:
         with db.session_manager() as session:
             # Process any Pointings that need updating
             while len(self.update_queue) > 0:
-                pointing = self.update_queue.pop()
+                pointing = self.update_queue.pop(0)  # First-in, first-out
                 try:
                     pointing_id = pointing[0]
                     new_status = pointing[1]

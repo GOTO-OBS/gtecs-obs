@@ -11,6 +11,7 @@ or that query the database and return information instead of classes (e.g. `vali
 """
 
 import hashlib
+import json
 from contextlib import contextmanager
 
 from astropy import units as u
@@ -568,6 +569,10 @@ def get_pointing_info(pointing_id):
             pointing_info['event_type'] = None
             pointing_info['event_origin'] = None
             pointing_info['event_time'] = None
+
+    # Check the dict is serializable, so we can send it though the web server API
+    if json.loads(json.dumps(pointing_info)) != pointing_info:
+        raise ValueError('Pointing info is not JSON-serializable')
 
     return pointing_info
 

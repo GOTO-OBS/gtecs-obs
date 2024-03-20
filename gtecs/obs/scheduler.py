@@ -48,7 +48,7 @@ class Scheduler:
 
         self.readout_time = params.READOUT_TIME
         self.template_requirement = params.TEMPLATE_REQUIREMENT
-        # # These aren't implmenented at the moment...
+        # # These aren't implemented at the moment...
         # self.write_file = params.WRITE_QUEUE_FILE
         # self.queue_file = os.path.join(params.FILE_PATH, 'queue_info')
         # self.write_html = params.WRITE_QUEUE_PAGE
@@ -287,8 +287,8 @@ class Scheduler:
 
                 # Return the info as a JSON dict
                 response = app.response_class(
-                        response=json.dumps(pointing_info),
-                        mimetype='application/json'
+                    response=json.dumps(pointing_info),
+                    mimetype='application/json'
                 )
                 return response
             except Exception:
@@ -315,8 +315,8 @@ class Scheduler:
 
                 # Return the info as a JSON dict
                 response = app.response_class(
-                        response=json.dumps(pointing_info),
-                        mimetype='application/json'
+                    response=json.dumps(pointing_info),
+                    mimetype='application/json'
                 )
                 return response
             except Exception:
@@ -337,8 +337,8 @@ class Scheduler:
 
                 # Return the info as a JSON dict
                 response = app.response_class(
-                        response=json.dumps(pointing_info),
-                        mimetype='application/json'
+                    response=json.dumps(pointing_info),
+                    mimetype='application/json'
                 )
                 return response
             except Exception:
@@ -639,11 +639,11 @@ class Scheduler:
             while self.force_check_flag:
                 time.sleep(0.1)
 
-        pointings = {telescope_id: [db.get_pointing_info(pointing.db_id)
-                                    if pointing is not None else None
-                                    for pointing in pointings]
-                     for telescope_id, pointings in self.latest_pointings.items()}
-        return pointings
+        pointing_info = {telescope_id: [db.get_pointing_info(pointing.db_id)
+                                        if pointing is not None else None
+                                        for pointing in pointings]
+                         for telescope_id, pointings in self.latest_pointings.items()}
+        return pointing_info
 
     def get_pointing_info(self, pointing_id):
         """Get info from the database for a given pointing.

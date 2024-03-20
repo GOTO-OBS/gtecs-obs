@@ -5,7 +5,7 @@ import os
 from astroplan.moon import moon_illumination
 
 from astropy import units as u
-from astropy.coordinates import AltAz, ICRS, get_moon, get_sun
+from astropy.coordinates import AltAz, ICRS, get_body, get_sun
 from astropy.time import Time
 
 from . import database as db
@@ -194,7 +194,7 @@ def write_queue_page(queue, queue_file_path, html_path):
         f.write('{:.1f} deg'.format(sun_alt))
 
         f.write('  MoonAlt: ')
-        moon = get_moon(time)
+        moon = get_body('moon', time)
         moon_alt = moon.transform_to(altaz_frame).alt.degree
         f.write('{:.1f} deg'.format(moon_alt))
 

@@ -1,4 +1,4 @@
-"""Class for monitoring the obs database and finding pointings to observe."""
+"""Class for monitoring the observation database and finding pointings to observe."""
 
 import sys
 import threading
@@ -526,7 +526,7 @@ class Scheduler:
         current_pointing_id : int or None
             The ID number of the current Pointing the telescope is observing, if any.
         current_status : str or None
-            The status of the current Pointing to update the observing database.
+            The status of the current Pointing to update the observation database.
             Valid statuses are 'running', 'completed' or 'interrupted',
             or None if current_pointing is None.
 

@@ -27,10 +27,6 @@ from .scheduling import PointingQueue
 from .slack import send_slack_msg
 
 
-Pyro4.config.SERIALIZER = 'pickle'  # IMPORTANT - Can serialize Pointing objects
-Pyro4.config.SERIALIZERS_ACCEPTED.add('pickle')
-
-
 @Pyro4.expose
 class Scheduler:
     """Database scheduler daemon class."""

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a blank observing database."""
+"""Create a blank observation database."""
 
 import argparse
 import os
@@ -21,7 +21,7 @@ def run(overwrite=False, add_defaults=False, verbose=False):
         create_database(
             Base,
             name='obs',
-            description='Scheduler observing database',
+            description='Scheduler observation database',
             user=params.DATABASE_USER,
             password=params.DATABASE_PASSWORD,
             host=params.DATABASE_HOST,
@@ -97,7 +97,7 @@ def run(overwrite=False, add_defaults=False, verbose=False):
 
 
 if __name__ == '__main__':
-    description = """Create the scheduler observing database."""
+    description = """Create the scheduler observation database."""
 
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)

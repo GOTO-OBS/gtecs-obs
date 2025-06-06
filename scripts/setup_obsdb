@@ -16,23 +16,22 @@ from gtecs.obs.database.models import Base, SQL_CODE
 def run(overwrite=False, add_defaults=False, verbose=False):
     """Create and fill the database."""
     # Create a blank database
-    print(f'Creating blank {params.DATABASE_DIALECT} database...')
+    print('Creating blank database...')
     try:
         create_database(
             Base,
-            name='obs',
-            description='Scheduler observation database',
             user=params.DATABASE_USER,
             password=params.DATABASE_PASSWORD,
             host=params.DATABASE_HOST,
-            dialect=params.DATABASE_DIALECT,
+            schema_name='obs',
+            description='Scheduler observation database',
             overwrite=overwrite,
             sql_code=SQL_CODE,
             verbose=verbose,
         )
     except ValueError as err:
         if 'already exists' in str(err):
-            print('ERROR: Database already exists.')
+            print('ERROR: Database schema gtecs.obs already exists.')
             print('       Rerun with -o/--overwrite to drop existing data.')
             sys.exit()
         else:

@@ -12,8 +12,7 @@ from gototile.grid import SkyGrid
 import numpy as np
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy import exists, func, select, text
-from sqlalchemy.dialects.mysql import TIMESTAMP
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import column_property, declarative_base, relationship, validates
@@ -28,10 +27,6 @@ __all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
 
 
 Base = declarative_base()
-if params.DATABASE_DIALECT == 'mysql':
-    Base.metadata.schema = 'gtecs_obs'
-else:
-    Base.metadata.schema = 'obs'
 
 
 class User(Base):
@@ -73,8 +68,9 @@ class User(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'users'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -85,11 +81,7 @@ class User(Base):
     full_name = Column(Text, nullable=False)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     targets = relationship(
@@ -175,8 +167,9 @@ class ExposureSet(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'exposure_sets'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -191,14 +184,10 @@ class ExposureSet(Base):
     ut_mask = Column(Integer, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True, index=True)
+    target_id = Column(Integer, ForeignKey('obs.targets.id'), nullable=True, index=True)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     target = relationship(
@@ -211,7 +200,7 @@ class ExposureSet(Base):
     pointings = relationship(
         'Pointing',
         order_by='Pointing.db_id',
-        secondary=f'{Base.metadata.schema}.targets',
+        secondary='obs.targets',
         primaryjoin='ExposureSet.target_id == Target.db_id',
         secondaryjoin='Pointing.target_id == Target.db_id',
         back_populates='exposure_sets',
@@ -394,8 +383,9 @@ class Pointing(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'pointings'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -415,17 +405,13 @@ class Pointing(Base):
     validated_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=False, index=True)
-    time_block_id = Column(Integer, ForeignKey('time_blocks.id'), nullable=False, index=True)
-    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False, index=True)
-    telescope_id = Column(Integer, ForeignKey('telescopes.id'), nullable=True, index=True)
+    target_id = Column(Integer, ForeignKey('obs.targets.id'), nullable=False, index=True)
+    time_block_id = Column(Integer, ForeignKey('obs.time_blocks.id'), nullable=False, index=True)
+    strategy_id = Column(Integer, ForeignKey('obs.strategies.id'), nullable=False, index=True)
+    telescope_id = Column(Integer, ForeignKey('obs.telescopes.id'), nullable=True, index=True)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     target = relationship(
@@ -456,7 +442,7 @@ class Pointing(Base):
         'ExposureSet',
         order_by='ExposureSet.db_id',
         lazy='joined',  # SAVE TIME IN SCHEDULER
-        secondary=f'{Base.metadata.schema}.targets',
+        secondary='obs.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='ExposureSet.target_id == Target.db_id',
         back_populates='pointings',
@@ -466,7 +452,7 @@ class Pointing(Base):
     grid_tile = relationship(
         'GridTile',
         order_by='GridTile.db_id',
-        secondary=f'{Base.metadata.schema}.targets',
+        secondary='obs.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='GridTile.db_id == Target.grid_tile_id',
         back_populates='pointings',
@@ -477,7 +463,7 @@ class Pointing(Base):
     survey = relationship(
         'Survey',
         order_by='Survey.db_id',
-        secondary=f'{Base.metadata.schema}.targets',
+        secondary='obs.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='Survey.db_id == Target.survey_id',
         back_populates='pointings',
@@ -992,8 +978,9 @@ class Strategy(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'strategies'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -1018,14 +1005,10 @@ class Strategy(Base):
     tel_mask = Column(Integer, nullable=True, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('targets.id'), nullable=True, index=True)
+    target_id = Column(Integer, ForeignKey('obs.targets.id'), nullable=True, index=True)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     target = relationship(
@@ -1392,8 +1375,9 @@ class TimeBlock(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'time_blocks'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -1405,14 +1389,10 @@ class TimeBlock(Base):
     rank_change = Column(Integer, nullable=True, default=10)
 
     # Foreign keys
-    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False, index=True)
+    strategy_id = Column(Integer, ForeignKey('obs.strategies.id'), nullable=False, index=True)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     strategy = relationship(
@@ -1500,7 +1480,7 @@ class Target(Base):
         UTC time from which Target is considered valid and can be started.
         if not given then set to now, so the Target will start immediately.
         default = Time.now()
-    stop_time : string, `astropy.time.Time` or datetime.datetime, optional
+    stop_time : string, `astropy.time.Time` or datetime.datetime, or None, optional
         the latest UTC time after which Pointings must stop.
         if not given the Target will continue creating Pointings until
         it is completed.
@@ -1582,8 +1562,9 @@ class Target(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'targets'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -1605,16 +1586,12 @@ class Target(Base):
     deleted_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    grid_tile_id = Column(Integer, ForeignKey('grid_tiles.id'), nullable=True, index=True)
-    survey_id = Column(Integer, ForeignKey('surveys.id'), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey('obs.users.id'), nullable=False, index=True)
+    grid_tile_id = Column(Integer, ForeignKey('obs.grid_tiles.id'), nullable=True, index=True)
+    survey_id = Column(Integer, ForeignKey('obs.surveys.id'), nullable=True, index=True)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     # (remember to add to __init__)
@@ -1653,7 +1630,7 @@ class Target(Base):
     grid = relationship(
         'Grid',
         order_by='Grid.db_id',
-        secondary=f'{Base.metadata.schema}.grid_tiles',
+        secondary='obs.grid_tiles',
         primaryjoin='Target.grid_tile_id == GridTile.db_id',
         secondaryjoin='Grid.db_id == GridTile.grid_id',
         back_populates='targets',
@@ -2259,8 +2236,9 @@ class Site(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'sites'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -2272,11 +2250,7 @@ class Site(Base):
     height = Column(Float, nullable=False)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     telescopes = relationship(
@@ -2387,9 +2361,9 @@ class Telescope(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'telescopes'
-
+    __table_args__ = {'schema': 'obs'}
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
 
@@ -2398,15 +2372,11 @@ class Telescope(Base):
     horizon = Column(Text, nullable=True)
 
     # Foreign keys
-    site_id = Column(Integer, ForeignKey('sites.id'), nullable=False, index=True)
-    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=True, index=True)
+    site_id = Column(Integer, ForeignKey('obs.sites.id'), nullable=False, index=True)
+    grid_id = Column(Integer, ForeignKey('obs.grids.id'), nullable=True, index=True)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     site = relationship(
@@ -2529,8 +2499,9 @@ class Grid(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'grids'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -2544,11 +2515,7 @@ class Grid(Base):
     algorithm = Column(String(255), nullable=False)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     grid_tiles = relationship(
@@ -2566,7 +2533,7 @@ class Grid(Base):
     targets = relationship(
         'Target',
         order_by='Target.db_id',
-        secondary=f'{Base.metadata.schema}.grid_tiles',
+        secondary='obs.grid_tiles',
         primaryjoin='Grid.db_id == GridTile.grid_id',
         secondaryjoin='Target.grid_tile_id == GridTile.db_id',
         back_populates='grid',
@@ -2682,8 +2649,9 @@ class GridTile(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'grid_tiles'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -2694,14 +2662,10 @@ class GridTile(Base):
     dec = Column(Float, nullable=False)
 
     # Foreign keys
-    grid_id = Column(Integer, ForeignKey('grids.id'), nullable=False, index=True)
+    grid_id = Column(Integer, ForeignKey('obs.grids.id'), nullable=False, index=True)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     grid = relationship(
@@ -2719,7 +2683,7 @@ class GridTile(Base):
     pointings = relationship(
         'Pointing',
         order_by='Pointing.db_id',
-        secondary=f'{Base.metadata.schema}.targets',
+        secondary='obs.targets',
         primaryjoin='GridTile.db_id == Target.grid_tile_id',
         secondaryjoin='Pointing.target_id == Target.db_id',
         back_populates='grid_tile',
@@ -2840,8 +2804,9 @@ class Survey(Base):
 
     """
 
-    # Set corresponding SQL table name
+    # Set corresponding SQL table name and schema
     __tablename__ = 'surveys'
+    __table_args__ = {'schema': 'obs'}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -2850,11 +2815,7 @@ class Survey(Base):
     name = Column(String(255), nullable=False, index=True)
 
     # Update timestamp
-    if params.DATABASE_DIALECT == 'mysql':
-        ts = Column(TIMESTAMP(fsp=3), nullable=False,
-                    server_default=text('CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)'))
-    elif params.DATABASE_DIALECT == 'postgres':
-        ts = Column(DateTime, nullable=False, server_default=func.now())
+    ts = Column(DateTime, nullable=False, server_default=func.now())
 
     # Foreign relationships
     targets = relationship(
@@ -2867,7 +2828,7 @@ class Survey(Base):
     pointings = relationship(
         'Pointing',
         order_by='Pointing.db_id',
-        secondary=f'{Base.metadata.schema}.targets',
+        secondary='obs.targets',
         primaryjoin='Survey.db_id == Target.survey_id',
         secondaryjoin='Pointing.target_id == Target.db_id',
         back_populates='survey',
@@ -2883,25 +2844,24 @@ class Survey(Base):
 
 
 SQL_CODE = []
-if params.DATABASE_DIALECT == 'postgres':
-    # Create ts update triggers (https://stackoverflow.com/a/71072370)
-    ts_function = """
-    CREATE FUNCTION {schema}.update_ts()
-    RETURNS TRIGGER
-    LANGUAGE plpgsql AS
-    $func$
-    BEGIN
-       NEW.ts := now();
-       RETURN NEW;
-    END
-    $func$;
-    """
-    SQL_CODE.append(ts_function.format(schema=Base.metadata.schema))
+# Create ts update triggers (https://stackoverflow.com/a/71072370)
+ts_function = """
+CREATE FUNCTION obs.update_ts()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS
+$func$
+BEGIN
+    NEW.ts := now();
+    RETURN NEW;
+END
+$func$;
+"""
+SQL_CODE.append(ts_function)
 
-    ts_trigger = """
-    CREATE TRIGGER trig_update_ts_{table} BEFORE UPDATE ON {schema}.{table}
-    FOR EACH ROW EXECUTE PROCEDURE {schema}.update_ts();
-    """
-    for table in Base.metadata.tables.values():
-        if 'ts' in table.columns:
-            SQL_CODE.append(ts_trigger.format(schema=Base.metadata.schema, table=table.name))
+ts_trigger = """
+CREATE TRIGGER trig_update_ts_{table} BEFORE UPDATE ON obs.{table}
+FOR EACH ROW EXECUTE PROCEDURE obs.update_ts();
+"""
+for table in Base.metadata.tables.values():
+    if 'ts' in table.columns:
+        SQL_CODE.append(ts_trigger.format(table=table.name))

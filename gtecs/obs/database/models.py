@@ -12,7 +12,7 @@ from gototile.grid import SkyGrid
 import numpy as np
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy import exists, func, select
+from sqlalchemy import event, exists, func, select, DDL
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import column_property, declarative_base, relationship, validates
@@ -2843,10 +2843,9 @@ class Survey(Base):
         return 'Survey({})'.format(', '.join(strings))
 
 
-SQL_CODE = []
-# Create ts update triggers (https://stackoverflow.com/a/71072370)
-ts_function = """
-CREATE FUNCTION obs.update_ts()
+# Create ts update triggers on every table
+ts_function = DDL("""
+CREATE OR REPLACE FUNCTION obs.update_ts()
 RETURNS TRIGGER
 LANGUAGE plpgsql AS
 $func$
@@ -2855,13 +2854,13 @@ BEGIN
     RETURN NEW;
 END
 $func$;
-"""
-SQL_CODE.append(ts_function)
-
-ts_trigger = """
-CREATE TRIGGER trig_update_ts_{table} BEFORE UPDATE ON obs.{table}
-FOR EACH ROW EXECUTE PROCEDURE obs.update_ts();
-"""
+""")
+event.listen(Base.metadata, "before_create", ts_function)
 for table in Base.metadata.tables.values():
-    if 'ts' in table.columns:
-        SQL_CODE.append(ts_trigger.format(table=table.name))
+    if table.schema == 'obs' and 'ts' in table.columns:
+        ts_trigger = DDL(f"""
+        CREATE TRIGGER trig_update_ts_{table.name}
+        BEFORE UPDATE ON obs.{table.name}
+        FOR EACH ROW EXECUTE PROCEDURE obs.update_ts();
+        """)
+        event.listen(table, "after_create", ts_trigger)

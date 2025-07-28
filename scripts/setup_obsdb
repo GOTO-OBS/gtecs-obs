@@ -10,7 +10,7 @@ from gototile.grid import SkyGrid
 from gtecs.common.database import create_database
 from gtecs.obs import database as db
 from gtecs.obs import params
-from gtecs.obs.database.models import Base, SQL_CODE
+from gtecs.obs.database.models import Base
 
 
 def run(overwrite=False, add_defaults=False, verbose=False):
@@ -26,7 +26,6 @@ def run(overwrite=False, add_defaults=False, verbose=False):
             schema_name='obs',
             description='Scheduler observation database',
             overwrite=overwrite,
-            sql_code=SQL_CODE,
             verbose=verbose,
         )
     except ValueError as err:

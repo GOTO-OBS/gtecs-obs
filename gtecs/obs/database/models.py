@@ -2862,6 +2862,6 @@ for table in Base.metadata.tables.values():
         ts_trigger = DDL(f"""
         CREATE TRIGGER trig_update_ts_{table.name}
         BEFORE UPDATE ON {SCHEMA}.{table.name}
-        FOR EACH ROW EXECUTE PROCEDURE {SCHEMA}.update_ts();
+        FOR EACH ROW EXECUTE FUNCTION {SCHEMA}.update_ts();
         """)
         event.listen(table, "after_create", ts_trigger)

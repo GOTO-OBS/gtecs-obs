@@ -25,6 +25,7 @@ __all__ = ['User', 'ExposureSet', 'Pointing', 'Strategy', 'Target', 'TimeBlock',
            'Site', 'Telescope', 'Grid', 'GridTile', 'Survey',
            ]
 
+SCHEMA = 'obs'
 
 Base = declarative_base()
 
@@ -70,7 +71,7 @@ class User(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'users'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -169,7 +170,7 @@ class ExposureSet(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'exposure_sets'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -184,7 +185,7 @@ class ExposureSet(Base):
     ut_mask = Column(Integer, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('obs.targets.id'), nullable=True, index=True)
+    target_id = Column(Integer, ForeignKey(f'{SCHEMA}.targets.id'), nullable=True, index=True)
 
     # Update timestamp
     ts = Column(DateTime, nullable=False, server_default=func.now())
@@ -200,7 +201,7 @@ class ExposureSet(Base):
     pointings = relationship(
         'Pointing',
         order_by='Pointing.db_id',
-        secondary='obs.targets',
+        secondary=f'{SCHEMA}.targets',
         primaryjoin='ExposureSet.target_id == Target.db_id',
         secondaryjoin='Pointing.target_id == Target.db_id',
         back_populates='exposure_sets',
@@ -385,7 +386,7 @@ class Pointing(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'pointings'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -405,10 +406,10 @@ class Pointing(Base):
     validated_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('obs.targets.id'), nullable=False, index=True)
-    time_block_id = Column(Integer, ForeignKey('obs.time_blocks.id'), nullable=False, index=True)
-    strategy_id = Column(Integer, ForeignKey('obs.strategies.id'), nullable=False, index=True)
-    telescope_id = Column(Integer, ForeignKey('obs.telescopes.id'), nullable=True, index=True)
+    target_id = Column(Integer, ForeignKey(f'{SCHEMA}.targets.id'), nullable=False, index=True)
+    time_block_id = Column(Integer, ForeignKey(f'{SCHEMA}.time_blocks.id'), nullable=False, index=True)
+    strategy_id = Column(Integer, ForeignKey(f'{SCHEMA}.strategies.id'), nullable=False, index=True)
+    telescope_id = Column(Integer, ForeignKey(f'{SCHEMA}.telescopes.id'), nullable=True, index=True)
 
     # Update timestamp
     ts = Column(DateTime, nullable=False, server_default=func.now())
@@ -442,7 +443,7 @@ class Pointing(Base):
         'ExposureSet',
         order_by='ExposureSet.db_id',
         lazy='joined',  # SAVE TIME IN SCHEDULER
-        secondary='obs.targets',
+        secondary=f'{SCHEMA}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='ExposureSet.target_id == Target.db_id',
         back_populates='pointings',
@@ -452,7 +453,7 @@ class Pointing(Base):
     grid_tile = relationship(
         'GridTile',
         order_by='GridTile.db_id',
-        secondary='obs.targets',
+        secondary=f'{SCHEMA}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='GridTile.db_id == Target.grid_tile_id',
         back_populates='pointings',
@@ -463,7 +464,7 @@ class Pointing(Base):
     survey = relationship(
         'Survey',
         order_by='Survey.db_id',
-        secondary='obs.targets',
+        secondary=f'{SCHEMA}.targets',
         primaryjoin='Pointing.target_id == Target.db_id',
         secondaryjoin='Survey.db_id == Target.survey_id',
         back_populates='pointings',
@@ -980,7 +981,7 @@ class Strategy(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'strategies'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -1005,7 +1006,7 @@ class Strategy(Base):
     tel_mask = Column(Integer, nullable=True, default=None)
 
     # Foreign keys
-    target_id = Column(Integer, ForeignKey('obs.targets.id'), nullable=True, index=True)
+    target_id = Column(Integer, ForeignKey(f'{SCHEMA}.targets.id'), nullable=True, index=True)
 
     # Update timestamp
     ts = Column(DateTime, nullable=False, server_default=func.now())
@@ -1377,7 +1378,7 @@ class TimeBlock(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'time_blocks'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -1389,7 +1390,7 @@ class TimeBlock(Base):
     rank_change = Column(Integer, nullable=True, default=10)
 
     # Foreign keys
-    strategy_id = Column(Integer, ForeignKey('obs.strategies.id'), nullable=False, index=True)
+    strategy_id = Column(Integer, ForeignKey(f'{SCHEMA}.strategies.id'), nullable=False, index=True)
 
     # Update timestamp
     ts = Column(DateTime, nullable=False, server_default=func.now())
@@ -1564,7 +1565,7 @@ class Target(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'targets'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -1586,9 +1587,9 @@ class Target(Base):
     deleted_time = Column(DateTime, nullable=True, default=None)
 
     # Foreign keys
-    user_id = Column(Integer, ForeignKey('obs.users.id'), nullable=False, index=True)
-    grid_tile_id = Column(Integer, ForeignKey('obs.grid_tiles.id'), nullable=True, index=True)
-    survey_id = Column(Integer, ForeignKey('obs.surveys.id'), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey(f'{SCHEMA}.users.id'), nullable=False, index=True)
+    grid_tile_id = Column(Integer, ForeignKey(f'{SCHEMA}.grid_tiles.id'), nullable=True, index=True)
+    survey_id = Column(Integer, ForeignKey(f'{SCHEMA}.surveys.id'), nullable=True, index=True)
 
     # Update timestamp
     ts = Column(DateTime, nullable=False, server_default=func.now())
@@ -1630,7 +1631,7 @@ class Target(Base):
     grid = relationship(
         'Grid',
         order_by='Grid.db_id',
-        secondary='obs.grid_tiles',
+        secondary=f'{SCHEMA}.grid_tiles',
         primaryjoin='Target.grid_tile_id == GridTile.db_id',
         secondaryjoin='Grid.db_id == GridTile.grid_id',
         back_populates='targets',
@@ -2238,7 +2239,7 @@ class Site(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'sites'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -2363,7 +2364,7 @@ class Telescope(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'telescopes'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
 
@@ -2372,8 +2373,8 @@ class Telescope(Base):
     horizon = Column(Text, nullable=True)
 
     # Foreign keys
-    site_id = Column(Integer, ForeignKey('obs.sites.id'), nullable=False, index=True)
-    grid_id = Column(Integer, ForeignKey('obs.grids.id'), nullable=True, index=True)
+    site_id = Column(Integer, ForeignKey(f'{SCHEMA}.sites.id'), nullable=False, index=True)
+    grid_id = Column(Integer, ForeignKey(f'{SCHEMA}.grids.id'), nullable=True, index=True)
 
     # Update timestamp
     ts = Column(DateTime, nullable=False, server_default=func.now())
@@ -2501,7 +2502,7 @@ class Grid(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'grids'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -2533,7 +2534,7 @@ class Grid(Base):
     targets = relationship(
         'Target',
         order_by='Target.db_id',
-        secondary='obs.grid_tiles',
+        secondary=f'{SCHEMA}.grid_tiles',
         primaryjoin='Grid.db_id == GridTile.grid_id',
         secondaryjoin='Target.grid_tile_id == GridTile.db_id',
         back_populates='grid',
@@ -2651,7 +2652,7 @@ class GridTile(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'grid_tiles'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -2662,7 +2663,7 @@ class GridTile(Base):
     dec = Column(Float, nullable=False)
 
     # Foreign keys
-    grid_id = Column(Integer, ForeignKey('obs.grids.id'), nullable=False, index=True)
+    grid_id = Column(Integer, ForeignKey(f'{SCHEMA}.grids.id'), nullable=False, index=True)
 
     # Update timestamp
     ts = Column(DateTime, nullable=False, server_default=func.now())
@@ -2683,7 +2684,7 @@ class GridTile(Base):
     pointings = relationship(
         'Pointing',
         order_by='Pointing.db_id',
-        secondary='obs.targets',
+        secondary=f'{SCHEMA}.targets',
         primaryjoin='GridTile.db_id == Target.grid_tile_id',
         secondaryjoin='Pointing.target_id == Target.db_id',
         back_populates='grid_tile',
@@ -2806,7 +2807,7 @@ class Survey(Base):
 
     # Set corresponding SQL table name and schema
     __tablename__ = 'surveys'
-    __table_args__ = {'schema': 'obs'}
+    __table_args__ = {'schema': SCHEMA}
 
     # Primary key
     db_id = Column('id', Integer, primary_key=True)
@@ -2828,7 +2829,7 @@ class Survey(Base):
     pointings = relationship(
         'Pointing',
         order_by='Pointing.db_id',
-        secondary='obs.targets',
+        secondary=f'{SCHEMA}.targets',
         primaryjoin='Survey.db_id == Target.survey_id',
         secondaryjoin='Pointing.target_id == Target.db_id',
         back_populates='survey',
@@ -2844,8 +2845,8 @@ class Survey(Base):
 
 
 # Create ts update triggers on every table
-ts_function = DDL("""
-CREATE OR REPLACE FUNCTION obs.update_ts()
+ts_function = DDL(f"""
+CREATE OR REPLACE FUNCTION {SCHEMA}.update_ts()
 RETURNS TRIGGER
 LANGUAGE plpgsql AS
 $func$
@@ -2857,10 +2858,10 @@ $func$;
 """)
 event.listen(Base.metadata, "before_create", ts_function)
 for table in Base.metadata.tables.values():
-    if table.schema == 'obs' and 'ts' in table.columns:
+    if table.schema == SCHEMA and 'ts' in table.columns:
         ts_trigger = DDL(f"""
         CREATE TRIGGER trig_update_ts_{table.name}
-        BEFORE UPDATE ON obs.{table.name}
-        FOR EACH ROW EXECUTE PROCEDURE obs.update_ts();
+        BEFORE UPDATE ON {SCHEMA}.{table.name}
+        FOR EACH ROW EXECUTE PROCEDURE {SCHEMA}.update_ts();
         """)
         event.listen(table, "after_create", ts_trigger)

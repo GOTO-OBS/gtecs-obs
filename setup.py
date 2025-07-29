@@ -5,6 +5,8 @@ from setuptools import setup, find_namespace_packages
 
 REQUIRES = ['sqlalchemy>=2',
             'psycopg2',
+            'alembic',
+            'alembic-utils',
             'astropy',
             'astroplan',
             'numpy',

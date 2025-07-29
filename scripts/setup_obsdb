@@ -1,111 +1,279 @@
 #!/usr/bin/env python3
-"""Create a blank observation database."""
+"""Prepare an observation database with default data."""
 
 import argparse
 import os
 import sys
 
 from gototile.grid import SkyGrid
+from sqlalchemy import text
 
-from gtecs.common.database import create_database
 from gtecs.obs import database as db
 from gtecs.obs import params
 from gtecs.obs.database.models import Base
 
 
-def run(overwrite=False, add_defaults=False, verbose=False):
-    """Create and fill the database."""
-    # Create a blank database
-    print('Creating blank database...')
+def check_database_connection():
+    """Check if we can connect to the gtecs database."""
     try:
-        create_database(
-            Base,
-            user=params.DATABASE_USER,
-            password=params.DATABASE_PASSWORD,
-            host=params.DATABASE_HOST,
-            schema_name='obs',
-            description='Scheduler observation database',
-            overwrite=overwrite,
-            verbose=verbose,
+        with db.session_manager() as session:
+            # Simple query to test database connection
+            session.execute(text("SELECT 1")).fetchone()
+            return True
+    except Exception:
+        return False
+
+
+def check_schema_exists():
+    """Check if the obs schema exists within the gtecs database."""
+    try:
+        with db.session_manager() as session:
+            # Try to query the information schema to see if our schema exists
+            result = session.execute(
+                text(
+                    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'obs'"
+                )
+            ).fetchone()
+            return result is not None
+    except Exception:
+        return False
+
+
+def check_tables_exist():
+    """Check if all expected tables exist in the obs schema."""
+    # Get expected table names from SQLAlchemy metadata
+    expected_tables = {
+        table.name for table in Base.metadata.tables.values() if table.schema == "obs"
+    }
+
+    try:
+        with db.session_manager() as session:
+            # Query for all tables in the obs schema
+            result = session.execute(
+                text(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = 'obs' AND table_type = 'BASE TABLE'"
+                )
+            ).fetchall()
+
+            existing_tables = {row[0] for row in result}
+            missing_tables = expected_tables - existing_tables
+
+            return len(missing_tables) == 0, missing_tables
+    except Exception:
+        return False, expected_tables
+
+
+def check_database_empty():
+    """Check if the database is empty (no data in any tables)."""
+    try:
+        with db.session_manager() as session:
+            # Check all tables for any data
+            for table in Base.metadata.tables.values():
+                if table.schema == "obs":
+                    result = session.execute(
+                        text(f"SELECT COUNT(*) FROM obs.{table.name}")
+                    ).scalar()
+                    if result > 0:
+                        return False
+            return True
+    except Exception:
+        return False
+
+
+def clear_database(verbose=False):
+    """Clear all data from database tables while preserving structure."""
+    print("Clearing existing data from database...")
+    with db.session_manager() as session:
+        # Get table names from metadata in reverse dependency order
+        # We need to delete in reverse order to avoid foreign key constraint issues
+        table_names = [
+            table.name
+            for table in reversed(Base.metadata.sorted_tables)
+            if table.schema == "obs"
+        ]
+
+        # Delete from tables in dependency order
+        for table_name in table_names:
+            result = session.execute(text(f"DELETE FROM obs.{table_name}"))
+            if result.rowcount > 0 and verbose:
+                print(f"  Cleared {result.rowcount} rows from {table_name}")
+
+        session.commit()
+
+
+def run(overwrite=False, add_defaults=False, verbose=False):
+    """Setup the database with default data."""
+
+    # Check if we can connect to the gtecs database
+    if not check_database_connection():
+        print('ERROR: Cannot connect to the "gtecs" database.')
+        print(
+            "       Please check your database configuration and ensure PostgreSQL is running."
         )
-    except ValueError as err:
-        if 'already exists' in str(err):
-            print('ERROR: Database schema gtecs.obs already exists.')
-            print('       Rerun with -o/--overwrite to drop existing data.')
-            sys.exit()
+        print('       You may need to create the "gtecs" database first.')
+        sys.exit(1)
+
+    if verbose:
+        print('Successfully connected to "gtecs" database.')
+
+    # Check if the obs schema exists
+    if not check_schema_exists():
+        print('ERROR: Schema "obs" does not exist in the gtecs database.')
+        print(
+            '       Please run "alembic upgrade head" to create the schema and tables.'
+        )
+        sys.exit(1)
+
+    if verbose:
+        print('Found existing schema "obs" in gtecs database.')
+
+    # Check if all expected tables exist
+    tables_exist, missing_tables = check_tables_exist()
+    if not tables_exist:
+        print("ERROR: Schema exists but some tables are missing:")
+        for table in sorted(missing_tables):
+            print(f"       - {table}")
+        print('       Please run "alembic upgrade head" to create all required tables.')
+        sys.exit(1)
+
+    if verbose:
+        print("All expected tables found in database.")
+
+    # Check if database is empty
+    is_empty = check_database_empty()
+
+    if not is_empty:
+        if not overwrite:
+            print("ERROR: Database contains data.")
+            print("       Use -o/--overwrite to clear existing data.")
+            sys.exit(1)
         else:
-            raise
+            try:
+                clear_database(verbose=verbose)
+                print("Database cleared successfully.")
+                if not add_defaults:
+                    sys.exit(0)  # Exit if not adding defaults
+            except Exception as e:
+                print("ERROR: Failed to clear database.")
+                print(f"       {e}")
+                sys.exit(1)
+    else:
+        print("Database is empty.")
 
     if add_defaults:
+        print("Adding default data to database...")
         # Create the default user (NB no password)
-        print('Creating default user...')
-        user = db.User('default', '', 'Default user')
+        if verbose:
+            print("Creating default user...")
+        user = db.User("default", "", "Default user")
         with db.session_manager() as session:
             session.add(user)
 
         # Add in default GOTO sites and telescopes
-        print('Creating entires for GOTO telescopes...')
-        site1 = db.Site.from_name('LaPalma')
-        site2 = db.Site.from_name('SSO')
+        if verbose:
+            print("Creating entries for GOTO telescopes...")
+        site1 = db.Site.from_name("LaPalma")
+        site2 = db.Site.from_name("SSO")
 
-        skygrid = SkyGrid.from_name('GOTO-8')
-        grid = db.Grid.from_skygrid(skygrid, name='GOTO-8_grid')
+        skygrid = SkyGrid.from_name("GOTO-8")
+        grid = db.Grid.from_skygrid(skygrid, name="GOTO-8_grid")
+        # Add grid tiles
         for coord, name in zip(skygrid.coords, skygrid.tilenames):
             ra = coord.ra.value
             dec = coord.dec.value
             if abs(dec) < 0.00001:  # GOTO-tile rounding errors
                 dec = 0
-            grid_tile = db.GridTile(name=str(name),
-                                    ra=float(ra),
-                                    dec=float(dec),
-                                    grid=grid)
+            grid_tile = db.GridTile(
+                name=str(name), ra=float(ra), dec=float(dec), grid=grid
+            )
             grid.grid_tiles.append(grid_tile)
 
         # Create default horizon files for each telescope
         horizons = []
         for telescope_id in [1, 2, 3, 4]:
             horizon_paths = []
-            for filename in ['horizon', 'horizon_shielding']:
+            for filename in ["horizon", "horizon_shielding"]:
                 if not os.path.exists(params.FILE_PATH):
-                    os.mkdir(params.FILE_PATH)
-                horizon_file = os.path.join(params.FILE_PATH, filename + f'_{telescope_id}')
+                    os.makedirs(params.FILE_PATH, exist_ok=True)
+                horizon_file = os.path.join(
+                    params.FILE_PATH, filename + f"_{telescope_id}"
+                )
                 if not os.path.exists(horizon_file):
                     # Write a default file
-                    with open(horizon_file, 'w') as f:
-                        f.write('# The artificial horizon used by the scheduler\n')
+                    with open(horizon_file, "w") as f:
+                        f.write("# The artificial horizon used by the scheduler\n")
                         for az in range(0, 361, 30):
-                            f.write(f'{az}\t30\tDome\n')
+                            f.write(f"{az}\t30\tDome\n")
                 else:
-                    print(f'  Horizon file {horizon_file} already exists')
-                horizon_paths.append((horizon_file))
-            horizons.append(';'.join(horizon_paths))
+                    if verbose:
+                        print(f"  Horizon file {horizon_file} already exists")
+                horizon_paths.append(horizon_file)
+            horizons.append(";".join(horizon_paths))
 
         # Create the telescopes
-        goto1 = db.Telescope(name='GOTO-1', horizon=horizons[0], site=site1, grid=grid)
-        goto2 = db.Telescope(name='GOTO-2', horizon=horizons[1], site=site1, grid=grid)
-        goto3 = db.Telescope(name='GOTO-3', horizon=horizons[2], site=site2, grid=grid)
-        goto4 = db.Telescope(name='GOTO-4', horizon=horizons[3], site=site2, grid=grid)
+        goto1 = db.Telescope(
+            name="GOTO-1", horizon=horizons[0], site=site1, grid=grid
+        )
+        goto2 = db.Telescope(
+            name="GOTO-2", horizon=horizons[1], site=site1, grid=grid
+        )
+        goto3 = db.Telescope(
+            name="GOTO-3", horizon=horizons[2], site=site2, grid=grid
+        )
+        goto4 = db.Telescope(
+            name="GOTO-4", horizon=horizons[3], site=site2, grid=grid
+        )
 
-        # We need to be specific about the order for the IDs to be correct...
-        for tel in [goto1, goto2, goto3, goto4]:
-            session.add(tel)
-            session.commit()
+        with db.session_manager() as session:
+            # Add the sites and grid
+            session.add(site1)
+            session.add(site2)
+            session.add(grid)
 
-    print('Done')
+            # Add the telescopes
+            # We need to be specific about the order for the IDs to be correct...
+            for tel in [goto1, goto2, goto3, goto4]:
+                session.add(tel)
+                session.commit()
+
+        print("Default data added successfully.")
+
+    else:
+        print("Use -d/--add-defaults to add GOTO telescopes.")
 
 
-if __name__ == '__main__':
-    description = """Create the scheduler observation database."""
+if __name__ == "__main__":
+    description = """Setup the scheduler observation database with default data.
 
-    parser = argparse.ArgumentParser(description=description,
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    The database schema must already exist (created via alembic).
+    This script only adds or manages the default data."""
 
-    parser.add_argument('-v', '--verbose', action='store_true', default=False,
-                        help='Print SQL statements?')
-    parser.add_argument('-o', '--overwrite', action='store_true', default=False,
-                        help='Overwrite an existing database [WARNING: WILL LOSE DATA]?')
-    parser.add_argument('-d', '--add-defaults', action='store_true', default=False,
-                        help='Add default (GOTO) telescope definitions?')
+    parser = argparse.ArgumentParser(
+        description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=False,
+        help="Print verbose output",
+    )
+    parser.add_argument(
+        "-o",
+        "--overwrite",
+        action="store_true",
+        default=False,
+        help="Clear existing data before adding defaults [WARNING: WILL LOSE DATA]",
+    )
+    parser.add_argument(
+        "-d",
+        "--add-defaults",
+        action="store_true",
+        default=False,
+        help="Add default (GOTO) telescope definitions and data",
+    )
 
     args = parser.parse_args()
 

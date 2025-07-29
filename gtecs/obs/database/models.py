@@ -2844,24 +2844,39 @@ class Survey(Base):
         return 'Survey({})'.format(', '.join(strings))
 
 
-# Create ts update triggers on every table
-ts_function = DDL(f"""
-CREATE OR REPLACE FUNCTION {SCHEMA}.update_ts()
-RETURNS TRIGGER
+# Registries for other entities
+# Note: These are created in the database via alembic-utils
+functions = {}
+triggers = {}
+
+# Define ts update function and triggers for tracking changes
+ts_function = 'update_ts()'
+ts_function_sql = """RETURNS TRIGGER
 LANGUAGE plpgsql AS
-$func$
+$function$
 BEGIN
     NEW.ts := now();
     RETURN NEW;
 END
-$func$;
-""")
-event.listen(Base.metadata, "before_create", ts_function)
-for table in Base.metadata.tables.values():
-    if table.schema == SCHEMA and 'ts' in table.columns:
-        ts_trigger = DDL(f"""
-        CREATE TRIGGER trig_update_ts_{table.name}
-        BEFORE UPDATE ON {SCHEMA}.{table.name}
-        FOR EACH ROW EXECUTE FUNCTION {SCHEMA}.update_ts();
-        """)
-        event.listen(table, "after_create", ts_trigger)
+$function$;
+"""
+functions[ts_function] = {
+    'schema': SCHEMA,
+    'signature': ts_function,
+    'definition': ts_function_sql,
+}
+tables_with_ts = [
+    table for table in Base.metadata.tables.values()
+    if table.schema == SCHEMA and 'ts' in table.columns
+]
+for table in tables_with_ts:
+    ts_trigger = f'trig_update_ts_{table.name}'
+    ts_trigger_sql = f"""BEFORE UPDATE ON {SCHEMA}.{table.name}
+    FOR EACH ROW EXECUTE FUNCTION {SCHEMA}.update_ts();
+    """
+    triggers[ts_trigger] = {
+        'schema': SCHEMA,
+        'signature': ts_trigger,
+        'on_entity': f"{SCHEMA}.{table.name}",
+        'definition': ts_trigger_sql,
+    }

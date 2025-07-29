@@ -24,6 +24,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
+    # Create obs schema if it doesn't exist
+    op.execute("CREATE SCHEMA IF NOT EXISTS obs")
+
+    # Create tables
     # Note the order of table creation is important due to foreign key constraints.
 
     # Grids table
@@ -481,7 +485,7 @@ def downgrade() -> None:
         )
     )
 
-    # Now drop the tables in reverse order of creation
+    # Drop tables in reverse order of creation
 
     # Pointings table
     op.drop_index(
@@ -566,3 +570,6 @@ def downgrade() -> None:
     # Grids table
     op.drop_index(op.f("ix_obs_grids_name"), table_name="grids", schema="obs")
     op.drop_table("grids", schema="obs")
+
+    # Finally, drop the obs schema
+    op.execute("DROP SCHEMA obs CASCADE")

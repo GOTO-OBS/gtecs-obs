@@ -439,14 +439,13 @@ def upgrade() -> None:
         "time_blocks",
         "pointings",
     ]
-
-    for table_name in tables_with_ts:
+    for table in tables_with_ts:
         update_ts_trigger = PGTrigger(
             schema="obs",
-            signature=f"trig_update_ts_{table_name}",
-            on_entity=f"obs.{table_name}",
+            signature=f"trig_update_ts_{table}",
+            on_entity=f"obs.{table}",
             is_constraint=False,
-            definition=f"BEFORE UPDATE ON obs.{table_name} FOR EACH ROW EXECUTE FUNCTION obs.update_ts()",
+            definition=f"BEFORE UPDATE ON obs.{table} FOR EACH ROW EXECUTE FUNCTION obs.update_ts()",
         )
         op.create_entity(update_ts_trigger)
 

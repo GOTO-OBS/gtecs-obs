@@ -16,12 +16,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Filter Base.metadata to only include tables in the 'obs' schema
-metadata = MetaData(schema="obs")
-for table in Base.metadata.tables.values():
-    if table.schema == "obs":
-        table.tometadata(metadata)
-target_metadata = metadata
+# Get the table metadata from the Base, which includes all schemas
+target_metadata = Base.metadata
 
 # Automatically create and register alembic-utils entities for functions and triggers
 entities = []
@@ -54,12 +50,22 @@ def get_url() -> str:
 
 def include_name(name, type_, parent_names):
     """Include only specific object types in autogenerate."""
-    if type_ == "schema":
-        return name in ["obs"]
-    elif type_ == "grant_table":
+    if type_ == "grant_table":
         return False
     else:
         return True
+
+
+def include_object(object, name, type_, reflected, compare_to):
+    """Include only specific objects in autogenerate."""
+    # Only generate migration operations for obs schema objects
+    if hasattr(object, "schema"):
+        if object.schema != "obs":
+            return False
+    # For reflected objects (from database), only include obs schema
+    if reflected and hasattr(object, "schema") and object.schema != "obs":
+        return False
+    return True
 
 
 def run_migrations_offline() -> None:
@@ -82,6 +88,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
         include_name=include_name,
+        include_object=include_object,
         version_table="alembic_version_obs",  # Use separate version table for obs schema
     )
 
@@ -104,6 +111,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             include_schemas=True,
             include_name=include_name,
+            include_object=include_object,
             version_table="alembic_version_obs",  # Use separate version table for obs schema
         )
 

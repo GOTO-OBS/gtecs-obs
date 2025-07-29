@@ -82,6 +82,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
         include_name=include_name,
+        version_table="alembic_version_obs",  # Use separate version table for obs schema
     )
 
     with context.begin_transaction():
@@ -103,6 +104,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             include_schemas=True,
             include_name=include_name,
+            version_table="alembic_version_obs",  # Use separate version table for obs schema
         )
 
         with context.begin_transaction():

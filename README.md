@@ -10,9 +10,11 @@ Note this module is Python3 only and has been developed for Linux, otherwise use
 
 This package requires several Python modules, which should be included during installation.
 
-This package doesn't require any other G-TeCS packages to be installed, but it itself is a requirement of several of them.
+This package requires the following G-TeCS packages to function fully:
 
-This package requires the following packages created for GOTO:
+- [gtecs-common](https://github.com/GOTO-OBS/gtecs-common)
+
+It also requires the following packages created for GOTO:
 
 - [GOTO-tile](https://github.com/GOTO-OBS/goto-tile)
 
@@ -28,9 +30,15 @@ Several scripts from the `scripts` folder should also be added to your path, in 
 
 ### Setting up the database
 
-You'll need to make sure PostgreSQL is installed and configured before setting up the database. The config file contains parameters for the user and password to use when interacting with the database, make sure you create this user with rights first (e.g. `sudo -u postgres createuser -edP goto`). (a useful hint from https://stackoverflow.com/a/26735105:  edit `/etc/postgresql/12/main/pg_hba.conf` to change `local all all peer` to ` local all all md5` to remove the annoying user bits, then restart `sudo service postgresql restart`)
+You'll need to make sure PostgreSQL is installed and configured before setting up the database. The config file contains parameters for the user and password to use when interacting with the database, make sure you create this user with rights first (e.g. `sudo -u postgres createuser -edP gtecs`) (a useful hint from https://stackoverflow.com/a/26735105:  edit `/etc/postgresql/12/main/pg_hba.conf` to change `local all all peer` to ` local all all md5` to remove the annoying user bits, then restart `sudo service postgresql restart`).
 
-Once the user is created run the `setup_obsdb` script to create a blank database with all the required tables. Note you can use the `-d/--add-defaults` option to add in definitions for the basic GOTO telescopes, otherwise the database will be entirely empty.
+Then you can create the database with `createdb -O gtecs gtecs`, or just log into PostgreSQL as the `gtecs` user and run `CREATE DATABASE gtecs;`.
+
+Database migrations are handled using Alembic, which should be installed as part of the package. To create the initial database schema, run:
+
+    alembic upgrade head
+
+Once the database is created run the `setup_obsdb` script with the `-d/--add-defaults` option to add in definitions for the basic GOTO telescopes, otherwise the database will be entirely empty.
 
 ### Configuration
 

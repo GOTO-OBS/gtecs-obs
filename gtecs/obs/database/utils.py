@@ -40,7 +40,7 @@ __all__ = ['get_session', 'session_manager',
            ]
 
 
-def get_session(user=None, password=None, host=None, dialect=None, echo=None, pool_pre_ping=None):
+def get_session(user=None, password=None, host=None, echo=None, pool_pre_ping=None):
     """Create a database connection session.
 
     All arguments are passed to `gtecs.common.database.get_session()`,
@@ -56,12 +56,6 @@ def get_session(user=None, password=None, host=None, dialect=None, echo=None, po
         password = params.DATABASE_PASSWORD
     if host is None:
         host = params.DATABASE_HOST
-    if dialect is None:
-        dialect = params.DATABASE_DIALECT
-    if dialect == 'mysql':
-        db_name = 'gtecs_obs'
-    else:
-        db_name = 'gtecs'  # We don't need the schema name for the postgres connection
     if echo is None:
         echo = params.DATABASE_ECHO
     if pool_pre_ping is None:
@@ -69,9 +63,7 @@ def get_session(user=None, password=None, host=None, dialect=None, echo=None, po
     session = get_session_common(
         user=user,
         password=password,
-        db_name=db_name,
         host=host,
-        dialect=dialect,
         echo=echo,
         pool_pre_ping=pool_pre_ping,
     )

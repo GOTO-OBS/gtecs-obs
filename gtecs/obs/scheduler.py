@@ -432,18 +432,39 @@ class Scheduler:
             # Create new Pointings for any Targets that are still unscheduled (e.g. expired)
             unscheduled_targets = db.get_targets(session, status='unscheduled', time=check_time)
             if len(unscheduled_targets) > 0:
-                self.log.info('Rescheduling {} unscheduled Targets: {}'.format(
-                              len(unscheduled_targets), [t.db_id for t in unscheduled_targets]))
+                msg = 'Rescheduling {} unscheduled Targets'.format(len(unscheduled_targets))
+                self.log.info(msg)
                 added_pointings = 0
                 for target in unscheduled_targets:
+                    self.log.info('Rescheduling Target {}: {}'.format(target.db_id, target.name))
                     # Get the next Pointing for this Target
                     new_pointing = target.get_next_pointing(time=check_time)
                     if new_pointing is not None:
                         session.add(new_pointing)
                         session.commit()
                         added_pointings += 1
+                    # If the strategy creates pointings with given end times, we might need to
+                    # work though a load of expired ones in order to get an actually valid one
+                    # (or None). Otherwise we'll just keep adding expired ones each loop.
+                    # This often happens when targets are created without a fixed end time and
+                    # no one cleans them out.
+                    if new_pointing.status == 'expired':
+                        # Annoyingly we can't just skip forward, as each new pointing needs to
+                        # get info from the previous one so we need to create and add them all.
+                        # If we're running this check often enough then there shouldn't ever
+                        # be too much of a backlog, but we still have a limit of how many
+                        # to add at once (so we don't freeze the loop for too long).
+                        while added_pointings < 10:
+                            new_pointing = target.get_next_pointing(time=check_time)
+                            if new_pointing is None:
+                                break
+                            session.add(new_pointing)
+                            session.commit()
+                            added_pointings += 1
+                            if new_pointing.status != 'expired':
+                                break
+                self.log.info('Added {} new Pointings'.format(added_pointings))
                 if added_pointings > 0:
-                    self.log.info('Added {} new Pointings'.format(added_pointings))
                     database_updated = True
 
         return database_updated

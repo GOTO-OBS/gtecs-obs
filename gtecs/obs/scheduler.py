@@ -434,10 +434,17 @@ class Scheduler:
             if len(unscheduled_targets) > 0:
                 self.log.info('Rescheduling {} unscheduled Targets: {}'.format(
                               len(unscheduled_targets), [t.db_id for t in unscheduled_targets]))
-                pointings = [target.get_next_pointing() for target in unscheduled_targets]
-                pointings = [p for p in pointings if p is not None]
-                db.insert_items(session, pointings)
-                database_updated = True
+                added_pointings = 0
+                for target in unscheduled_targets:
+                    # Get the next Pointing for this Target
+                    new_pointing = target.get_next_pointing(time=check_time)
+                    if new_pointing is not None:
+                        session.add(new_pointing)
+                        session.commit()
+                        added_pointings += 1
+                if added_pointings > 0:
+                    self.log.info('Added {} new Pointings'.format(added_pointings))
+                    database_updated = True
 
         return database_updated
 

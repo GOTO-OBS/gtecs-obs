@@ -71,3 +71,9 @@ SCHEDULER_SUNALT_LIMIT = config['SCHEDULER_SUNALT_LIMIT']
 ENABLE_SLACK = config['ENABLE_SLACK']
 SLACK_BOT_TOKEN = config['SLACK_BOT_TOKEN']
 SLACK_DEFAULT_CHANNEL = config['SLACK_DEFAULT_CHANNEL']
+
+############################################################
+# Check for any parameters in the config spec that have not been defined in this module
+unused_params = set(CONFIG_SPEC.keys()) - {name for name in locals() if name.isupper()}
+for key in unused_params:
+    print(f'Warning: {key} in the configspec is not defined in params')

@@ -226,6 +226,9 @@ def run(overwrite=False, add_defaults=False, verbose=False):
         user = db.User("default", "", "Default user")
         with db.session_manager() as session:
             session.add(user)
+            session.flush()
+            if verbose:
+                print(user)
 
         # Add in default GOTO sites and telescopes
         if verbose:
@@ -269,10 +272,10 @@ def run(overwrite=False, add_defaults=False, verbose=False):
             horizons.append(";".join(horizon_paths))
 
         # Create the telescopes
-        goto1 = db.Telescope(name="GOTO-1", horizon=horizons[0], site=site1, grid=grid)
-        goto2 = db.Telescope(name="GOTO-2", horizon=horizons[1], site=site1, grid=grid)
-        goto3 = db.Telescope(name="GOTO-3", horizon=horizons[2], site=site2, grid=grid)
-        goto4 = db.Telescope(name="GOTO-4", horizon=horizons[3], site=site2, grid=grid)
+        goto1 = db.Telescope(db_id=1, name="GOTO-1", horizon=horizons[0], site=site1, grid=grid)
+        goto2 = db.Telescope(db_id=2, name="GOTO-2", horizon=horizons[1], site=site1, grid=grid)
+        goto3 = db.Telescope(db_id=3, name="GOTO-3", horizon=horizons[2], site=site2, grid=grid)
+        goto4 = db.Telescope(db_id=4, name="GOTO-4", horizon=horizons[3], site=site2, grid=grid)
 
         with db.session_manager() as session:
             # Add the sites and grid
@@ -281,10 +284,19 @@ def run(overwrite=False, add_defaults=False, verbose=False):
             session.add(grid)
 
             # Add the telescopes
-            # We need to be specific about the order for the IDs to be correct...
             for tel in [goto1, goto2, goto3, goto4]:
                 session.add(tel)
-                session.commit()
+                session.flush()  # Ensure IDs are assigned correctly
+
+            session.commit()
+            if verbose:
+                print(grid)
+                print(site1)
+                print(site2)
+                print(goto1)
+                print(goto2)
+                print(goto3)
+                print(goto4)
 
         print("Default data added successfully.")
 

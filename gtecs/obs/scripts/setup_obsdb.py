@@ -287,7 +287,8 @@ def run(overwrite=False, add_defaults=False, verbose=False):
         print("Use -d/--add-defaults to add GOTO telescopes.")
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the script."""
     description = """Setup the scheduler observation database with default data.
 
     The database schema must already exist (created via alembic).

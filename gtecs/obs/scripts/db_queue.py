@@ -100,7 +100,8 @@ def run(site_id, telescopes, time, horizon, readout_time, template_requirement, 
         print('{}=end'.format(boldtxt('_')))
 
 
-if __name__ == '__main__':
+def main():
+    """Main entry point for the script."""
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     location_group = parser.add_mutually_exclusive_group()

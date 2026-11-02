@@ -1,0 +1,98 @@
+# Build Configuration
+
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0", "wheel"]
+
+# Project Configuration
+
+[project]
+name = "gtecs-obs"
+version = "0.1.0"
+description = "G-TeCS functions for observation scheduling"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "Martin Dyer", email = "martin.dyer@sheffield.ac.uk" },
+]
+maintainers = [
+    { name = "Martin Dyer", email = "martin.dyer@sheffield.ac.uk" },
+]
+dependencies = [
+    "sqlalchemy>=2",
+    "psycopg2",
+    "alembic",
+    "alembic-utils",
+    "astropy",
+    "astroplan",
+    "numpy",
+    "scipy",
+    "Pyro4",
+    "flask",
+    "webtest",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+keywords = [
+    "astronomy",
+    "telescope",
+    "control",
+    "GOTO",
+]
+
+[project.scripts]
+# daemon control
+scheduler = "gtecs.obs.scheduler:main"
+# other scripts
+add_allsky_survey = "gtecs.obs.scripts.add_allsky_survey:main"
+add_followup = "gtecs.obs.scripts.add_followup:main"
+add_pointing = "gtecs.obs.scripts.add_pointing:main"
+add_survey = "gtecs.obs.scripts.add_survey:main"
+db_monitor = "gtecs.obs.scripts.db_monitor:main"
+db_queue = "gtecs.obs.scripts.db_queue:main"
+setup_obsdb = "gtecs.obs.scripts.setup_obsdb:main"
+
+[project.urls]
+homepage = "http://github.com/GOTO-OBS/gtecs-obs"
+documentation = "http://github.com/GOTO-OBS/gtecs-obs"
+repository = "http://github.com/GOTO-OBS/gtecs-obs"
+issues = "http://github.com/GOTO-OBS/gtecs-obs/issues"
+
+# Package Configuration
+
+[tool.setuptools]
+zip-safe = false
+
+[tool.setuptools.packages.find]
+include = ["gtecs*"]
+
+[tool.setuptools.package-data]
+gtecs = ["obs/data/*"]
+
+# Tool Configuration
+
+## Ruff (optional - for code formatting and linting)
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+### Ruff linter
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = []
+
+### Ruff formatter
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"

@@ -1,5 +1,6 @@
 """Class for monitoring the observation database and finding pointings to observe."""
 
+import json
 import sys
 import threading
 import time
@@ -7,17 +8,12 @@ import traceback
 from copy import copy
 
 import Pyro4
-
 from astropy import units as u
 from astropy.coordinates import AltAz, get_sun
 from astropy.time import Time
-
 from flask import Flask, abort, request
-
 from gtecs.common import logging
-
-import json
-
+from gtecs.common.system import execute_long_command, get_pid, kill_process, make_pid_file
 from webtest.http import StopableWSGIServer
 
 from . import database as db
@@ -654,24 +650,129 @@ class Scheduler:
         return db.get_pointing_info(pointing_id)
 
 
-def run():
-    """Start the scheduler."""
-    try:
-        send_slack_msg('Scheduler started')
-        scheduler = Scheduler()
-        scheduler.run(params.PYRO_HOST, params.PYRO_PORT, params.PYRO_TIMEOUT)
-    except Exception:
-        print('Error detected, shutting down')
-        traceback.print_exc()
-    except KeyboardInterrupt:
-        print('Interrupt detected, shutting down')
-    finally:
+def print_instructions():
+    """Print instructions for using the script."""
+    print(
+        'Usage: scheduler [command] [options]',
+        'The scheduler monitors the database and calculates which pointings to observe.',
+        '',
+        'Commands:',
+        '   start                  start the scheduler',
+        '   ping                   check if the scheduler is running',
+        '   shutdown               shut down the scheduler',
+        '   info [-f]              print the latest scheduled pointings [force-update]',
+        '   log [tail args]        print scheduler log (alias for tail)',
+        '   help                   print these instructions',
+        sep='\n',
+    )
+
+
+def query(command, args):
+    """Process a query."""
+    # Command functions
+    if command in ['help', '?']:
+        print_instructions()
+
+    # Primary control
+    elif command == 'start':
         try:
-            scheduler.shutdown()
-        except UnboundLocalError:
-            # class was never created
-            pass
-        time.sleep(1)  # wait to stop threads
-        send_slack_msg('Scheduler shutdown')
-        print('Scheduler done')
-        sys.exit(0)
+            with Pyro4.Proxy(params.PYRO_URI) as proxy:
+                uri = proxy.uri
+            pid = get_pid('scheduler')
+            print('Scheduler is already running ({}, PID={})'.format(uri, pid))
+        except Pyro4.errors.CommunicationError:
+            with make_pid_file('scheduler'):
+                try:
+                    send_slack_msg('Scheduler started')
+                    scheduler = Scheduler()
+                    scheduler.run(params.PYRO_HOST, params.PYRO_PORT, params.PYRO_TIMEOUT)
+                except Exception:
+                    print('Error detected, shutting down')
+                    traceback.print_exc()
+                except KeyboardInterrupt:
+                    print('Interrupt detected, shutting down')
+                finally:
+                    try:
+                        scheduler.shutdown()
+                    except UnboundLocalError:
+                        # class was never created
+                        pass
+                    time.sleep(1)  # wait to stop threads
+                    send_slack_msg('Scheduler shutdown')
+                    print('Scheduler done')
+                    sys.exit(0)
+
+    elif command == 'ping':
+        try:
+            with Pyro4.Proxy(params.PYRO_URI) as proxy:
+                uri = proxy.uri
+            pid = get_pid('scheduler')
+            print('Scheduler is running ({}, PID={})'.format(uri, pid))
+        except Pyro4.errors.CommunicationError:
+            print('Scheduler is not running')
+
+    elif command == 'shutdown':
+        try:
+            with Pyro4.Proxy(params.PYRO_URI) as proxy:
+                proxy.shutdown()
+                print('Scheduler shutdown')
+        except Pyro4.errors.CommunicationError:
+            print('Scheduler is not running')
+
+    elif command == 'kill':
+        if not get_pid('scheduler'):
+            print('Scheduler is not running')
+        kill_process('scheduler')
+
+    elif command in ['log', 'tail']:
+        log_file = 'scheduler.log'
+        log_path = logging.get_log_path() / log_file
+        tail_command = 'tail {} {}'.format(log_path, ' '.join(args))
+
+        execute_long_command(tail_command)
+
+    # Scheduler commands
+    elif command == 'info':
+        if len(args) == 0:
+            force = False
+        elif len(args) == 1 and args[0] in ['f', 'F', '-f', '-F', '--force-update']:
+            force = True
+        else:
+            raise ValueError('Invalid arguments')
+
+        # do one query for all telescopes
+        with Pyro4.Proxy(params.PYRO_URI) as proxy:
+            pointings = proxy.check_queue(force_update=force)
+
+        telescope_data = db.get_telescope_info()
+        for telescope_id in telescope_data:
+            # Print Pointing (or None) for each telescope
+            print(telescope_data[telescope_id]['name'], end=': ')
+            try:
+                if telescope_id not in pointings:
+                    print('ERROR')
+                elif pointings[telescope_id][0] is None:
+                    print('None')
+                else:
+                    pointing = pointings[telescope_id][0]
+                    print(f'Pointing ID={pointing["id"]} ({pointing["name"]})')
+                # TODO: Print higher horizon if shielding?
+                # TODO: Print what it's currently observing?
+                # TODO: Verbose Pointing info?
+            except Exception:
+                print('ERROR')
+
+    else:
+        print('ERROR: Unrecognized command "{}"'.format(command))
+        print_instructions()
+
+
+def main():
+    """Main entry point for the script."""
+    if len(sys.argv) == 1:
+        # No command: print help and exit
+        print_instructions()
+        sys.exit()
+
+    command, *args = sys.argv[1:]
+    query(command, args)

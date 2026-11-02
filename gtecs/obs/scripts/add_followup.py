@@ -77,7 +77,8 @@ def run(name, coord):
     print('Done')
 
 
-if __name__ == '__main__':
+def main():
+    """Main entry point for the script."""
     description = """Add a single pointing for a given target."""
 
     parser = argparse.ArgumentParser(description=description,

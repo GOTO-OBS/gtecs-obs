@@ -355,7 +355,8 @@ def run(filename, coords_or_tiles='coords', on_grid=True):
     print('Done')
 
 
-if __name__ == '__main__':
+def main():
+    """Main entry point for the script."""
     description = """Add a limited survey of targets into the G-TeCS database."""
 
     parser = argparse.ArgumentParser(description=description,

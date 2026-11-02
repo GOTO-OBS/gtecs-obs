@@ -145,5 +145,6 @@ def run():
     print('Done')
 
 
-if __name__ == '__main__':
+def main():
+    """Main entry point for the script."""
     run()

@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""A simple script to monitor what's in the GOTO database."""
+
+import sys
+
+from astropy.time import Time
+
+from gtecs.obs import database as db
+
+
+def gtxt(text):
+    """Print green coloured text."""
+    return '\033[32;1m' + str(text) + '\033[0m'
+
+
+def ytxt(text):
+    """Print yellow coloured text."""
+    return '\033[33;1m' + str(text) + '\033[0m'
+
+
+def btxt(text):
+    """Print blue coloured text."""
+    return '\033[34;1m' + str(text) + '\033[0m'
+
+
+def run():
+    """Print pointings in the database."""
+    t = Time.now()
+
+    if len(sys.argv) > 1:
+        show_all = sys.argv[1] in ['-a', '--all']
+    else:
+        show_all = False
+
+    with db.session_manager() as session:
+        all_pointings = db.get_pointings(session)
+        n_all = len(all_pointings)
+        print('{} points in database'.format(n_all))
+
+        running = db.get_pointings(session, status='running')
+        if len(running) > 0:
+            print(ytxt('CURRENTLY OBSERVING: ID %i \n' % running[0].db_id))
+        else:
+            print('\n')
+
+        for pointing in all_pointings:
+            if show_all or pointing.status != 'expired':
+                string = '{: <6.0f} | {: >20} | {}{} | {: >6.2f} | {: >6.2f} | {} |'.format(
+                    pointing.db_id,
+                    pointing.name,
+                    '{: >3.0f}'.format(pointing.rank) if pointing.rank is not None else 'inf',
+                    '!' if pointing.too else ' ',
+                    pointing.ra, pointing.dec,
+                    pointing.start_time)
+
+                print(string, end=' ')
+
+                if pointing.status == 'running':
+                    status = ytxt('RUNNING')
+                elif pointing.status == 'completed':
+                    status = gtxt('completed')
+                elif pointing.status == 'pending':
+                    status = btxt('pending')
+                elif pointing.status == 'upcoming':
+                    wait = Time(pointing.start_time) - t
+                    status = 'upcoming ({:.1f}h)'.format(wait.to('hour').value)
+                else:
+                    status = pointing.status
+                print(status, end='\n')
+
+        print('{} points in database'.format(n_all))
+
+
+def main():
+    """Main entry point for the script."""
+    run()

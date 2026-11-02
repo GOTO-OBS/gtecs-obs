@@ -13,7 +13,13 @@ from astropy.coordinates import AltAz, get_sun
 from astropy.time import Time
 from flask import Flask, abort, request
 from gtecs.common import logging
-from gtecs.common.system import execute_long_command, get_pid, kill_process, make_pid_file
+from gtecs.common.system import (
+    NeatCloser,
+    execute_long_command,
+    get_pid,
+    kill_process,
+    make_pid_file,
+)
 from webtest.http import StopableWSGIServer
 
 from . import database as db
@@ -650,6 +656,18 @@ class Scheduler:
         return db.get_pointing_info(pointing_id)
 
 
+class ShutdownCloser(NeatCloser):
+    """A class to neatly handle shutdown requests."""
+
+    def __init__(self, daemon):
+        super().__init__('Script')
+        self.daemon = daemon
+
+    def tidy_up(self):
+        """Shutdown the daemon."""
+        self.daemon.shutdown()
+
+
 def print_instructions():
     """Print instructions for using the script."""
     print(
@@ -685,6 +703,7 @@ def query(command, args):
                 try:
                     send_slack_msg('Scheduler started')
                     scheduler = Scheduler()
+                    ShutdownCloser(scheduler)
                     scheduler.run(params.PYRO_HOST, params.PYRO_PORT, params.PYRO_TIMEOUT)
                 except Exception:
                     print('Error detected, shutting down')

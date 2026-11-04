@@ -21,7 +21,7 @@ maintainers = [
 ]
 dependencies = [
     "sqlalchemy>=2",
-    "psycopg2",
+    "psycopg2-binary",
     "alembic",
     "alembic-utils",
     "astropy",

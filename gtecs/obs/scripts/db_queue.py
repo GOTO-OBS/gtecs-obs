@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """A script to view the current pointing queue."""
 
 import argparse

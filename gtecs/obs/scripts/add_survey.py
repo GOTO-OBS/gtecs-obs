@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """A script add a limited survey of targets into the G-TeCS database."""
 
 import argparse

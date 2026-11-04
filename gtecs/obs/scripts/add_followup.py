@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """A simple script to add a target for followup to the observation database."""
 
 import argparse

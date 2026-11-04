@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """A script to fill G-TeCS database using GOTO-tile."""
 
 import time

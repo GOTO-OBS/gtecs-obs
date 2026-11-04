@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Prepare an observation database with default data."""
 
 import argparse

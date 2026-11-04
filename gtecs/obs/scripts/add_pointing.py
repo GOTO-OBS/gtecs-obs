@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """A script to allow simple adding of pointings to the scheduler database."""
 
 import astropy.units as u

@@ -13,12 +13,17 @@ from astropy.coordinates import AltAz, get_sun
 from astropy.time import Time
 from flask import Flask, abort, request
 from gtecs.common import logging
-from gtecs.common.system import (
-    NeatCloser,
-    execute_long_command,
-    get_pid,
-    kill_process,
-    make_pid_file,
+from gtecs.common.daemon import BaseDaemon
+from gtecs.common.pyro import get_uri, wait_for_uri
+from gtecs.common.system import execute_long_command, get_pid, kill_process, make_pid_file
+from gtecs.common.systemd import (
+    SystemctlError,
+    get_service,
+    get_service_pid,
+    kill_service,
+    restart_service,
+    start_service,
+    stop_service,
 )
 from webtest.http import StopableWSGIServer
 
@@ -30,16 +35,16 @@ from .slack import send_slack_msg
 
 
 @Pyro4.expose
-class Scheduler:
+class SchedulerDaemon(BaseDaemon):
     """Database scheduler daemon class."""
 
-    def __init__(self):
-        # get a logger for the scheduler
-        self.log = logging.get_logger('scheduler')
-        self.log.info('Scheduler started')
+    name = 'scheduler'
 
-        # scheduler variables
-        self.running = False
+    def __init__(self):
+        """Initialize the scheduler daemon."""
+        super().__init__()
+
+        # Scheduler properties
         self.loop_time = 0
         self.check_time = 0
         self.check_period = params.SCHEDULER_CHECK_PERIOD
@@ -58,10 +63,15 @@ class Scheduler:
 
         # Get site data (only once, on init)
         self.site_data = db.get_site_info()
-        self.telescopes = sorted([telescope_id
-                                  for telescopes in [self.site_data[site_id]['telescopes'].keys()
-                                                     for site_id in self.site_data]
-                                  for telescope_id in telescopes])
+        self.telescopes = sorted(
+            [
+                telescope_id
+                for telescopes in [
+                    self.site_data[site_id]['telescopes'].keys() for site_id in self.site_data
+                ]
+                for telescope_id in telescopes
+            ]
+        )
 
         self.old_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
         self.latest_pointings = {telescope_id: [None] for telescope_id in self.telescopes}
@@ -76,13 +86,8 @@ class Scheduler:
         self.server_path = params.SERVER_PATH
         self.server_api_key = params.SERVER_API_KEY
 
-    def __del__(self):
-        self.shutdown()
-
     def run(self, host, port, timeout=5):
         """Run the scheduler as a Pyro daemon."""
-        self.running = True
-
         # Start monitor thread
         t = threading.Thread(target=self._monitor_thread)
         t.daemon = True
@@ -93,46 +98,12 @@ class Scheduler:
         t2.daemon = True
         t2.start()
 
-        # Check the Pyro address is available
-        try:
-            pyro_daemon = Pyro4.Daemon(host, port)
-        except Exception:
-            raise
-        else:
-            pyro_daemon.close()
+        # Start the daemon, will block until shutdown
+        self.run_daemon(host, port, timeout=timeout)
 
-        # Start the daemon
-        with Pyro4.Daemon(host, port) as pyro_daemon:
-            self._uri = pyro_daemon.register(self, objectId='scheduler')
-            Pyro4.config.COMMTIMEOUT = timeout
-
-            # Start request loop
-            self.log.info('Pyro daemon registered to {}'.format(self._uri))
-            pyro_daemon.requestLoop(loopCondition=self.is_running)
-
-        # Loop has closed
-        self.log.info('Pyro daemon successfully shut down')
-        time.sleep(1.)
-
-    def is_running(self):
-        """Check if the daemon is running or not.
-
-        Used for the Pyro loop condition, it needs a function so you can't just
-        give it self.running.
-        """
-        return self.running
-
-    @property
-    def uri(self):
-        """Return the Pyro URI."""
-        if hasattr(self, '_uri'):
-            return self._uri
-        else:
-            return None
-
-    def shutdown(self):
-        """Shut down the running threads."""
-        self.running = False
+        # If we reached here the loop has exited
+        # Sleep for a second to make sure the threads have time to close
+        time.sleep(1.0)
 
     # Internal threads
     def _monitor_thread(self):
@@ -289,8 +260,7 @@ class Scheduler:
 
                 # Return the info as a JSON dict
                 response = app.response_class(
-                    response=json.dumps(pointing_info),
-                    mimetype='application/json'
+                    response=json.dumps(pointing_info), mimetype='application/json'
                 )
                 return response
             except Exception:
@@ -317,8 +287,7 @@ class Scheduler:
 
                 # Return the info as a JSON dict
                 response = app.response_class(
-                    response=json.dumps(pointing_info),
-                    mimetype='application/json'
+                    response=json.dumps(pointing_info), mimetype='application/json'
                 )
                 return response
             except Exception:
@@ -339,8 +308,7 @@ class Scheduler:
 
                 # Return the info as a JSON dict
                 response = app.response_class(
-                    response=json.dumps(pointing_info),
-                    mimetype='application/json'
+                    response=json.dumps(pointing_info), mimetype='application/json'
                 )
                 return response
             except Exception:
@@ -386,8 +354,11 @@ class Scheduler:
                     # It's been more than a minute since we last had a query from this pilot.
                     if self.is_night[telescope_id]:
                         # Only log during the night time.
-                        self.log.debug('No contact from Telescope {} since {}'.format(
-                                       telescope_id, self.pilot_query_time[telescope_id].iso))
+                        self.log.debug(
+                            'No contact from Telescope {} since {}'.format(
+                                telescope_id, self.pilot_query_time[telescope_id].iso
+                            )
+                        )
 
                     # If there is still a running pointing, mark it as interrupted.
                     telescope = db.get_telescope_by_id(session, telescope_id)
@@ -395,8 +366,11 @@ class Scheduler:
                         pointing = telescope.current_pointing
                         running_time = (check_time - Time(pointing.running_time)).sec
                         obs_time = pointing.get_obstime(self.readout_time)
-                        self.log.info('Pointing {} has been running for {:.1f}s/{:.1f}s'.format(
-                                      pointing.db_id, running_time, obs_time))
+                        self.log.info(
+                            'Pointing {} has been running for {:.1f}s/{:.1f}s'.format(
+                                pointing.db_id, running_time, obs_time
+                            )
+                        )
                         self.update_queue.append((pointing.db_id, 'interrupted'))
                         # No force check needed here, we're already in one!
 
@@ -416,8 +390,9 @@ class Scheduler:
                     if new_status == 'running':
                         telescope_id = pointing[2]
                         db.mark_pointing_running(pointing_id, telescope_id)
-                        self.log.info(f'Marked Pointing {pointing_id} as running'
-                                      f' on Telescope {telescope_id}')
+                        self.log.info(
+                            f'Marked Pointing {pointing_id} as running on Telescope {telescope_id}'
+                        )
                         database_updated = True
                     elif new_status == 'completed':
                         db.mark_pointing_completed(pointing_id, schedule_next=True)
@@ -434,8 +409,11 @@ class Scheduler:
             # Create new Pointings for any Targets that are still unscheduled (e.g. expired)
             unscheduled_targets = db.get_targets(session, status='unscheduled', time=check_time)
             if len(unscheduled_targets) > 0:
-                self.log.info('Rescheduling {} unscheduled Targets: {}'.format(
-                              len(unscheduled_targets), [t.db_id for t in unscheduled_targets]))
+                self.log.info(
+                    'Rescheduling {} unscheduled Targets: {}'.format(
+                        len(unscheduled_targets), [t.db_id for t in unscheduled_targets]
+                    )
+                )
                 pointings = [target.get_next_pointing() for target in unscheduled_targets]
                 pointings = [p for p in pointings if p is not None]
                 db.insert_items(session, pointings)
@@ -449,13 +427,16 @@ class Scheduler:
             pointings = {}
             telescopes = self.site_data[site_id]['telescopes']
 
-            if (params.SCHEDULER_SKIP_DAYTIME and
-                    not all(self.is_night[telescope_id] for telescope_id in sorted(telescopes))):
+            if params.SCHEDULER_SKIP_DAYTIME and not all(
+                self.is_night[telescope_id] for telescope_id in sorted(telescopes)
+            ):
                 # It's still daytime, no reason to check the queue
                 for telescope_id in sorted(telescopes):
                     self.log.debug(f'Telescope {telescope_id}: Daytime')
-                return {telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
-                        for telescope_id in telescopes}
+                return {
+                    telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
+                    for telescope_id in telescopes
+                }
 
             # Import the queue for this site from the database
             queue = PointingQueue.from_database(site_id, check_time)
@@ -509,12 +490,21 @@ class Scheduler:
         except Exception:
             self.log.error('Failed to schedule Pointings for Site {}'.format(site_id))
             self.log.debug('', exc_info=True)
-            return {telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
-                    for telescope_id in telescopes}
+            return {
+                telescope_id: [None for _ in telescopes[telescope_id]['horizon']]
+                for telescope_id in telescopes
+            }
 
     # Functions
-    def update_schedule(self, telescope_id, current_pointing_id, current_status, horizon=0,
-                        return_new=True, force_update=False):
+    def update_schedule(
+        self,
+        telescope_id,
+        current_pointing_id,
+        current_status,
+        horizon=0,
+        return_new=True,
+        force_update=False,
+    ):
         """Get what Pointing to observe for the given telescope.
 
         This function should be called by the pilot for each telescope. By including the
@@ -550,7 +540,7 @@ class Scheduler:
         # TODO: Require some sort of unique API key from each telescope for security?
 
         # Prevent multiple queries at the same time, or queries while the schedule is updating
-        while (self.query_lock is True or self.update_lock is True):
+        while self.query_lock is True or self.update_lock is True:
             time.sleep(0.1)
         self.query_lock = True
 
@@ -641,10 +631,13 @@ class Scheduler:
             while self.force_check_flag:
                 time.sleep(0.1)
 
-        pointing_info = {telescope_id: [db.get_pointing_info(pointing.db_id)
-                                        if pointing is not None else None
-                                        for pointing in pointings]
-                         for telescope_id, pointings in self.latest_pointings.items()}
+        pointing_info = {
+            telescope_id: [
+                db.get_pointing_info(pointing.db_id) if pointing is not None else None
+                for pointing in pointings
+            ]
+            for telescope_id, pointings in self.latest_pointings.items()
+        }
         return pointing_info
 
     def get_pointing_info(self, pointing_id):
@@ -656,102 +649,168 @@ class Scheduler:
         return db.get_pointing_info(pointing_id)
 
 
-class ShutdownCloser(NeatCloser):
-    """A class to neatly handle shutdown requests."""
-
-    def __init__(self, daemon):
-        super().__init__('Script')
-        self.daemon = daemon
-
-    def tidy_up(self):
-        """Shutdown the daemon."""
-        self.daemon.shutdown()
-
-
-def print_instructions():
-    """Print instructions for using the script."""
-    print(
-        'Usage: scheduler [command] [options]',
-        'The scheduler monitors the database and calculates which pointings to observe.',
-        '',
-        'Commands:',
-        '   start                  start the scheduler',
-        '   ping                   check if the scheduler is running',
-        '   shutdown               shut down the scheduler',
-        '   info [-f]              print the latest scheduled pointings [force-update]',
-        '   log [tail args]        print scheduler log (alias for tail)',
-        '   help                   print these instructions',
-        sep='\n',
-    )
-
-
 def query(command, args):
     """Process a query."""
-    # Command functions
-    if command in ['help', '?']:
-        print_instructions()
+    # Primary control commands
+    if command == 'run':
+        service = get_service('scheduler')
 
-    # Primary control
-    elif command == 'start':
-        try:
-            with Pyro4.Proxy(params.PYRO_URI) as proxy:
-                uri = proxy.uri
-            pid = get_pid('scheduler')
-            print('Scheduler is already running ({}, PID={})'.format(uri, pid))
-        except Pyro4.errors.CommunicationError:
-            with make_pid_file('scheduler'):
+        # Check the systemd service is already running
+        if service is not None and service['active'] and service['pid'] != os.getpid():
+            print(f'The scheduler service is already running (PID={service["pid"]})')
+            print('Use "scheduler stop" to stop it before running the scheduler locally')
+            return
+
+        # Check if the Pyro URI is already registered
+        uri = get_uri(params.PYRO_URI)
+        if uri is not None:
+            pid = get_service_pid('scheduler', 'scheduler')
+            print(f'Scheduler is already running ({uri}, PID={pid})')
+            return
+
+        exit_code = 0
+        with make_pid_file('scheduler'):
+            try:
+                send_slack_msg('Scheduler started')
+                daemon = SchedulerDaemon()
+                daemon.run(params.PYRO_HOST, params.PYRO_PORT, params.PYRO_TIMEOUT)
+            except Exception:
+                print('Error detected, shutting down')
+                traceback.print_exc()
+                exit_code = 1
+            except (KeyboardInterrupt, SystemExit):
+                # SIGINT raises a KeyboardInterrupt, and make_pid_file makes SIGTERM raise
+                # a SystemExit (which is how systemd stops the service),
+                # so both are normal ways to stop.
+                print('Interrupt detected, shutting down')
+            finally:
                 try:
-                    send_slack_msg('Scheduler started')
-                    scheduler = Scheduler()
-                    ShutdownCloser(scheduler)
-                    scheduler.run(params.PYRO_HOST, params.PYRO_PORT, params.PYRO_TIMEOUT)
-                except Exception:
-                    print('Error detected, shutting down')
-                    traceback.print_exc()
-                except KeyboardInterrupt:
-                    print('Interrupt detected, shutting down')
-                finally:
-                    try:
-                        scheduler.shutdown()
-                    except UnboundLocalError:
-                        # class was never created
-                        pass
-                    time.sleep(1)  # wait to stop threads
-                    send_slack_msg('Scheduler shutdown')
-                    print('Scheduler done')
-                    sys.exit(0)
+                    daemon.shutdown()
+                except UnboundLocalError:
+                    # class was never created
+                    pass
+                time.sleep(1)  # wait to stop threads
+                send_slack_msg('Scheduler shutdown')
+                print('Scheduler done')
 
-    elif command == 'ping':
-        try:
-            with Pyro4.Proxy(params.PYRO_URI) as proxy:
-                uri = proxy.uri
-            pid = get_pid('scheduler')
-            print('Scheduler is running ({}, PID={})'.format(uri, pid))
-        except Pyro4.errors.CommunicationError:
-            print('Scheduler is not running')
+            sys.exit(exit_code)
+        return
 
-    elif command == 'shutdown':
+    if command == 'start':
+        service = get_service('scheduler')
+
+        # Check if the systemd service is set up
+        if service is None:
+            print('ERROR: Cannot connect to the systemd service, or it is not installed')
+            print('Use "scheduler run" to run the scheduler in this terminal instead')
+            return
+
+        # Check if the Pyro URI is already registered
+        uri = get_uri(params.PYRO_URI)
+        if uri is not None:
+            pid = get_service_pid('scheduler', 'scheduler')
+            print(f'Scheduler is already running ({uri}, PID={pid})')
+            return
+
+        start_service('scheduler', sudo=params.SYSTEMD_SUDO)
+
+        # Check if the service is now running
+        uri = wait_for_uri(params.PYRO_URI)
+        if uri is None:
+            print('ERROR: The scheduler service started, but it is not responding')
+            print('Check the service with "systemctl status scheduler"')
+        else:
+            pid = get_service_pid('scheduler', 'scheduler')
+            print(f'Scheduler started ({uri}, PID={pid})')
+        return
+
+    if command in ['shutdown', 'stop']:
+        service = get_service('scheduler')
+
+        # Check if the systemd service is set up
+        if service is None:
+            print('ERROR: Cannot connect to the systemd service, or it is not installed')
+            return
+
+        if service['active']:
+            # The service is running through systemd, so shut it down through systemd
+            stop_service('scheduler', sudo=params.SYSTEMD_SUDO)
+            print('Scheduler shutdown')
+            return
+
+        # It might might be running independently in a terminal,
+        # so try shutting down though Pyro
         try:
             with Pyro4.Proxy(params.PYRO_URI) as proxy:
                 proxy.shutdown()
                 print('Scheduler shutdown')
         except Pyro4.errors.CommunicationError:
             print('Scheduler is not running')
+        return
 
-    elif command == 'kill':
-        if not get_pid('scheduler'):
+    if command == 'restart':
+        service = get_service('scheduler')
+
+        # Check if the systemd service is set up
+        if service is None:
+            print('ERROR: Cannot connect to the systemd service, or it is not installed')
+            return
+
+        restart_service('scheduler', sudo=params.SYSTEMD_SUDO)
+
+        # Check if the service is now running
+        uri = wait_for_uri(params.PYRO_URI)
+        if uri is None:
+            print('ERROR: The scheduler service restarted, but it is not responding')
+            print('Check the service with "systemctl status scheduler"')
+        else:
+            pid = get_service_pid('scheduler', 'scheduler')
+            print(f'Scheduler restarted ({uri}, PID={pid})')
+        return
+
+    if command == 'kill':
+        service = get_service('scheduler')
+        if service is not None and service['active']:
+            # The service is running through systemd, so we need to kill it through systemd
+            kill_service('scheduler', sudo=params.SYSTEMD_SUDO)
+            print('Scheduler killed (note systemd may restart it)')
+            return
+
+        if get_pid('scheduler'):
+            # It might might be running independently in a terminal,
+            # so try killing it directly
+            kill_process('scheduler')
+            return
+
+        print('Scheduler is not running')
+        return
+
+    if command in ['ping', 'status']:
+        uri = get_uri(params.PYRO_URI)
+        if uri is not None:
+            pid = get_service_pid('scheduler', 'scheduler')
+            print(f'Scheduler is running ({uri}, PID={pid})')
+            with Pyro4.Proxy(params.PYRO_URI) as proxy:
+                start_time = proxy.start_time
+            print(f'Uptime: {time.time() - start_time:.1f}s')
+        else:
             print('Scheduler is not running')
-        kill_process('scheduler')
 
-    elif command in ['log', 'tail']:
+        service = get_service('scheduler')
+        if service is not None:
+            print('Service state: {} ({})'.format(service['active_state'], service['sub_state']))
+        return
+
+    if command in ['log', 'tail']:
         log_file = 'scheduler.log'
         log_path = logging.get_log_path() / log_file
         tail_command = 'tail {} {}'.format(log_path, ' '.join(args))
 
         execute_long_command(tail_command)
+        return
 
     # Scheduler commands
-    elif command == 'info':
+    if command == 'info':
         if len(args) == 0:
             force = False
         elif len(args) == 1 and args[0] in ['f', 'F', '-f', '-F', '--force-update']:
@@ -780,18 +839,37 @@ def query(command, args):
                 # TODO: Verbose Pointing info?
             except Exception:
                 print('ERROR')
+        return
 
+    # Help or unknown command - print instructions
+    if command in ['help', '?']:
+        print('The scheduler monitors the database and calculates which pointings to observe.\n')
     else:
-        print('ERROR: Unrecognized command "{}"'.format(command))
-        print_instructions()
+        print(f'ERROR: Unrecognized command "{command}"\n')
+    print('Usage: scheduler [command] [options]\n')
+    print('Scheduler commands:')
+    print('   info [-f]              print the latest scheduled pointings [force-update]')
+    print('Control commands:')
+    print('   start                  start the scheduler systemd service')
+    print('   stop/shutdown          stop the scheduler systemd service')
+    print('   restart                restart the scheduler systemd service')
+    print('   kill                   kill the scheduler systemd service (systemd may restart it)')
+    print('   run                    run the scheduler daemon locally in this terminal')
+    print('   ping/status            check if the scheduler daemon or service is running')
+    print('   log [tail args]        print log file contents (alias for tail)')
+    print('   help                   print these instructions')
 
 
 def main():
     """Main entry point for the script."""
-    if len(sys.argv) == 1:
-        # No command: print help and exit
-        print_instructions()
-        sys.exit()
+    if len(sys.argv) > 1:
+        command, *args = sys.argv[1:]
+    else:
+        # Interpret no arguments as a request for help
+        command, args = 'help', []
 
-    command, *args = sys.argv[1:]
-    query(command, args)
+    try:
+        query(command, args)
+    except (SystemctlError, ConnectionError) as err:
+        print(f'ERROR: {err}')
+        sys.exit(1)

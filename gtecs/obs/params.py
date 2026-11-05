@@ -52,6 +52,7 @@ if PYRO_HOST == 'localhost':
 PYRO_PORT = config['PYRO_PORT']
 PYRO_URI = 'PYRO:scheduler@{}:{}'.format(PYRO_HOST, PYRO_PORT)
 PYRO_TIMEOUT = config['PYRO_TIMEOUT']
+SYSTEMD_SUDO = config['SYSTEMD_SUDO']
 
 SERVER_HOST = config['SERVER_HOST']
 if SERVER_HOST == 'localhost':

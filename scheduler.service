@@ -5,8 +5,10 @@ After=network-online.target
 [Service]
 Type=simple
 User=goto
-ExecStart=/home/goto/.local/bin/scheduler start
+ExecStart=/home/goto/.local/bin/scheduler run
 Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target
